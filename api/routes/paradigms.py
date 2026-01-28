@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm.attributes import flag_modified
 from pydantic import BaseModel, Field
 
 from models.database import get_db
@@ -286,6 +287,10 @@ async def update_paradigm(
 
     # Update fields
     update_data = paradigm_data.model_dump(exclude_unset=True)
+    json_fields = {"foundational", "structural", "dynamic", "explanatory",
+                   "trait_definitions", "critique_patterns", "active_traits",
+                   "related_paradigms", "primary_engines", "compatible_engines"}
+
     for field, value in update_data.items():
         if value is not None:
             # Handle nested models
@@ -294,6 +299,9 @@ async def update_paradigm(
             elif isinstance(value, list) and value and hasattr(value[0], 'model_dump'):
                 value = [v.model_dump() for v in value]
             setattr(paradigm, field, value)
+            # Flag JSON/mutable fields as modified so SQLAlchemy detects the change
+            if field in json_fields:
+                flag_modified(paradigm, field)
 
     return paradigm.to_dict()
 
@@ -320,6 +328,7 @@ async def update_paradigm_layer(
         raise HTTPException(status_code=404, detail=f"Paradigm '{paradigm_key}' not found")
 
     setattr(paradigm, layer_name, layer_data.layer_data)
+    flag_modified(paradigm, layer_name)  # Tell SQLAlchemy the JSON field changed
 
     return {
         "paradigm_key": paradigm_key,
