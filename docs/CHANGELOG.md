@@ -6,6 +6,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- Paradigm branching feature - create derivative paradigms from existing ones ([api/routes/paradigms.py](api/routes/paradigms.py), [api/routes/llm.py](api/routes/llm.py))
+- LLM-powered sequential content generation for branched paradigms (18 fields)
+- Branching fields on Paradigm model: parent_paradigm_key, branch_metadata, branch_depth, generation_status ([api/models/paradigm.py](api/models/paradigm.py))
+- POST /paradigms/{key}/branch endpoint for branch creation
+- GET /paradigms/{key}/lineage endpoint for ancestry chain
+- GET /paradigms/{key}/branches endpoint for child paradigms
+- POST /llm/generate-branch/{key} endpoint for triggering content generation
+- GET /llm/branch-progress/{key} endpoint for generation progress
+- Filtering params on paradigms list (parent_key, is_root, generation_status)
+- BranchParadigmModal component for branch configuration ([frontend/src/components/paradigms/BranchParadigmModal.tsx](frontend/src/components/paradigms/BranchParadigmModal.tsx))
+- BranchGenerationProgress component for progress display ([frontend/src/components/paradigms/BranchGenerationProgress.tsx](frontend/src/components/paradigms/BranchGenerationProgress.tsx))
+- ParadigmLineage component for ancestry/branches display ([frontend/src/components/paradigms/ParadigmLineage.tsx](frontend/src/components/paradigms/ParadigmLineage.tsx))
+- Branch indicators on paradigm list page with filter tabs
+- "Create Branch" button on paradigm detail page
+- TypeScript types for branching (BranchMetadata, BranchRequest, BranchResponse, BranchProgressResponse, LineageItem)
 - Initial project setup with FastAPI backend and Next.js frontend
 - Structured LLM suggestion display with edit-before-accept capability ([api/routes/llm.py](api/routes/llm.py), [frontend/src/components/SuggestionPanel.tsx](frontend/src/components/SuggestionPanel.tsx))
 - SuggestionCard component with collapsible cards, edit-in-place, confidence indicators ([frontend/src/components/SuggestionCard.tsx](frontend/src/components/SuggestionCard.tsx))

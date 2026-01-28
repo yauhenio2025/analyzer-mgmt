@@ -13,10 +13,14 @@ import {
   Check,
   X,
   Loader2,
+  GitBranch,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { Paradigm, StructuredSuggestion, SuggestionResponse } from '@/types';
 import SuggestionPanel from '@/components/SuggestionPanel';
+import BranchParadigmModal from '@/components/paradigms/BranchParadigmModal';
+import BranchGenerationProgress from '@/components/paradigms/BranchGenerationProgress';
+import ParadigmLineage from '@/components/paradigms/ParadigmLineage';
 import clsx from 'clsx';
 
 interface SuggestionState {
@@ -259,6 +263,7 @@ export default function ParadigmDetailPage() {
   const [localParadigm, setLocalParadigm] = useState<Partial<Paradigm> | null>(null);
   const [loadingField, setLoadingField] = useState<string | null>(null);
   const [currentSuggestions, setCurrentSuggestions] = useState<SuggestionState | null>(null);
+  const [showBranchModal, setShowBranchModal] = useState(false);
 
   const { data: paradigm, isLoading, error } = useQuery({
     queryKey: ['paradigms', key],
@@ -425,6 +430,11 @@ export default function ParadigmDetailPage() {
     }
   }, [localParadigm, updateMutation]);
 
+  const handleBranchCreated = useCallback((branchKey: string) => {
+    // Navigate to the new branch
+    router.push(`/paradigms/${branchKey}`);
+  }, [router]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -473,6 +483,14 @@ export default function ParadigmDetailPage() {
             <span className="text-sm text-amber-600 mr-2">Unsaved changes</span>
           )}
           <button
+            onClick={() => setShowBranchModal(true)}
+            className="btn-secondary"
+            title="Create a derivative paradigm"
+          >
+            <GitBranch className="h-4 w-4 mr-2" />
+            Create Branch
+          </button>
+          <button
             onClick={() => handleAskAI('foundational', 'assumptions', 'Core Assumptions')}
             className="btn-secondary"
           >
@@ -494,6 +512,19 @@ export default function ParadigmDetailPage() {
       <div className="card p-4">
         <p className="text-gray-700">{paradigm.description}</p>
       </div>
+
+      {/* Generation Progress (for branches being generated) */}
+      {paradigm.generation_status === 'generating' && (
+        <BranchGenerationProgress
+          paradigmKey={paradigm.paradigm_key}
+          onComplete={() => {
+            queryClient.invalidateQueries({ queryKey: ['paradigms', key] });
+          }}
+        />
+      )}
+
+      {/* Lineage Section */}
+      <ParadigmLineage paradigmKey={paradigm.paradigm_key} />
 
       {/* 4-Layer Grid */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -601,6 +632,14 @@ export default function ParadigmDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Branch Modal */}
+      <BranchParadigmModal
+        isOpen={showBranchModal}
+        onClose={() => setShowBranchModal(false)}
+        parentParadigm={paradigm}
+        onBranchCreated={handleBranchCreated}
+      />
     </div>
   );
 }

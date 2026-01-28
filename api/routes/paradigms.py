@@ -107,6 +107,27 @@ class LayerUpdate(BaseModel):
     layer_data: dict
 
 
+class BranchRequest(BaseModel):
+    """Schema for creating a branched paradigm."""
+    name: str = Field(..., min_length=1, max_length=500, description="Name for the new branched paradigm")
+    synthesis_prompt: str = Field(..., min_length=10, description="Direction for synthesizing the branch")
+    additional_thinkers: Optional[str] = Field(None, description="Additional guiding thinkers for the branch")
+
+
+class BranchResponse(BaseModel):
+    """Response after initiating branch creation."""
+    paradigm_key: str
+    generation_status: str
+    message: str
+
+
+class LineageItem(BaseModel):
+    """An item in the paradigm lineage."""
+    paradigm_key: str
+    paradigm_name: str
+    branch_depth: int
+
+
 # ============================================================================
 # Routes
 # ============================================================================
@@ -116,9 +137,12 @@ class LayerUpdate(BaseModel):
 async def list_paradigms(
     status: str = Query("active", description="Filter by status"),
     search: Optional[str] = Query(None, description="Search in name and description"),
+    parent_key: Optional[str] = Query(None, description="Filter by parent paradigm key"),
+    is_root: Optional[bool] = Query(None, description="Filter for root paradigms only (no parent)"),
+    generation_status: Optional[str] = Query(None, description="Filter by generation status"),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """List all paradigms."""
+    """List all paradigms with optional filtering."""
     query = select(Paradigm)
 
     if status:
@@ -129,6 +153,12 @@ async def list_paradigms(
             (Paradigm.paradigm_name.ilike(search_filter)) |
             (Paradigm.description.ilike(search_filter))
         )
+    if parent_key:
+        query = query.where(Paradigm.parent_paradigm_key == parent_key)
+    if is_root is True:
+        query = query.where(Paradigm.parent_paradigm_key.is_(None))
+    if generation_status:
+        query = query.where(Paradigm.generation_status == generation_status)
 
     result = await db.execute(query.order_by(Paradigm.paradigm_name))
     paradigms = result.scalars().all()
@@ -334,6 +364,149 @@ async def update_paradigm_layer(
         "paradigm_key": paradigm_key,
         "layer_name": layer_name,
         "layer_data": paradigm.get_layer(layer_name),
+    }
+
+
+@router.post("/{parent_key}/branch")
+async def create_branch(
+    parent_key: str,
+    branch_data: BranchRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Create a branched paradigm from an existing one.
+
+    The branch inherits the parent's engines and starts LLM generation
+    for all content fields based on the synthesis prompt.
+    """
+    import re
+    from datetime import datetime
+
+    # Validate parent exists
+    query = select(Paradigm).where(Paradigm.paradigm_key == parent_key)
+    result = await db.execute(query)
+    parent = result.scalar_one_or_none()
+
+    if not parent:
+        raise HTTPException(status_code=404, detail=f"Parent paradigm '{parent_key}' not found")
+
+    # Generate key from name (slugify)
+    new_key = re.sub(r'[^a-z0-9]+', '_', branch_data.name.lower()).strip('_')
+
+    # Check if key already exists
+    existing_query = select(Paradigm).where(Paradigm.paradigm_key == new_key)
+    existing = await db.execute(existing_query)
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Paradigm with key '{new_key}' already exists"
+        )
+
+    # Create the branched paradigm with initial structure
+    branch = Paradigm(
+        paradigm_key=new_key,
+        paradigm_name=branch_data.name,
+        version="1.0.0",
+        description="",  # Will be generated
+        guiding_thinkers=branch_data.additional_thinkers or parent.guiding_thinkers,
+        foundational={"assumptions": [], "core_tensions": [], "scope_conditions": []},
+        structural={"primary_entities": [], "relations": [], "levels_of_analysis": []},
+        dynamic={"change_mechanisms": [], "temporal_patterns": [], "transformation_processes": []},
+        explanatory={"key_concepts": [], "analytical_methods": [], "problem_diagnosis": [], "ideal_state": []},
+        active_traits=parent.active_traits.copy() if parent.active_traits else [],
+        trait_definitions=[],  # Will be generated
+        critique_patterns=[],  # Will be generated
+        historical_context=None,  # Will be generated
+        related_paradigms=[parent_key],
+        primary_engines=parent.primary_engines.copy() if parent.primary_engines else [],
+        compatible_engines=parent.compatible_engines.copy() if parent.compatible_engines else [],
+        status="draft",
+        parent_paradigm_key=parent_key,
+        branch_metadata={
+            "synthesis_prompt": branch_data.synthesis_prompt,
+            "additional_thinkers": branch_data.additional_thinkers,
+            "generated_at": None,  # Will be set when complete
+            "generation_model": "claude-sonnet-4-20250514",
+        },
+        branch_depth=parent.branch_depth + 1,
+        generation_status="generating",
+    )
+
+    db.add(branch)
+    await db.flush()
+
+    return {
+        "paradigm_key": new_key,
+        "generation_status": "generating",
+        "message": f"Branch '{branch_data.name}' creation started from '{parent.paradigm_name}'",
+    }
+
+
+@router.get("/{paradigm_key}/lineage")
+async def get_paradigm_lineage(
+    paradigm_key: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Get the full lineage (parent chain) of a paradigm back to root."""
+    # First get the paradigm
+    query = select(Paradigm).where(Paradigm.paradigm_key == paradigm_key)
+    result = await db.execute(query)
+    paradigm = result.scalar_one_or_none()
+
+    if not paradigm:
+        raise HTTPException(status_code=404, detail=f"Paradigm '{paradigm_key}' not found")
+
+    lineage = []
+    current = paradigm
+
+    # Walk up the parent chain
+    while current:
+        lineage.append({
+            "paradigm_key": current.paradigm_key,
+            "paradigm_name": current.paradigm_name,
+            "branch_depth": current.branch_depth,
+        })
+
+        if current.parent_paradigm_key:
+            parent_query = select(Paradigm).where(
+                Paradigm.paradigm_key == current.parent_paradigm_key
+            )
+            parent_result = await db.execute(parent_query)
+            current = parent_result.scalar_one_or_none()
+        else:
+            current = None
+
+    return {
+        "paradigm_key": paradigm_key,
+        "lineage": lineage,
+        "root_paradigm": lineage[-1]["paradigm_key"] if lineage else None,
+    }
+
+
+@router.get("/{paradigm_key}/branches")
+async def get_paradigm_branches(
+    paradigm_key: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Get all direct child branches of a paradigm."""
+    # Verify paradigm exists
+    query = select(Paradigm).where(Paradigm.paradigm_key == paradigm_key)
+    result = await db.execute(query)
+    paradigm = result.scalar_one_or_none()
+
+    if not paradigm:
+        raise HTTPException(status_code=404, detail=f"Paradigm '{paradigm_key}' not found")
+
+    # Get all direct children
+    children_query = select(Paradigm).where(
+        Paradigm.parent_paradigm_key == paradigm_key
+    ).order_by(Paradigm.paradigm_name)
+    children_result = await db.execute(children_query)
+    children = children_result.scalars().all()
+
+    return {
+        "paradigm_key": paradigm_key,
+        "branches": [c.to_summary() for c in children],
+        "total": len(children),
     }
 
 

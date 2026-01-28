@@ -108,6 +108,17 @@ export interface CritiquePattern {
   fix: string;
 }
 
+export interface BranchMetadata {
+  synthesis_prompt: string;
+  additional_thinkers?: string;
+  generated_at?: string;
+  generation_model?: string;
+  generated_fields?: string[];
+  generation_errors?: Array<{ field: string; error: string }>;
+}
+
+export type GenerationStatus = 'complete' | 'generating' | 'failed';
+
 export interface Paradigm {
   id: string;
   paradigm_key: string;
@@ -127,6 +138,11 @@ export interface Paradigm {
   primary_engines: string[];
   compatible_engines: string[];
   status: string;
+  // Branching fields
+  parent_paradigm_key?: string;
+  branch_metadata?: BranchMetadata;
+  branch_depth: number;
+  generation_status: GenerationStatus;
   created_at?: string;
   updated_at?: string;
 }
@@ -140,6 +156,45 @@ export interface ParadigmSummary {
   active_traits: string[];
   status: string;
   engine_count: number;
+  // Branching fields
+  parent_paradigm_key?: string;
+  branch_depth: number;
+  generation_status: GenerationStatus;
+}
+
+export interface LineageItem {
+  paradigm_key: string;
+  paradigm_name: string;
+  branch_depth: number;
+}
+
+export interface BranchRequest {
+  name: string;
+  synthesis_prompt: string;
+  additional_thinkers?: string;
+}
+
+export interface BranchResponse {
+  paradigm_key: string;
+  generation_status: string;
+  message: string;
+}
+
+export interface BranchProgressResponse {
+  paradigm_key: string;
+  generation_status: GenerationStatus;
+  progress: {
+    completed: number;
+    total: number;
+    percentage: number;
+  };
+  current_layer: string | null;
+  field_status: Array<{
+    field: string;
+    layer: string;
+    status: 'complete' | 'pending';
+  }>;
+  branch_metadata?: BranchMetadata;
 }
 
 // ============================================================================

@@ -1,6 +1,6 @@
 # Feature Inventory
 
-> Auto-maintained by Claude Code. Last updated: 2026-01-28 (LLM Suggestion Improvements)
+> Auto-maintained by Claude Code. Last updated: 2026-01-28 (Paradigm Branching)
 
 ## Backend API
 
@@ -18,8 +18,21 @@
 - **Description**: 4-layer ontology paradigm CRUD with layer-level editing
 - **Entry Points**:
   - `api/routes/paradigms.py:1-250` - Paradigm API endpoints
-  - `api/models/paradigm.py:1-140` - Paradigm model with generate_primer()
+  - `api/models/paradigm.py:1-180` - Paradigm model with generate_primer() and branching fields
 - **Dependencies**: FastAPI, SQLAlchemy, PostgreSQL
+- **Added**: 2026-01-28
+
+### Paradigm Branching
+- **Status**: Active
+- **Description**: Create derivative paradigms from existing ones with LLM-powered content generation
+- **Entry Points**:
+  - `api/routes/paradigms.py:340-460` - Branch creation, lineage, and branches endpoints
+  - `api/routes/llm.py:568-780` - LLM generation service for branches (18-field sequential generation)
+  - `api/models/paradigm.py:53-63` - Branching fields (parent_paradigm_key, branch_metadata, branch_depth, generation_status)
+  - `frontend/src/components/paradigms/BranchParadigmModal.tsx:1-170` - Modal for creating branches
+  - `frontend/src/components/paradigms/BranchGenerationProgress.tsx:1-180` - Generation progress display
+  - `frontend/src/components/paradigms/ParadigmLineage.tsx:1-150` - Lineage visualization
+- **Dependencies**: Anthropic SDK, React Query
 - **Added**: 2026-01-28
 
 ### Pipeline Management

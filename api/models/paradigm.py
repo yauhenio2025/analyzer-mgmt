@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, Text, DateTime, JSON
+from sqlalchemy import String, Text, DateTime, JSON, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.database import Base
@@ -52,6 +52,14 @@ class Paradigm(Base):
     # Status
     status: Mapped[str] = mapped_column(String(50), default="active")
 
+    # Branching fields
+    parent_paradigm_key: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True, index=True
+    )
+    branch_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    branch_depth: Mapped[int] = mapped_column(Integer, default=0)
+    generation_status: Mapped[str] = mapped_column(String(50), default="complete")
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -79,6 +87,10 @@ class Paradigm(Base):
             "primary_engines": self.primary_engines,
             "compatible_engines": self.compatible_engines,
             "status": self.status,
+            "parent_paradigm_key": self.parent_paradigm_key,
+            "branch_metadata": self.branch_metadata,
+            "branch_depth": self.branch_depth,
+            "generation_status": self.generation_status,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -94,6 +106,9 @@ class Paradigm(Base):
             "active_traits": self.active_traits,
             "status": self.status,
             "engine_count": len(self.primary_engines or []) + len(self.compatible_engines or []),
+            "parent_paradigm_key": self.parent_paradigm_key,
+            "branch_depth": self.branch_depth,
+            "generation_status": self.generation_status,
         }
 
     def get_layer(self, layer_name: str) -> dict:

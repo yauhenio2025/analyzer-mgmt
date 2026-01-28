@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm.attributes import flag_modified
 from pydantic import BaseModel, Field
 
 from models.database import get_db
@@ -522,6 +523,366 @@ Provide a structured comparison covering:
         "shared_engines": list(
             set(paradigm_a.compatible_engines or []) & set(paradigm_b.compatible_engines or [])
         ),
+    }
+
+
+# ============================================================================
+# Branch Generation
+# ============================================================================
+
+
+# Generation sequence for branched paradigms (18 fields)
+BRANCH_GENERATION_SEQUENCE = [
+    # Identity fields first
+    ("description", "identity", "A 2-3 sentence description of this paradigm"),
+    ("guiding_thinkers", "identity", "Key thinkers whose work informs this paradigm"),
+    ("historical_context", "identity", "Historical background and development"),
+    # Foundational layer
+    ("foundational.assumptions", "foundational", "Core assumptions this paradigm makes"),
+    ("foundational.core_tensions", "foundational", "Key tensions or dialectics within the paradigm"),
+    ("foundational.scope_conditions", "foundational", "Conditions under which the paradigm applies"),
+    # Structural layer
+    ("structural.primary_entities", "structural", "Main entities/actors the paradigm analyzes"),
+    ("structural.relations", "structural", "Key relationships between entities"),
+    ("structural.levels_of_analysis", "structural", "Levels at which analysis occurs"),
+    # Dynamic layer
+    ("dynamic.change_mechanisms", "dynamic", "How change happens according to this paradigm"),
+    ("dynamic.temporal_patterns", "dynamic", "Time-related patterns and processes"),
+    ("dynamic.transformation_processes", "dynamic", "How transformations unfold"),
+    # Explanatory layer
+    ("explanatory.key_concepts", "explanatory", "Core concepts used in analysis"),
+    ("explanatory.analytical_methods", "explanatory", "Methods for conducting analysis"),
+    ("explanatory.problem_diagnosis", "explanatory", "How problems are identified and diagnosed"),
+    ("explanatory.ideal_state", "explanatory", "Vision of ideal or desired outcomes"),
+    # Final fields
+    ("trait_definitions", "traits", "Traits that characterize this paradigm's analytical lens"),
+    ("critique_patterns", "critique", "Patterns for identifying analytical gaps"),
+]
+
+
+BRANCH_GENERATION_SYSTEM_PROMPT = """You are synthesizing a new analytical paradigm by combining insights from an existing paradigm with a new theoretical direction.
+
+PARENT PARADIGM:
+{parent_primer}
+
+SYNTHESIS DIRECTION: {synthesis_prompt}
+
+You are generating content for: {field_name} ({layer_name} layer)
+Description: {field_description}
+
+PREVIOUSLY GENERATED CONTENT:
+{context}
+
+Generate content that:
+1. Builds coherently on what was previously generated
+2. Synthesizes the parent paradigm with the new direction
+3. Is specific and analytical, not generic
+4. Maintains internal consistency
+
+Return ONLY a JSON response in the exact format requested. No explanatory text."""
+
+
+def get_field_value(paradigm: Paradigm, field_path: str):
+    """Get a nested field value from paradigm."""
+    parts = field_path.split(".")
+    value = paradigm
+    for part in parts:
+        if isinstance(value, dict):
+            value = value.get(part)
+        else:
+            value = getattr(value, part, None)
+        if value is None:
+            return None
+    return value
+
+
+def set_field_value(paradigm: Paradigm, field_path: str, value) -> None:
+    """Set a nested field value on paradigm."""
+    parts = field_path.split(".")
+    if len(parts) == 1:
+        setattr(paradigm, field_path, value)
+    else:
+        layer_name = parts[0]
+        field_name = parts[1]
+        layer = getattr(paradigm, layer_name, {}) or {}
+        layer[field_name] = value
+        setattr(paradigm, layer_name, layer)
+
+
+def build_generation_context(paradigm: Paradigm, current_field_path: str) -> str:
+    """Build context from previously generated fields for coherent generation."""
+    context_parts = []
+
+    # Always include identity if available
+    if paradigm.description:
+        context_parts.append(f"Description: {paradigm.description}")
+    if paradigm.guiding_thinkers:
+        context_parts.append(f"Guiding Thinkers: {paradigm.guiding_thinkers}")
+    if paradigm.historical_context:
+        context_parts.append(f"Historical Context: {paradigm.historical_context}")
+
+    # Include completed layers (summarized)
+    for layer_name in ["foundational", "structural", "dynamic", "explanatory"]:
+        layer = getattr(paradigm, layer_name, {})
+        if layer and any(layer.values()):
+            layer_summary = []
+            for key, items in layer.items():
+                if items:
+                    layer_summary.append(f"  {key}: {', '.join(items[:3])}")
+            if layer_summary:
+                context_parts.append(f"{layer_name.title()} Layer:\n" + "\n".join(layer_summary))
+
+    if not context_parts:
+        return "No previous content generated yet."
+
+    return "\n\n".join(context_parts)
+
+
+async def generate_branched_paradigm_content(
+    db: AsyncSession,
+    paradigm_key: str,
+) -> dict:
+    """Generate all content for a branched paradigm using sequential LLM calls.
+
+    Each field is generated in sequence, with previous results feeding into
+    subsequent calls to maintain coherence.
+    """
+    from datetime import datetime
+
+    # Get the paradigm and its parent
+    query = select(Paradigm).where(Paradigm.paradigm_key == paradigm_key)
+    result = await db.execute(query)
+    paradigm = result.scalar_one_or_none()
+
+    if not paradigm:
+        return {"error": f"Paradigm '{paradigm_key}' not found"}
+
+    if not paradigm.parent_paradigm_key:
+        return {"error": "Paradigm has no parent - not a branch"}
+
+    parent_query = select(Paradigm).where(
+        Paradigm.paradigm_key == paradigm.parent_paradigm_key
+    )
+    parent_result = await db.execute(parent_query)
+    parent = parent_result.scalar_one_or_none()
+
+    if not parent:
+        return {"error": f"Parent paradigm '{paradigm.parent_paradigm_key}' not found"}
+
+    # Get generation metadata
+    synthesis_prompt = paradigm.branch_metadata.get("synthesis_prompt", "")
+    parent_primer = parent.generate_primer()
+
+    generated_fields = []
+    errors = []
+
+    for field_path, layer_name, field_description in BRANCH_GENERATION_SEQUENCE:
+        try:
+            context = build_generation_context(paradigm, field_path)
+
+            # Determine expected response format based on field type
+            if field_path == "description":
+                format_instruction = "Return a single string (2-3 sentences)."
+                parse_as = "string"
+            elif field_path == "guiding_thinkers":
+                format_instruction = "Return a single string listing key thinkers (comma-separated)."
+                parse_as = "string"
+            elif field_path == "historical_context":
+                format_instruction = "Return a single string describing historical context."
+                parse_as = "string"
+            elif field_path == "trait_definitions":
+                format_instruction = """Return a JSON array of trait objects:
+[{"trait_name": "name", "trait_description": "description", "trait_items": ["item1", "item2"]}]"""
+                parse_as = "trait_array"
+            elif field_path == "critique_patterns":
+                format_instruction = """Return a JSON array of critique pattern objects:
+[{"pattern": "name", "diagnostic": "what it identifies", "fix": "template for fixing with {placeholders}"}]"""
+                parse_as = "critique_array"
+            else:
+                format_instruction = "Return a JSON array of 3-5 strings. Example: [\"Item 1\", \"Item 2\", \"Item 3\"]"
+                parse_as = "string_array"
+
+            system_prompt = BRANCH_GENERATION_SYSTEM_PROMPT.format(
+                parent_primer=parent_primer[:4000],  # Truncate for context
+                synthesis_prompt=synthesis_prompt,
+                field_name=field_path,
+                layer_name=layer_name,
+                field_description=field_description,
+                context=context[:2000],  # Truncate context
+            )
+
+            user_prompt = f"""Generate content for: {field_path}
+
+{format_instruction}
+
+Be specific to this synthesized paradigm. Do not be generic."""
+
+            response = await call_llm(system_prompt, user_prompt)
+
+            # Parse the response
+            if parse_as == "string":
+                # For string fields, use response directly (strip quotes if present)
+                value = response.strip().strip('"').strip("'")
+            elif parse_as == "string_array":
+                # Parse JSON array of strings
+                try:
+                    value = json.loads(response)
+                    if not isinstance(value, list):
+                        value = [str(value)]
+                except json.JSONDecodeError:
+                    # Try to extract array from response
+                    if "[" in response and "]" in response:
+                        start = response.find("[")
+                        end = response.rfind("]") + 1
+                        value = json.loads(response[start:end])
+                    else:
+                        value = [response.strip()]
+            elif parse_as == "trait_array":
+                try:
+                    value = json.loads(response)
+                    if not isinstance(value, list):
+                        value = []
+                except json.JSONDecodeError:
+                    if "[" in response and "]" in response:
+                        start = response.find("[")
+                        end = response.rfind("]") + 1
+                        value = json.loads(response[start:end])
+                    else:
+                        value = []
+            elif parse_as == "critique_array":
+                try:
+                    value = json.loads(response)
+                    if not isinstance(value, list):
+                        value = []
+                except json.JSONDecodeError:
+                    if "[" in response and "]" in response:
+                        start = response.find("[")
+                        end = response.rfind("]") + 1
+                        value = json.loads(response[start:end])
+                    else:
+                        value = []
+
+            # Set the value on the paradigm
+            set_field_value(paradigm, field_path, value)
+
+            # Mark JSON fields as modified
+            if "." in field_path:
+                layer_name = field_path.split(".")[0]
+                flag_modified(paradigm, layer_name)
+            elif field_path in ["trait_definitions", "critique_patterns", "active_traits"]:
+                flag_modified(paradigm, field_path)
+
+            generated_fields.append(field_path)
+
+            # Flush to persist progress
+            await db.flush()
+
+        except Exception as e:
+            errors.append({"field": field_path, "error": str(e)})
+
+    # Update metadata with completion time
+    branch_metadata = paradigm.branch_metadata or {}
+    branch_metadata["generated_at"] = datetime.utcnow().isoformat()
+    branch_metadata["generated_fields"] = generated_fields
+    if errors:
+        branch_metadata["generation_errors"] = errors
+    paradigm.branch_metadata = branch_metadata
+    flag_modified(paradigm, "branch_metadata")
+
+    # Update status
+    if errors and len(errors) == len(BRANCH_GENERATION_SEQUENCE):
+        paradigm.generation_status = "failed"
+    else:
+        paradigm.generation_status = "complete"
+        paradigm.status = "active"
+
+    await db.flush()
+
+    return {
+        "paradigm_key": paradigm_key,
+        "generated_fields": generated_fields,
+        "errors": errors,
+        "generation_status": paradigm.generation_status,
+    }
+
+
+@router.post("/generate-branch/{paradigm_key}")
+async def generate_branch_content(
+    paradigm_key: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Trigger content generation for a branched paradigm.
+
+    This endpoint starts the sequential LLM generation process for all
+    18 fields of a branched paradigm.
+    """
+    # Verify paradigm exists and is a branch
+    query = select(Paradigm).where(Paradigm.paradigm_key == paradigm_key)
+    result = await db.execute(query)
+    paradigm = result.scalar_one_or_none()
+
+    if not paradigm:
+        raise HTTPException(status_code=404, detail=f"Paradigm '{paradigm_key}' not found")
+
+    if not paradigm.parent_paradigm_key:
+        raise HTTPException(status_code=400, detail="Paradigm is not a branch (no parent)")
+
+    if paradigm.generation_status == "complete":
+        raise HTTPException(status_code=400, detail="Paradigm generation already complete")
+
+    # Run generation
+    result = await generate_branched_paradigm_content(db, paradigm_key)
+
+    return result
+
+
+@router.get("/branch-progress/{paradigm_key}")
+async def get_branch_generation_progress(
+    paradigm_key: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Get the current generation progress for a branched paradigm."""
+    query = select(Paradigm).where(Paradigm.paradigm_key == paradigm_key)
+    result = await db.execute(query)
+    paradigm = result.scalar_one_or_none()
+
+    if not paradigm:
+        raise HTTPException(status_code=404, detail=f"Paradigm '{paradigm_key}' not found")
+
+    # Count completed fields
+    completed = 0
+    total = len(BRANCH_GENERATION_SEQUENCE)
+
+    field_status = []
+    for field_path, layer_name, _ in BRANCH_GENERATION_SEQUENCE:
+        value = get_field_value(paradigm, field_path)
+        is_complete = bool(value) if not isinstance(value, list) else len(value) > 0
+        if is_complete:
+            completed += 1
+        field_status.append({
+            "field": field_path,
+            "layer": layer_name,
+            "status": "complete" if is_complete else "pending",
+        })
+
+    # Determine current stage
+    current_layer = None
+    for fs in field_status:
+        if fs["status"] == "pending":
+            current_layer = fs["layer"]
+            break
+
+    return {
+        "paradigm_key": paradigm_key,
+        "generation_status": paradigm.generation_status,
+        "progress": {
+            "completed": completed,
+            "total": total,
+            "percentage": round(completed / total * 100) if total > 0 else 0,
+        },
+        "current_layer": current_layer,
+        "field_status": field_status,
+        "branch_metadata": paradigm.branch_metadata,
     }
 
 

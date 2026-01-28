@@ -19,6 +19,10 @@ import type {
   SuggestionResponse,
   PromptImprovement,
   SchemaValidation,
+  BranchRequest,
+  BranchResponse,
+  BranchProgressResponse,
+  LineageItem,
 } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
@@ -140,7 +144,13 @@ class ApiClient {
   // ============================================================================
 
   paradigms = {
-    list: (params?: { status?: string; search?: string }) => {
+    list: (params?: {
+      status?: string;
+      search?: string;
+      parent_key?: string;
+      is_root?: boolean;
+      generation_status?: string;
+    }) => {
       const queryParams = new URLSearchParams();
       if (params) {
         Object.entries(params).forEach(([key, value]) => {
@@ -188,6 +198,31 @@ class ApiClient {
 
     delete: (paradigmKey: string) =>
       this.delete<{ message: string }>(`/paradigms/${paradigmKey}`),
+
+    // Branching methods
+    createBranch: (parentKey: string, data: BranchRequest) =>
+      this.post<BranchResponse>(`/paradigms/${parentKey}/branch`, data),
+
+    getLineage: (paradigmKey: string) =>
+      this.get<{ paradigm_key: string; lineage: LineageItem[]; root_paradigm: string | null }>(
+        `/paradigms/${paradigmKey}/lineage`
+      ),
+
+    getBranches: (paradigmKey: string) =>
+      this.get<{ paradigm_key: string; branches: ParadigmSummary[]; total: number }>(
+        `/paradigms/${paradigmKey}/branches`
+      ),
+
+    generateBranch: (paradigmKey: string) =>
+      this.post<{
+        paradigm_key: string;
+        generated_fields: string[];
+        errors: Array<{ field: string; error: string }>;
+        generation_status: string;
+      }>(`/llm/generate-branch/${paradigmKey}`),
+
+    getBranchProgress: (paradigmKey: string) =>
+      this.get<BranchProgressResponse>(`/llm/branch-progress/${paradigmKey}`),
   };
 
   // ============================================================================
