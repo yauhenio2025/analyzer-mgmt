@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -264,12 +264,14 @@ export default function ParadigmDetailPage() {
     queryKey: ['paradigms', key],
     queryFn: () => api.paradigms.get(key as string),
     enabled: !!key,
-    onSuccess: (data) => {
-      if (!localParadigm) {
-        setLocalParadigm(data);
-      }
-    },
   });
+
+  // Sync localParadigm when data loads (React Query v5 doesn't support onSuccess)
+  useEffect(() => {
+    if (paradigm && !localParadigm) {
+      setLocalParadigm(paradigm);
+    }
+  }, [paradigm, localParadigm]);
 
   const updateMutation = useMutation({
     mutationFn: (data: Partial<Paradigm>) => api.paradigms.update(key as string, data),
