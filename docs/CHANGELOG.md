@@ -7,6 +7,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 - Initial project setup with FastAPI backend and Next.js frontend
+
+### Changed
+- Updated SQLAlchemy models to use database-agnostic types (JSON instead of JSONB, String instead of UUID) for SQLite compatibility
 - Engine management API with full CRUD, versioning, and prompt editing ([api/routes/engines.py](api/routes/engines.py))
 - Paradigm management API with 4-layer ontology support ([api/routes/paradigms.py](api/routes/paradigms.py))
 - Pipeline management API with stage composition ([api/routes/pipelines.py](api/routes/pipelines.py))

@@ -14,10 +14,24 @@ import {
   Edit2,
   Check,
   X,
+  Loader2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { Paradigm, FoundationalLayer, StructuralLayer, DynamicLayer, ExplanatoryLayer } from '@/types';
 import clsx from 'clsx';
+
+interface AISuggestion {
+  type: string;
+  content: string;
+  confidence: number;
+}
+
+interface SuggestionState {
+  layerName: LayerName;
+  fieldKey: string;
+  suggestions: AISuggestion[];
+  rationale: string;
+}
 
 type LayerName = 'foundational' | 'structural' | 'dynamic' | 'explanatory';
 
@@ -77,9 +91,24 @@ interface LayerEditorProps {
   data: Record<string, string[]>;
   onChange: (fieldKey: string, items: string[]) => void;
   onAskAI: (fieldKey: string) => void;
+  loadingField: string | null;
+  suggestions: SuggestionState | null;
+  onAcceptSuggestion: (suggestion: AISuggestion) => void;
+  onDismissSuggestion: (index: number) => void;
+  onDismissAllSuggestions: () => void;
 }
 
-function LayerEditor({ config, data, onChange, onAskAI }: LayerEditorProps) {
+function LayerEditor({
+  config,
+  data,
+  onChange,
+  onAskAI,
+  loadingField,
+  suggestions,
+  onAcceptSuggestion,
+  onDismissSuggestion,
+  onDismissAllSuggestions,
+}: LayerEditorProps) {
   const [expanded, setExpanded] = useState(true);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [newItem, setNewItem] = useState('');
@@ -97,6 +126,10 @@ function LayerEditor({ config, data, onChange, onAskAI }: LayerEditorProps) {
     onChange(fieldKey, currentItems.filter((_, i) => i !== index));
   };
 
+  const isLoadingThisField = (fieldKey: string) => loadingField === `${config.name}.${fieldKey}`;
+  const getSuggestionsForField = (fieldKey: string) =>
+    suggestions?.layerName === config.name && suggestions?.fieldKey === fieldKey ? suggestions : null;
+
   return (
     <div className={clsx('border-2 rounded-lg overflow-hidden', config.color.split(' ')[1])}>
       <button
@@ -113,74 +146,146 @@ function LayerEditor({ config, data, onChange, onAskAI }: LayerEditorProps) {
 
       {expanded && (
         <div className="p-4 space-y-4 bg-white">
-          {config.fields.map((field) => (
-            <div key={field.key}>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-700">{field.label}</label>
-                <button
-                  onClick={() => onAskAI(field.key)}
-                  className="text-xs text-primary-600 hover:text-primary-700 flex items-center"
-                >
-                  <Sparkles className="h-3 w-3 mr-1" />
-                  Suggest with AI
-                </button>
-              </div>
+          {config.fields.map((field) => {
+            const fieldSuggestions = getSuggestionsForField(field.key);
+            const isLoading = isLoadingThisField(field.key);
 
-              <div className="space-y-2">
-                {(data[field.key] || []).map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex items-start gap-2 p-2 bg-gray-50 rounded text-sm"
-                  >
-                    <span className="flex-1">{item}</span>
-                    <button
-                      onClick={() => handleRemoveItem(field.key, index)}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-
-                {editingField === field.key ? (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newItem}
-                      onChange={(e) => setNewItem(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleAddItem(field.key)}
-                      placeholder={`Add ${field.label.toLowerCase()}...`}
-                      className="input flex-1 text-sm"
-                      autoFocus
-                    />
-                    <button
-                      onClick={() => handleAddItem(field.key)}
-                      className="btn-primary py-1 px-2"
-                    >
-                      <Check className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingField(null);
-                        setNewItem('');
-                      }}
-                      className="btn-secondary py-1 px-2"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
+            return (
+              <div key={field.key}>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-gray-700">{field.label}</label>
                   <button
-                    onClick={() => setEditingField(field.key)}
-                    className="text-sm text-primary-600 hover:text-primary-700 flex items-center"
+                    onClick={() => onAskAI(field.key)}
+                    disabled={isLoading}
+                    className={clsx(
+                      "text-xs flex items-center",
+                      isLoading
+                        ? "text-gray-400 cursor-not-allowed"
+                        : "text-primary-600 hover:text-primary-700"
+                    )}
                   >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add item
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Getting suggestions...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        Suggest with AI
+                      </>
+                    )}
                   </button>
+                </div>
+
+                {/* AI Suggestions Panel */}
+                {fieldSuggestions && fieldSuggestions.suggestions.length > 0 && (
+                  <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-purple-700 flex items-center">
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        AI Suggestions ({fieldSuggestions.suggestions.length})
+                      </span>
+                      <button
+                        onClick={onDismissAllSuggestions}
+                        className="text-xs text-purple-600 hover:text-purple-800"
+                      >
+                        Dismiss all
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {fieldSuggestions.suggestions.map((suggestion, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-start gap-2 p-2 bg-white rounded border border-purple-100"
+                        >
+                          <span className="flex-1 text-sm text-gray-700">{suggestion.content}</span>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <span className="text-xs text-gray-400">
+                              {Math.round(suggestion.confidence * 100)}%
+                            </span>
+                            <button
+                              onClick={() => onAcceptSuggestion(suggestion)}
+                              className="p-1 text-green-600 hover:bg-green-100 rounded"
+                              title="Accept suggestion"
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => onDismissSuggestion(idx)}
+                              className="p-1 text-red-500 hover:bg-red-100 rounded"
+                              title="Dismiss suggestion"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {fieldSuggestions.rationale && (
+                      <p className="mt-2 text-xs text-purple-600 italic">
+                        {fieldSuggestions.rationale}
+                      </p>
+                    )}
+                  </div>
                 )}
+
+                <div className="space-y-2">
+                  {(data[field.key] || []).map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex items-start gap-2 p-2 bg-gray-50 rounded text-sm"
+                    >
+                      <span className="flex-1">{item}</span>
+                      <button
+                        onClick={() => handleRemoveItem(field.key, index)}
+                        className="text-gray-400 hover:text-red-500"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {editingField === field.key ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newItem}
+                        onChange={(e) => setNewItem(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleAddItem(field.key)}
+                        placeholder={`Add ${field.label.toLowerCase()}...`}
+                        className="input flex-1 text-sm"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleAddItem(field.key)}
+                        className="btn-primary py-1 px-2"
+                      >
+                        <Check className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingField(null);
+                          setNewItem('');
+                        }}
+                        className="btn-secondary py-1 px-2"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setEditingField(field.key)}
+                      className="text-sm text-primary-600 hover:text-primary-700 flex items-center"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add item
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -194,6 +299,8 @@ export default function ParadigmDetailPage() {
 
   const [hasChanges, setHasChanges] = useState(false);
   const [localParadigm, setLocalParadigm] = useState<Partial<Paradigm> | null>(null);
+  const [loadingField, setLoadingField] = useState<string | null>(null);
+  const [currentSuggestions, setCurrentSuggestions] = useState<SuggestionState | null>(null);
 
   const { data: paradigm, isLoading, error } = useQuery({
     queryKey: ['paradigms', key],
@@ -229,20 +336,78 @@ export default function ParadigmDetailPage() {
 
   const handleAskAI = useCallback(
     async (layerName: LayerName, fieldKey: string) => {
+      const loadingKey = `${layerName}.${fieldKey}`;
+      setLoadingField(loadingKey);
+      setCurrentSuggestions(null);
+
       try {
         const result = await api.llm.paradigmSuggestions(
           key as string,
           `Suggest additions for ${fieldKey} in the ${layerName} layer`,
           layerName
         );
-        console.log('AI suggestion:', result);
-        // TODO: Show suggestion in a modal
+        setCurrentSuggestions({
+          layerName,
+          fieldKey,
+          suggestions: result.suggestions || [],
+          rationale: result.rationale || '',
+        });
       } catch (error) {
         console.error('Failed to get AI suggestion:', error);
+        // Show error as a suggestion so user sees what happened
+        setCurrentSuggestions({
+          layerName,
+          fieldKey,
+          suggestions: [{
+            type: 'error',
+            content: error instanceof Error ? error.message : 'Failed to get suggestions',
+            confidence: 0,
+          }],
+          rationale: 'An error occurred while fetching suggestions.',
+        });
+      } finally {
+        setLoadingField(null);
       }
     },
     [key]
   );
+
+  const handleAcceptSuggestion = useCallback(
+    (suggestion: AISuggestion) => {
+      if (!currentSuggestions || !localParadigm) return;
+
+      const { layerName, fieldKey } = currentSuggestions;
+      const layer = { ...(localParadigm[layerName] as Record<string, string[]>) };
+      const currentItems = layer[fieldKey] || [];
+      layer[fieldKey] = [...currentItems, suggestion.content];
+
+      setLocalParadigm((prev) => prev ? { ...prev, [layerName]: layer } : prev);
+      setHasChanges(true);
+
+      // Remove accepted suggestion from list
+      setCurrentSuggestions((prev) => {
+        if (!prev) return null;
+        const remaining = prev.suggestions.filter((s) => s !== suggestion);
+        return remaining.length > 0 ? { ...prev, suggestions: remaining } : null;
+      });
+    },
+    [currentSuggestions, localParadigm]
+  );
+
+  const handleDismissSuggestion = useCallback(
+    (index: number) => {
+      setCurrentSuggestions((prev) => {
+        if (!prev) return null;
+        const remaining = prev.suggestions.filter((_, i) => i !== index);
+        return remaining.length > 0 ? { ...prev, suggestions: remaining } : null;
+      });
+    },
+    []
+  );
+
+  const handleDismissAllSuggestions = useCallback(() => {
+    setCurrentSuggestions(null);
+  }, []);
 
   const handleSave = useCallback(() => {
     if (localParadigm) {
@@ -334,6 +499,11 @@ export default function ParadigmDetailPage() {
             data={displayParadigm[config.name] as Record<string, string[]>}
             onChange={(fieldKey, items) => handleLayerChange(config.name, fieldKey, items)}
             onAskAI={(fieldKey) => handleAskAI(config.name, fieldKey)}
+            loadingField={loadingField}
+            suggestions={currentSuggestions}
+            onAcceptSuggestion={handleAcceptSuggestion}
+            onDismissSuggestion={handleDismissSuggestion}
+            onDismissAllSuggestions={handleDismissAllSuggestions}
           />
         ))}
       </div>
