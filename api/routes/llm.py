@@ -721,8 +721,37 @@ Be specific to this synthesized paradigm. Do not be generic."""
 
             # Parse the response
             if parse_as == "string":
-                # For string fields, use response directly (strip quotes if present)
-                value = response.strip().strip('"').strip("'")
+                # For string fields, extract from various LLM response formats
+                value = response.strip()
+
+                # Handle markdown code blocks
+                if "```json" in value:
+                    try:
+                        json_start = value.index("```json") + 7
+                        json_end = value.index("```", json_start)
+                        value = value[json_start:json_end].strip()
+                    except ValueError:
+                        pass
+                elif "```" in value:
+                    try:
+                        start = value.index("```") + 3
+                        end = value.index("```", start)
+                        value = value[start:end].strip()
+                    except ValueError:
+                        pass
+
+                # Handle JSON object responses like {"field": "value"}
+                if value.startswith("{") and value.endswith("}"):
+                    try:
+                        parsed = json.loads(value)
+                        if isinstance(parsed, dict):
+                            # Get the first value from the dict
+                            value = list(parsed.values())[0] if parsed else value
+                    except json.JSONDecodeError:
+                        pass
+
+                # Strip quotes
+                value = str(value).strip().strip('"').strip("'")
             elif parse_as == "string_array":
                 # Parse JSON array of strings
                 try:
