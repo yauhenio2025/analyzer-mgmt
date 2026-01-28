@@ -4,8 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, Text, DateTime
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import String, Text, DateTime, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.database import Base
@@ -18,8 +17,8 @@ class Paradigm(Base):
     """
     __tablename__ = "paradigms"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     paradigm_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     version: Mapped[str] = mapped_column(String(50), default="1.0.0")
@@ -29,26 +28,26 @@ class Paradigm(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     guiding_thinkers: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # 4-Layer Ontology (stored as JSONB)
-    foundational: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    structural: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    dynamic: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    explanatory: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    # 4-Layer Ontology (stored as JSON)
+    foundational: Mapped[dict] = mapped_column(JSON, nullable=False)
+    structural: Mapped[dict] = mapped_column(JSON, nullable=False)
+    dynamic: Mapped[dict] = mapped_column(JSON, nullable=False)
+    explanatory: Mapped[dict] = mapped_column(JSON, nullable=False)
 
     # Traits
-    active_traits: Mapped[list] = mapped_column(JSONB, default=list)
-    trait_definitions: Mapped[list] = mapped_column(JSONB, default=list)
+    active_traits: Mapped[list] = mapped_column(JSON, default=list)
+    trait_definitions: Mapped[list] = mapped_column(JSON, default=list)
 
     # Critique patterns
-    critique_patterns: Mapped[list] = mapped_column(JSONB, default=list)
+    critique_patterns: Mapped[list] = mapped_column(JSON, default=list)
 
     # Metadata
     historical_context: Mapped[Optional[str]] = mapped_column(Text)
-    related_paradigms: Mapped[list] = mapped_column(JSONB, default=list)
+    related_paradigms: Mapped[list] = mapped_column(JSON, default=list)
 
     # Engine associations
-    primary_engines: Mapped[list] = mapped_column(JSONB, default=list)
-    compatible_engines: Mapped[list] = mapped_column(JSONB, default=list)
+    primary_engines: Mapped[list] = mapped_column(JSON, default=list)
+    compatible_engines: Mapped[list] = mapped_column(JSON, default=list)
 
     # Status
     status: Mapped[str] = mapped_column(String(50), default="active")

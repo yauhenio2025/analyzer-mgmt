@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.database import Base
@@ -18,8 +17,8 @@ class Consumer(Base):
     """
     __tablename__ = "consumers"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
 
     # Identity
@@ -78,11 +77,11 @@ class ConsumerDependency(Base):
     """
     __tablename__ = "consumer_dependencies"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    consumer_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("consumers.id", ondelete="CASCADE")
+    consumer_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("consumers.id", ondelete="CASCADE")
     )
 
     # What is depended upon

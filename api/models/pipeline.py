@@ -5,8 +5,7 @@ from datetime import datetime
 from typing import Optional
 import enum
 
-from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, Boolean
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, Boolean, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.database import Base
@@ -27,8 +26,8 @@ class Pipeline(Base):
     """
     __tablename__ = "pipelines"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     pipeline_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
 
@@ -37,7 +36,7 @@ class Pipeline(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
 
     # Configuration
-    stage_definitions: Mapped[list] = mapped_column(JSONB, default=list)
+    stage_definitions: Mapped[list] = mapped_column(JSON, default=list)
     blend_mode: Mapped[str] = mapped_column(String(50), default="sequential")
     category: Mapped[Optional[str]] = mapped_column(String(100))
 
@@ -92,11 +91,11 @@ class PipelineStage(Base):
     """
     __tablename__ = "pipeline_stages"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    pipeline_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("pipelines.id", ondelete="CASCADE")
+    pipeline_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("pipelines.id", ondelete="CASCADE")
     )
 
     # Ordering
@@ -107,19 +106,19 @@ class PipelineStage(Base):
     engine_key: Mapped[Optional[str]] = mapped_column(String(255))
 
     # Nested pipeline support
-    sub_pipeline_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
+    sub_pipeline_id: Mapped[Optional[str]] = mapped_column(String(36))
 
     # Stage blend mode (for sub-passes)
     blend_mode: Mapped[Optional[str]] = mapped_column(String(50))
 
     # Sub-pass engine keys (for stages with multiple engines)
-    sub_pass_engine_keys: Mapped[list] = mapped_column(JSONB, default=list)
+    sub_pass_engine_keys: Mapped[list] = mapped_column(JSON, default=list)
 
     # Context passing
     pass_context: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Stage-specific configuration
-    config: Mapped[dict] = mapped_column(JSONB, default=dict)
+    config: Mapped[dict] = mapped_column(JSON, default=dict)
 
     # Relationships
     pipeline: Mapped["Pipeline"] = relationship("Pipeline", back_populates="stages")

@@ -5,8 +5,7 @@ from datetime import datetime
 from typing import Optional
 import enum
 
-from sqlalchemy import String, Text, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import String, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.database import Base
@@ -43,8 +42,8 @@ class ChangeEvent(Base):
     """
     __tablename__ = "change_events"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
 
     # What changed
@@ -53,9 +52,9 @@ class ChangeEvent(Base):
     change_type: Mapped[str] = mapped_column(String(50), nullable=False)  # create, update, delete
 
     # Change details
-    old_value: Mapped[Optional[dict]] = mapped_column(JSONB)
-    new_value: Mapped[Optional[dict]] = mapped_column(JSONB)
-    diff: Mapped[Optional[dict]] = mapped_column(JSONB)
+    old_value: Mapped[Optional[dict]] = mapped_column(JSON)
+    new_value: Mapped[Optional[dict]] = mapped_column(JSON)
+    diff: Mapped[Optional[dict]] = mapped_column(JSON)
 
     # Metadata
     changed_by: Mapped[Optional[str]] = mapped_column(String(255))
@@ -63,7 +62,7 @@ class ChangeEvent(Base):
 
     # Propagation
     propagation_status: Mapped[str] = mapped_column(String(50), default="pending")
-    affected_consumers: Mapped[list] = mapped_column(JSONB, default=list)
+    affected_consumers: Mapped[list] = mapped_column(JSON, default=list)
 
     # Timestamp
     changed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -112,14 +111,14 @@ class ChangeNotification(Base):
     """
     __tablename__ = "change_notifications"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    change_event_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("change_events.id", ondelete="CASCADE")
+    change_event_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("change_events.id", ondelete="CASCADE")
     )
-    consumer_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("consumers.id", ondelete="CASCADE")
+    consumer_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("consumers.id", ondelete="CASCADE")
     )
 
     # Notification status

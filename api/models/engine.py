@@ -4,8 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, Enum as SQLEnum, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 
@@ -52,8 +51,8 @@ class Engine(Base):
     """
     __tablename__ = "engines"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     engine_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
@@ -74,14 +73,14 @@ class Engine(Base):
     concretization_prompt: Mapped[Optional[str]] = mapped_column(Text)
 
     # Schema and focus
-    canonical_schema: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    extraction_focus: Mapped[list] = mapped_column(JSONB, default=list)
+    canonical_schema: Mapped[dict] = mapped_column(JSON, nullable=False)
+    extraction_focus: Mapped[list] = mapped_column(JSON, default=list)
 
     # Output compatibility
-    primary_output_modes: Mapped[list] = mapped_column(JSONB, default=list)
+    primary_output_modes: Mapped[list] = mapped_column(JSON, default=list)
 
     # Paradigm associations
-    paradigm_keys: Mapped[list] = mapped_column(JSONB, default=list)
+    paradigm_keys: Mapped[list] = mapped_column(JSON, default=list)
 
     # Status
     status: Mapped[str] = mapped_column(String(50), default="active")
@@ -142,16 +141,16 @@ class EngineVersion(Base):
     """
     __tablename__ = "engine_versions"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    engine_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("engines.id", ondelete="CASCADE")
+    engine_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("engines.id", ondelete="CASCADE")
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # Full snapshot
-    full_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    full_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
 
     # Change metadata
     change_summary: Mapped[Optional[str]] = mapped_column(Text)
