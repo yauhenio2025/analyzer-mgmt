@@ -233,7 +233,25 @@ async def get_paradigm_suggestions(
         raise HTTPException(status_code=404, detail=f"Paradigm '{request.paradigm_key}' not found")
 
     # Build the system prompt for structured JSON output
-    system_prompt = """You are an expert in philosophical paradigms and theoretical frameworks.
+    # Customize format guidance based on field type
+    field_format_guide = ""
+    if request.field == "core_tensions":
+        field_format_guide = """
+For core_tensions, format content as: "X vs Y - brief description"
+Example: "Reform vs Revolution - gradual change within system versus complete overthrow"
+The content field should contain the COMPLETE tension in this format."""
+    elif request.field in ["assumptions", "scope_conditions"]:
+        field_format_guide = """
+Format content as a complete, standalone statement that can be added directly."""
+    elif request.field in ["primary_entities", "key_concepts"]:
+        field_format_guide = """
+Format content as: "Entity/Concept Name - brief definition or description"
+Example: "Surplus Value - the difference between what workers produce and what they're paid" """
+    elif request.field in ["relations", "change_mechanisms"]:
+        field_format_guide = """
+Format content as a complete description of the relation or mechanism."""
+
+    system_prompt = f"""You are an expert in philosophical paradigms and theoretical frameworks.
 You help users extend and improve paradigm definitions in a 4-layer ontology system.
 
 The 4 layers are:
@@ -244,19 +262,19 @@ The 4 layers are:
 
 IMPORTANT: Return your response as valid JSON in this EXACT format:
 
-{
+{{
   "suggestions": [
-    {
-      "title": "Short title (5 words max)",
-      "content": "The actual item to add (1-2 concise sentences)",
+    {{
+      "title": "Short label (3-5 words)",
+      "content": "The COMPLETE item to add - this exact text will be saved",
       "rationale": "Why this should be added (2-3 sentences)",
       "connections": ["related_field_1", "related_field_2"]
-    }
+    }}
   ],
   "analysis_summary": "Brief overall analysis (1-2 sentences)"
-}
-
-Return 3-5 specific, actionable suggestions. Each suggestion.content should be a single item that can be directly added to the paradigm field.
+}}
+{field_format_guide}
+Return 3-5 specific, actionable suggestions. The content field is what gets saved - make it complete and properly formatted.
 Do NOT include any text outside the JSON structure. Only output valid JSON."""
 
     # Build the user prompt with layer/field focus
