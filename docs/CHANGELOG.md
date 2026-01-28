@@ -7,6 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 - Initial project setup with FastAPI backend and Next.js frontend
+- Structured LLM suggestion display with edit-before-accept capability ([api/routes/llm.py](api/routes/llm.py), [frontend/src/components/SuggestionPanel.tsx](frontend/src/components/SuggestionPanel.tsx))
+- SuggestionCard component with collapsible cards, edit-in-place, confidence indicators ([frontend/src/components/SuggestionCard.tsx](frontend/src/components/SuggestionCard.tsx))
+- SuggestionPanel component with Accept All / Clear All bulk actions ([frontend/src/components/SuggestionPanel.tsx](frontend/src/components/SuggestionPanel.tsx))
+- JSON parsing helper for robust LLM response handling ([api/routes/llm.py](api/routes/llm.py))
+- StructuredSuggestion and SuggestionResponse TypeScript types ([frontend/src/types/index.ts](frontend/src/types/index.ts))
 
 ### Changed
 - Updated SQLAlchemy models to use database-agnostic types (JSON instead of JSONB, String instead of UUID) for SQLite compatibility

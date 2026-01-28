@@ -1,6 +1,6 @@
 # Feature Inventory
 
-> Auto-maintained by Claude Code. Last updated: 2026-01-28
+> Auto-maintained by Claude Code. Last updated: 2026-01-28 (LLM Suggestion Improvements)
 
 ## Backend API
 
@@ -51,10 +51,23 @@
 
 ### LLM Integration
 - **Status**: Active
-- **Description**: AI-powered suggestions for paradigms, prompts, and schemas
+- **Description**: AI-powered suggestions for paradigms, prompts, and schemas with structured JSON responses
 - **Entry Points**:
-  - `api/routes/llm.py:1-300` - LLM suggestion endpoints
+  - `api/routes/llm.py:1-100` - JSON parsing helper and StructuredSuggestion schema
+  - `api/routes/llm.py:100-240` - Paradigm suggestions endpoint with structured JSON prompts
+  - `api/routes/llm.py:240-450` - Prompt improvement and schema validation endpoints
 - **Dependencies**: Anthropic SDK (Claude API)
+- **Added**: 2026-01-28 | **Modified**: 2026-01-28
+
+### Structured Suggestion Display
+- **Status**: Active
+- **Description**: Collapsible suggestion cards with edit-before-accept, confidence indicators, and bulk actions
+- **Entry Points**:
+  - `frontend/src/components/SuggestionCard.tsx:1-175` - Single suggestion card with edit/accept/dismiss
+  - `frontend/src/components/SuggestionPanel.tsx:1-130` - Panel containing multiple suggestion cards
+  - `frontend/src/pages/paradigms/[key].tsx:24-35` - SuggestionState interface with new response format
+  - `frontend/src/pages/paradigms/[key].tsx:200-270` - handleAskAI and handleAcceptSuggestion functions
+- **Dependencies**: React, Lucide icons
 - **Added**: 2026-01-28
 
 ## Frontend UI
@@ -116,11 +129,12 @@
 
 ### TypeScript Types
 - **Status**: Active
-- **Description**: Comprehensive TypeScript types for all entities
+- **Description**: Comprehensive TypeScript types for all entities including LLM suggestion types
 - **Entry Points**:
-  - `frontend/src/types/index.ts:1-250` - All type definitions
+  - `frontend/src/types/index.ts:1-325` - All type definitions
+  - `frontend/src/types/index.ts:278-310` - StructuredSuggestion and SuggestionResponse interfaces
 - **Dependencies**: TypeScript
-- **Added**: 2026-01-28
+- **Added**: 2026-01-28 | **Modified**: 2026-01-28
 
 ### API Client
 - **Status**: Active

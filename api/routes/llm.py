@@ -1,6 +1,8 @@
 """LLM integration API routes for AI-assisted editing."""
 
+import json
 import os
+import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,6 +18,86 @@ router = APIRouter()
 
 
 # ============================================================================
+# JSON Parsing Helper
+# ============================================================================
+
+
+def parse_llm_suggestions(response: str) -> dict:
+    """Parse structured JSON from LLM response.
+
+    Attempts to extract JSON from the response. Falls back to wrapping
+    raw text as a single suggestion if parsing fails.
+    """
+    if not response:
+        return {"suggestions": [], "analysis_summary": "No response received."}
+
+    # Try direct JSON parse first
+    try:
+        result = json.loads(response)
+        if "suggestions" in result:
+            # Add UUIDs to each suggestion if missing
+            for suggestion in result.get("suggestions", []):
+                if "id" not in suggestion:
+                    suggestion["id"] = str(uuid.uuid4())
+                # Normalize confidence to float
+                if "confidence" not in suggestion:
+                    suggestion["confidence"] = 0.8
+            return result
+    except json.JSONDecodeError:
+        pass
+
+    # Try to extract JSON block from markdown
+    if "```json" in response:
+        try:
+            json_start = response.index("```json") + 7
+            json_end = response.index("```", json_start)
+            json_str = response[json_start:json_end].strip()
+            result = json.loads(json_str)
+            if "suggestions" in result:
+                for suggestion in result.get("suggestions", []):
+                    if "id" not in suggestion:
+                        suggestion["id"] = str(uuid.uuid4())
+                    if "confidence" not in suggestion:
+                        suggestion["confidence"] = 0.8
+                return result
+        except (ValueError, json.JSONDecodeError):
+            pass
+
+    # Try to find any JSON object in the response
+    try:
+        # Find first { and last }
+        start = response.find("{")
+        end = response.rfind("}") + 1
+        if start != -1 and end > start:
+            json_str = response[start:end]
+            result = json.loads(json_str)
+            if "suggestions" in result:
+                for suggestion in result.get("suggestions", []):
+                    if "id" not in suggestion:
+                        suggestion["id"] = str(uuid.uuid4())
+                    if "confidence" not in suggestion:
+                        suggestion["confidence"] = 0.8
+                return result
+    except json.JSONDecodeError:
+        pass
+
+    # Fallback: wrap raw text as a single suggestion
+    return {
+        "suggestions": [
+            {
+                "id": str(uuid.uuid4()),
+                "title": "AI Suggestion",
+                "content": response,
+                "rationale": "Raw response from AI (structured parsing failed)",
+                "connections": [],
+                "confidence": 0.6
+            }
+        ],
+        "analysis_summary": "Response was returned as raw text."
+    }
+
+
+# ============================================================================
 # Pydantic Schemas
 # ============================================================================
 
@@ -25,14 +107,27 @@ class ParadigmSuggestionRequest(BaseModel):
     paradigm_key: str
     query: str = Field(..., description="What aspect to analyze or suggest")
     layer: Optional[str] = Field(None, description="Specific layer to focus on")
+    field: Optional[str] = Field(None, description="Specific field within the layer")
+
+
+class StructuredSuggestion(BaseModel):
+    """A single structured suggestion from the LLM."""
+    id: str = Field(..., description="Unique identifier for this suggestion")
+    title: str = Field(..., description="Short title (5 words max)")
+    content: str = Field(..., description="The actual item to add (1-2 sentences)")
+    rationale: str = Field(..., description="Why this should be added")
+    connections: list[str] = Field(default_factory=list, description="Related fields")
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0, description="Confidence score")
 
 
 class ParadigmSuggestionResponse(BaseModel):
-    """Response with paradigm suggestions."""
+    """Response with structured paradigm suggestions."""
     paradigm_key: str
     query: str
-    suggestions: list[dict]
-    rationale: str
+    layer: Optional[str] = None
+    field: Optional[str] = None
+    suggestions: list[StructuredSuggestion]
+    analysis_summary: str
 
 
 class PromptImproveRequest(BaseModel):
@@ -137,20 +232,41 @@ async def get_paradigm_suggestions(
     if not paradigm:
         raise HTTPException(status_code=404, detail=f"Paradigm '{request.paradigm_key}' not found")
 
-    # Build the system prompt
+    # Build the system prompt for structured JSON output
     system_prompt = """You are an expert in philosophical paradigms and theoretical frameworks.
 You help users extend and improve paradigm definitions in a 4-layer ontology system.
 
 The 4 layers are:
-- Foundational: Core assumptions, tensions, and scope conditions
-- Structural: Primary entities, relations, and levels of analysis
-- Dynamic: Change mechanisms, temporal patterns, transformation processes
-- Explanatory: Key concepts, analytical methods, problem diagnosis, ideal state
+- Foundational: Core assumptions (assumptions), tensions (core_tensions), and scope conditions (scope_conditions)
+- Structural: Primary entities (primary_entities), relations (relations), and levels of analysis (levels_of_analysis)
+- Dynamic: Change mechanisms (change_mechanisms), temporal patterns (temporal_patterns), transformation processes (transformation_processes)
+- Explanatory: Key concepts (key_concepts), analytical methods (analytical_methods), problem diagnosis (problem_diagnosis), ideal state (ideal_state)
 
-Provide specific, actionable suggestions with clear rationale. Be scholarly but accessible."""
+IMPORTANT: Return your response as valid JSON in this EXACT format:
 
-    # Build the user prompt
-    user_prompt = f"""Analyze this paradigm and respond to the query:
+{
+  "suggestions": [
+    {
+      "title": "Short title (5 words max)",
+      "content": "The actual item to add (1-2 concise sentences)",
+      "rationale": "Why this should be added (2-3 sentences)",
+      "connections": ["related_field_1", "related_field_2"]
+    }
+  ],
+  "analysis_summary": "Brief overall analysis (1-2 sentences)"
+}
+
+Return 3-5 specific, actionable suggestions. Each suggestion.content should be a single item that can be directly added to the paradigm field.
+Do NOT include any text outside the JSON structure. Only output valid JSON."""
+
+    # Build the user prompt with layer/field focus
+    layer_focus = ""
+    if request.layer:
+        layer_focus = f"\n**Focus on layer**: {request.layer}"
+        if request.field:
+            layer_focus += f"\n**Focus on field**: {request.field}"
+
+    user_prompt = f"""Analyze this paradigm and generate suggestions:
 
 **Paradigm**: {paradigm.paradigm_name}
 **Guiding Thinkers**: {paradigm.guiding_thinkers}
@@ -162,28 +278,22 @@ Provide specific, actionable suggestions with clear rationale. Be scholarly but 
 - Dynamic: {paradigm.dynamic}
 - Explanatory: {paradigm.explanatory}
 
-**User Query**: {request.query}
-{f"**Focus on layer**: {request.layer}" if request.layer else ""}
+**User Query**: {request.query}{layer_focus}
 
-Provide suggestions in this format:
-1. Specific suggestions with explanations
-2. Rationale for each suggestion
-3. How it connects to the existing framework"""
+Generate 3-5 suggestions that could be added to strengthen this paradigm. Each suggestion should be a discrete, standalone item suitable for direct addition."""
 
     response = await call_llm(system_prompt, user_prompt)
 
-    # Parse response (in production, use structured output)
+    # Parse the structured JSON response
+    parsed = parse_llm_suggestions(response)
+
     return {
         "paradigm_key": request.paradigm_key,
         "query": request.query,
-        "suggestions": [
-            {
-                "type": "dimension",
-                "content": response,
-                "confidence": 0.8,
-            }
-        ],
-        "rationale": "Based on analysis of the paradigm's current structure and gaps.",
+        "layer": request.layer,
+        "field": request.field,
+        "suggestions": parsed.get("suggestions", []),
+        "analysis_summary": parsed.get("analysis_summary", ""),
     }
 
 

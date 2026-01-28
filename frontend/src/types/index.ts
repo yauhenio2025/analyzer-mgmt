@@ -276,6 +276,37 @@ export interface MigrationHint {
 // LLM Types
 // ============================================================================
 
+/**
+ * A single structured suggestion from the LLM.
+ * Each suggestion is a discrete, actionable item that can be edited before acceptance.
+ */
+export interface StructuredSuggestion {
+  id: string;
+  title: string;
+  content: string;           // The actual text to add
+  rationale: string;         // Why this is suggested
+  connections?: string[];    // Related fields
+  confidence: number;
+  status: 'pending' | 'accepted' | 'dismissed' | 'edited';
+  editedContent?: string;    // If user modifies before accepting
+}
+
+/**
+ * Response from the paradigm suggestions endpoint.
+ * Contains structured, parseable suggestions instead of raw markdown.
+ */
+export interface SuggestionResponse {
+  paradigm_key: string;
+  query: string;
+  layer: string | null;
+  field: string | null;
+  suggestions: StructuredSuggestion[];
+  analysis_summary: string;
+}
+
+/**
+ * @deprecated Use StructuredSuggestion instead
+ */
 export interface ParadigmSuggestion {
   type: string;
   content: string;

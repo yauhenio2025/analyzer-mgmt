@@ -6,31 +6,24 @@ import {
   ArrowLeft,
   Save,
   Plus,
-  Trash2,
   Sparkles,
   AlertCircle,
   ChevronDown,
   ChevronUp,
-  Edit2,
   Check,
   X,
   Loader2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { Paradigm, FoundationalLayer, StructuralLayer, DynamicLayer, ExplanatoryLayer } from '@/types';
+import type { Paradigm, StructuredSuggestion, SuggestionResponse } from '@/types';
+import SuggestionPanel from '@/components/SuggestionPanel';
 import clsx from 'clsx';
-
-interface AISuggestion {
-  type: string;
-  content: string;
-  confidence: number;
-}
 
 interface SuggestionState {
   layerName: LayerName;
   fieldKey: string;
-  suggestions: AISuggestion[];
-  rationale: string;
+  fieldLabel: string;
+  response: SuggestionResponse;
 }
 
 type LayerName = 'foundational' | 'structural' | 'dynamic' | 'explanatory';
@@ -90,12 +83,13 @@ interface LayerEditorProps {
   config: LayerConfig;
   data: Record<string, string[]>;
   onChange: (fieldKey: string, items: string[]) => void;
-  onAskAI: (fieldKey: string) => void;
+  onAskAI: (fieldKey: string, fieldLabel: string) => void;
   loadingField: string | null;
   suggestions: SuggestionState | null;
-  onAcceptSuggestion: (suggestion: AISuggestion) => void;
-  onDismissSuggestion: (index: number) => void;
+  onAcceptSuggestion: (suggestion: StructuredSuggestion, editedContent?: string) => void;
+  onDismissSuggestion: (suggestion: StructuredSuggestion) => void;
   onDismissAllSuggestions: () => void;
+  onAcceptAllSuggestions: () => void;
 }
 
 function LayerEditor({
@@ -108,6 +102,7 @@ function LayerEditor({
   onAcceptSuggestion,
   onDismissSuggestion,
   onDismissAllSuggestions,
+  onAcceptAllSuggestions,
 }: LayerEditorProps) {
   const [expanded, setExpanded] = useState(true);
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -155,7 +150,7 @@ function LayerEditor({
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-700">{field.label}</label>
                   <button
-                    onClick={() => onAskAI(field.key)}
+                    onClick={() => onAskAI(field.key, field.label)}
                     disabled={isLoading}
                     className={clsx(
                       "text-xs flex items-center",
@@ -178,55 +173,18 @@ function LayerEditor({
                   </button>
                 </div>
 
-                {/* AI Suggestions Panel */}
-                {fieldSuggestions && fieldSuggestions.suggestions.length > 0 && (
-                  <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-purple-700 flex items-center">
-                        <Sparkles className="h-3 w-3 mr-1" />
-                        AI Suggestions ({fieldSuggestions.suggestions.length})
-                      </span>
-                      <button
-                        onClick={onDismissAllSuggestions}
-                        className="text-xs text-purple-600 hover:text-purple-800"
-                      >
-                        Dismiss all
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {fieldSuggestions.suggestions.map((suggestion, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-start gap-2 p-2 bg-white rounded border border-purple-100"
-                        >
-                          <span className="flex-1 text-sm text-gray-700">{suggestion.content}</span>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <span className="text-xs text-gray-400">
-                              {Math.round(suggestion.confidence * 100)}%
-                            </span>
-                            <button
-                              onClick={() => onAcceptSuggestion(suggestion)}
-                              className="p-1 text-green-600 hover:bg-green-100 rounded"
-                              title="Accept suggestion"
-                            >
-                              <Check className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => onDismissSuggestion(idx)}
-                              className="p-1 text-red-500 hover:bg-red-100 rounded"
-                              title="Dismiss suggestion"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {fieldSuggestions.rationale && (
-                      <p className="mt-2 text-xs text-purple-600 italic">
-                        {fieldSuggestions.rationale}
-                      </p>
-                    )}
+                {/* AI Suggestions Panel - New structured format */}
+                {fieldSuggestions && fieldSuggestions.response.suggestions.length > 0 && (
+                  <div className="mb-3">
+                    <SuggestionPanel
+                      response={fieldSuggestions.response}
+                      fieldLabel={fieldSuggestions.fieldLabel}
+                      onAccept={onAcceptSuggestion}
+                      onDismiss={onDismissSuggestion}
+                      onDismissAll={onDismissAllSuggestions}
+                      onAcceptAll={onAcceptAllSuggestions}
+                      onClose={onDismissAllSuggestions}
+                    />
                   </div>
                 )}
 
@@ -335,7 +293,7 @@ export default function ParadigmDetailPage() {
   );
 
   const handleAskAI = useCallback(
-    async (layerName: LayerName, fieldKey: string) => {
+    async (layerName: LayerName, fieldKey: string, fieldLabel: string) => {
       const loadingKey = `${layerName}.${fieldKey}`;
       setLoadingField(loadingKey);
       setCurrentSuggestions(null);
@@ -343,27 +301,49 @@ export default function ParadigmDetailPage() {
       try {
         const result = await api.llm.paradigmSuggestions(
           key as string,
-          `Suggest additions for ${fieldKey} in the ${layerName} layer`,
-          layerName
+          `Suggest additions for ${fieldLabel} in the ${layerName} layer`,
+          layerName,
+          fieldKey
         );
+
+        // Initialize status for each suggestion
+        const suggestionsWithStatus = result.suggestions.map((s) => ({
+          ...s,
+          status: 'pending' as const,
+        }));
+
         setCurrentSuggestions({
           layerName,
           fieldKey,
-          suggestions: result.suggestions || [],
-          rationale: result.rationale || '',
+          fieldLabel,
+          response: {
+            ...result,
+            suggestions: suggestionsWithStatus,
+          },
         });
       } catch (error) {
         console.error('Failed to get AI suggestion:', error);
-        // Show error as a suggestion so user sees what happened
+        // Show error in the panel
         setCurrentSuggestions({
           layerName,
           fieldKey,
-          suggestions: [{
-            type: 'error',
-            content: error instanceof Error ? error.message : 'Failed to get suggestions',
-            confidence: 0,
-          }],
-          rationale: 'An error occurred while fetching suggestions.',
+          fieldLabel,
+          response: {
+            paradigm_key: key as string,
+            query: '',
+            layer: layerName,
+            field: fieldKey,
+            suggestions: [{
+              id: 'error',
+              title: 'Error',
+              content: error instanceof Error ? error.message : 'Failed to get suggestions',
+              rationale: 'An error occurred while fetching suggestions.',
+              connections: [],
+              confidence: 0,
+              status: 'pending' as const,
+            }],
+            analysis_summary: 'An error occurred.',
+          },
         });
       } finally {
         setLoadingField(null);
@@ -373,33 +353,42 @@ export default function ParadigmDetailPage() {
   );
 
   const handleAcceptSuggestion = useCallback(
-    (suggestion: AISuggestion) => {
+    (suggestion: StructuredSuggestion, editedContent?: string) => {
       if (!currentSuggestions || !localParadigm) return;
 
       const { layerName, fieldKey } = currentSuggestions;
       const layer = { ...(localParadigm[layerName] as Record<string, string[]>) };
       const currentItems = layer[fieldKey] || [];
-      layer[fieldKey] = [...currentItems, suggestion.content];
+      const contentToAdd = editedContent || suggestion.content;
+      layer[fieldKey] = [...currentItems, contentToAdd];
 
       setLocalParadigm((prev) => prev ? { ...prev, [layerName]: layer } : prev);
       setHasChanges(true);
 
-      // Remove accepted suggestion from list
+      // Mark suggestion as accepted and remove from list
       setCurrentSuggestions((prev) => {
         if (!prev) return null;
-        const remaining = prev.suggestions.filter((s) => s !== suggestion);
-        return remaining.length > 0 ? { ...prev, suggestions: remaining } : null;
+        const remaining = prev.response.suggestions.filter((s) => s.id !== suggestion.id);
+        if (remaining.length === 0) return null;
+        return {
+          ...prev,
+          response: { ...prev.response, suggestions: remaining },
+        };
       });
     },
     [currentSuggestions, localParadigm]
   );
 
   const handleDismissSuggestion = useCallback(
-    (index: number) => {
+    (suggestion: StructuredSuggestion) => {
       setCurrentSuggestions((prev) => {
         if (!prev) return null;
-        const remaining = prev.suggestions.filter((_, i) => i !== index);
-        return remaining.length > 0 ? { ...prev, suggestions: remaining } : null;
+        const remaining = prev.response.suggestions.filter((s) => s.id !== suggestion.id);
+        if (remaining.length === 0) return null;
+        return {
+          ...prev,
+          response: { ...prev.response, suggestions: remaining },
+        };
       });
     },
     []
@@ -408,6 +397,20 @@ export default function ParadigmDetailPage() {
   const handleDismissAllSuggestions = useCallback(() => {
     setCurrentSuggestions(null);
   }, []);
+
+  const handleAcceptAllSuggestions = useCallback(() => {
+    if (!currentSuggestions || !localParadigm) return;
+
+    const { layerName, fieldKey, response } = currentSuggestions;
+    const layer = { ...(localParadigm[layerName] as Record<string, string[]>) };
+    const currentItems = layer[fieldKey] || [];
+    const newItems = response.suggestions.map((s) => s.content);
+    layer[fieldKey] = [...currentItems, ...newItems];
+
+    setLocalParadigm((prev) => prev ? { ...prev, [layerName]: layer } : prev);
+    setHasChanges(true);
+    setCurrentSuggestions(null);
+  }, [currentSuggestions, localParadigm]);
 
   const handleSave = useCallback(() => {
     if (localParadigm) {
@@ -468,7 +471,7 @@ export default function ParadigmDetailPage() {
             <span className="text-sm text-amber-600 mr-2">Unsaved changes</span>
           )}
           <button
-            onClick={() => handleAskAI('foundational', 'general')}
+            onClick={() => handleAskAI('foundational', 'assumptions', 'Core Assumptions')}
             className="btn-secondary"
           >
             <Sparkles className="h-4 w-4 mr-2" />
@@ -498,12 +501,13 @@ export default function ParadigmDetailPage() {
             config={config}
             data={displayParadigm[config.name] as Record<string, string[]>}
             onChange={(fieldKey, items) => handleLayerChange(config.name, fieldKey, items)}
-            onAskAI={(fieldKey) => handleAskAI(config.name, fieldKey)}
+            onAskAI={(fieldKey, fieldLabel) => handleAskAI(config.name, fieldKey, fieldLabel)}
             loadingField={loadingField}
             suggestions={currentSuggestions}
             onAcceptSuggestion={handleAcceptSuggestion}
             onDismissSuggestion={handleDismissSuggestion}
             onDismissAllSuggestions={handleDismissAllSuggestions}
+            onAcceptAllSuggestions={handleAcceptAllSuggestions}
           />
         ))}
       </div>
