@@ -245,8 +245,9 @@ The content field should contain the COMPLETE tension in this format."""
 Format content as a complete, standalone statement that can be added directly."""
     elif request.field in ["primary_entities", "key_concepts"]:
         field_format_guide = """
-Format content as: "Entity/Concept Name - brief definition or description"
-Example: "Surplus Value - the difference between what workers produce and what they're paid" """
+Format content as: "Name - brief definition or description"
+Example: "Surplus Value - the difference between what workers produce and what they're paid"
+For title, just use the name (e.g. "Surplus Value"), don't add words like "Entity" or "Concept"."""
     elif request.field in ["relations", "change_mechanisms"]:
         field_format_guide = """
 Format content as a complete description of the relation or mechanism."""
