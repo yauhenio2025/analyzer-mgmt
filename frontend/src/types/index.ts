@@ -24,6 +24,66 @@ export type EngineCategory =
 
 export type EngineStatus = 'active' | 'deprecated' | 'draft' | 'archived';
 
+// ============================================================================
+// Stage Context Types (for prompt composition)
+// ============================================================================
+
+export type AudienceType = 'researcher' | 'analyst' | 'executive' | 'activist';
+
+export interface AudienceVocabulary {
+  researcher: Record<string, string>;
+  analyst: Record<string, string>;
+  executive: Record<string, string>;
+  activist: Record<string, string>;
+}
+
+export interface ExtractionContext {
+  analysis_type: string;
+  analysis_type_plural: string;
+  core_question: string;
+  extraction_steps: string[];
+  key_fields: Record<string, string>;
+  id_field: string;
+  key_relationships: string[];
+  special_instructions?: string;
+}
+
+export interface CurationContext {
+  item_type: string;
+  item_type_plural: string;
+  consolidation_rules: string[];
+  cross_doc_patterns: string[];
+  synthesis_outputs: string[];
+  special_instructions?: string;
+}
+
+export interface ConcretizationContext {
+  id_examples: Array<{ from: string; to: string }>;
+  naming_guidance: string;
+  recommended_table_types: string[];
+  recommended_visual_patterns: string[];
+}
+
+export interface StageContext {
+  framework_key?: string;
+  additional_frameworks: string[];
+  extraction: ExtractionContext;
+  curation: CurationContext;
+  concretization: ConcretizationContext;
+  audience_vocabulary: AudienceVocabulary;
+  skip_concretization: boolean;
+}
+
+export interface ComposedPrompts {
+  extraction?: string;
+  curation?: string;
+  concretization?: string;
+}
+
+// ============================================================================
+// Engine Types
+// ============================================================================
+
 export interface Engine {
   id: string;
   engine_key: string;
@@ -34,8 +94,11 @@ export interface Engine {
   kind: EngineKind;
   reasoning_domain?: string;
   researcher_question?: string;
-  extraction_prompt: string;
-  curation_prompt: string;
+  // NEW: Stage context for prompt composition
+  stage_context?: StageContext;
+  // Legacy prompts (for backwards compatibility - may be null if using stage_context)
+  extraction_prompt?: string;
+  curation_prompt?: string;
   concretization_prompt?: string;
   canonical_schema: Record<string, unknown>;
   extraction_focus: string[];
@@ -55,6 +118,7 @@ export interface EngineSummary {
   kind: EngineKind;
   paradigm_keys: string[];
   status: EngineStatus;
+  has_stage_context?: boolean;  // NEW: Indicates if engine uses stage_context
 }
 
 export interface EngineVersion {
@@ -66,6 +130,11 @@ export interface EngineVersion {
   changed_by?: string;
   created_at?: string;
 }
+
+// Update payload type (includes change_summary for versioning)
+export type EngineUpdate = Partial<Engine> & {
+  change_summary?: string;
+};
 
 // ============================================================================
 // Paradigm Types
@@ -375,6 +444,27 @@ export interface PromptImprovement {
   improved_prompt: string;
   changes_made: string[];
   explanation: string;
+}
+
+export interface StageContextImprovement {
+  engine_key: string;
+  stage: string;
+  field: string;
+  original_value: string;
+  improved_value: string;
+  suggestions: string[];
+  explanation: string;
+}
+
+export interface ComposedPromptResponse {
+  engine_key: string;
+  prompt_type: string;
+  prompt: string;
+  audience?: AudienceType;
+  framework_used?: string;
+  composed: boolean;
+  skipped?: boolean;
+  error?: string;
 }
 
 export interface SchemaValidation {

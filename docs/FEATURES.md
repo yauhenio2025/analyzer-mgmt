@@ -1,17 +1,43 @@
 # Feature Inventory
 
-> Auto-maintained by Claude Code. Last updated: 2026-01-28 (Paradigm Branching)
+> Auto-maintained by Claude Code. Last updated: 2026-01-29 (Stage Context Prompt Composition)
 
 ## Backend API
 
 ### Engine Management
 - **Status**: Active
-- **Description**: CRUD operations for analytical engine definitions with versioning
+- **Description**: CRUD operations for analytical engine definitions with versioning and stage_context support
 - **Entry Points**:
-  - `api/routes/engines.py:1-300` - All engine API endpoints
-  - `api/models/engine.py:1-150` - Engine and EngineVersion models
+  - `api/routes/engines.py:1-560` - All engine API endpoints including stage-context and prompt composition
+  - `api/models/engine.py:1-150` - Engine and EngineVersion models with stage_context column
 - **Dependencies**: FastAPI, SQLAlchemy, PostgreSQL
-- **Added**: 2026-01-28
+- **Added**: 2026-01-28 | **Modified**: 2026-01-29
+
+### Stage Context Prompt Composition
+- **Status**: Active
+- **Description**: Runtime prompt composition from stage_context + Jinja2 templates + framework primers
+- **Entry Points**:
+  - `api/stages/__init__.py:1-25` - Module exports
+  - `api/stages/schemas.py:1-200` - StageContext, ExtractionContext, CurationContext Pydantic models
+  - `api/stages/registry.py:1-150` - StageRegistry loads templates and frameworks from disk
+  - `api/stages/composer.py:1-350` - StageComposer renders Jinja2 templates with context
+  - `api/stages/templates/extraction.md.j2` - Extraction prompt template
+  - `api/stages/templates/curation.md.j2` - Curation prompt template
+  - `api/stages/templates/concretization.md.j2` - Concretization prompt template
+  - `api/stages/frameworks/brandomian.json` - Brandomian framework primer
+  - `api/stages/frameworks/dennett.json` - Dennett framework primer
+  - `api/stages/frameworks/toulmin.json` - Toulmin framework primer
+- **Dependencies**: Jinja2, Pydantic
+- **Added**: 2026-01-29
+
+### StageContextEditor Component
+- **Status**: Active
+- **Description**: React component for editing engine stage_context with collapsible sections
+- **Entry Points**:
+  - `frontend/src/components/StageContextEditor.tsx:1-450` - Full editor component
+  - `frontend/src/pages/engines/[key].tsx:200-350` - Integration in engine detail page
+- **Dependencies**: React, Lucide icons
+- **Added**: 2026-01-29
 
 ### Paradigm Management
 - **Status**: Active
@@ -138,16 +164,27 @@
 - **Dependencies**: SQLAlchemy, asyncpg
 - **Added**: 2026-01-28
 
+### Stage Context Migration Script
+- **Status**: Active
+- **Description**: Convert legacy engine prompts to stage_context format
+- **Entry Points**:
+  - `scripts/migrate_engines_to_stage_context.py:1-460` - Migration script with framework detection
+  - `db/migrations/versions/001_add_stage_context.py:1-66` - Alembic migration
+- **Dependencies**: SQLAlchemy, asyncpg, regex
+- **Added**: 2026-01-29
+
 ## Types and API Client
 
 ### TypeScript Types
 - **Status**: Active
-- **Description**: Comprehensive TypeScript types for all entities including LLM suggestion types
+- **Description**: Comprehensive TypeScript types for all entities including StageContext and LLM types
 - **Entry Points**:
-  - `frontend/src/types/index.ts:1-325` - All type definitions
+  - `frontend/src/types/index.ts:1-350` - All type definitions
+  - `frontend/src/types/index.ts:31-82` - StageContext, ExtractionContext, CurationContext, AudienceVocabulary
+  - `frontend/src/types/index.ts:133-136` - EngineUpdate type for update payloads
   - `frontend/src/types/index.ts:278-310` - StructuredSuggestion and SuggestionResponse interfaces
 - **Dependencies**: TypeScript
-- **Added**: 2026-01-28 | **Modified**: 2026-01-28
+- **Added**: 2026-01-28 | **Modified**: 2026-01-29
 
 ### API Client
 - **Status**: Active

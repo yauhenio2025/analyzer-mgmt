@@ -67,10 +67,15 @@ class Engine(Base):
     reasoning_domain: Mapped[Optional[str]] = mapped_column(String(255))
     researcher_question: Mapped[Optional[str]] = mapped_column(Text)
 
-    # Prompts (the core content)
-    extraction_prompt: Mapped[str] = mapped_column(Text, nullable=False)
-    curation_prompt: Mapped[str] = mapped_column(Text, nullable=False)
-    concretization_prompt: Mapped[Optional[str]] = mapped_column(Text)
+    # Stage context (NEW - replaces individual prompt columns)
+    # Contains engine-specific context for stage template composition
+    stage_context: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+    # Legacy prompts (kept for backwards compatibility during migration)
+    # Will be removed after migration to stage_context is complete
+    extraction_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    curation_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    concretization_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Schema and focus
     canonical_schema: Mapped[dict] = mapped_column(JSON, nullable=False)
@@ -108,6 +113,8 @@ class Engine(Base):
             "kind": self.kind,
             "reasoning_domain": self.reasoning_domain,
             "researcher_question": self.researcher_question,
+            "stage_context": self.stage_context,
+            # Legacy prompts (for backwards compatibility)
             "extraction_prompt": self.extraction_prompt,
             "curation_prompt": self.curation_prompt,
             "concretization_prompt": self.concretization_prompt,
@@ -131,7 +138,13 @@ class Engine(Base):
             "kind": self.kind,
             "paradigm_keys": self.paradigm_keys,
             "status": self.status,
+            "has_stage_context": self.stage_context is not None,
         }
+
+    @property
+    def has_stage_context(self) -> bool:
+        """Check if engine has stage_context for prompt composition."""
+        return self.stage_context is not None
 
 
 class EngineVersion(Base):

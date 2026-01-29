@@ -6,6 +6,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- Stage context prompt composition system ([api/stages/](api/stages/))
+  - Jinja2 templates for extraction, curation, concretization prompts
+  - Framework primers (brandomian, dennett, toulmin)
+  - Runtime prompt composition from stage_context + templates
+- StageContextEditor component for editing stage_context ([frontend/src/components/StageContextEditor.tsx](frontend/src/components/StageContextEditor.tsx))
+- GET /engines/{key}/stage-context endpoint ([api/routes/engines.py](api/routes/engines.py))
+- GET /engines/{key}/concretization-prompt endpoint ([api/routes/engines.py](api/routes/engines.py))
+- Audience parameter on prompt endpoints (?audience=researcher|analyst|executive|activist)
+- POST /llm/stage-context-improve endpoint for AI-assisted stage context editing ([api/routes/llm.py](api/routes/llm.py))
+- Migration script to convert engines to stage_context format ([scripts/migrate_engines_to_stage_context.py](scripts/migrate_engines_to_stage_context.py))
+- Alembic migration for stage_context column ([db/migrations/versions/001_add_stage_context.py](db/migrations/versions/001_add_stage_context.py))
+- StageContext, EngineUpdate TypeScript types ([frontend/src/types/index.ts](frontend/src/types/index.ts))
 - Paradigm branching feature - create derivative paradigms from existing ones ([api/routes/paradigms.py](api/routes/paradigms.py), [api/routes/llm.py](api/routes/llm.py))
 - LLM-powered sequential content generation for branched paradigms (18 fields)
 - Branching fields on Paradigm model: parent_paradigm_key, branch_metadata, branch_depth, generation_status ([api/models/paradigm.py](api/models/paradigm.py))
@@ -29,6 +41,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - StructuredSuggestion and SuggestionResponse TypeScript types ([frontend/src/types/index.ts](frontend/src/types/index.ts))
 
 ### Changed
+- Engine model now supports stage_context JSON column for prompt composition ([api/models/engine.py](api/models/engine.py))
+- Prompt columns (extraction_prompt, curation_prompt, concretization_prompt) now nullable for backwards compatibility
+- Engine detail page now shows StageContextEditor for engines with stage_context ([frontend/src/pages/engines/[key].tsx](frontend/src/pages/engines/[key].tsx))
+- Prompt endpoints now compose prompts at runtime when stage_context present
+- TypeScript target updated to ES2018 for regex dotAll flag support ([frontend/tsconfig.json](frontend/tsconfig.json))
 - Updated SQLAlchemy models to use database-agnostic types (JSON instead of JSONB, String instead of UUID) for SQLite compatibility
 - Engine management API with full CRUD, versioning, and prompt editing ([api/routes/engines.py](api/routes/engines.py))
 - Paradigm management API with 4-layer ontology support ([api/routes/paradigms.py](api/routes/paradigms.py))

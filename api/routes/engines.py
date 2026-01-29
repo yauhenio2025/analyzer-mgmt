@@ -1,6 +1,6 @@
 """Engine management API routes."""
 
-from typing import Optional
+from typing import Optional, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,8 +10,20 @@ from pydantic import BaseModel, Field
 
 from models.database import get_db
 from models.engine import Engine, EngineVersion
+from stages import StageContext, StageComposer
 
 router = APIRouter()
+
+# Lazy-loaded composer singleton
+_composer: Optional[StageComposer] = None
+
+
+def get_composer() -> StageComposer:
+    """Get the stage composer singleton."""
+    global _composer
+    if _composer is None:
+        _composer = StageComposer()
+    return _composer
 
 
 # ============================================================================
@@ -28,8 +40,14 @@ class EngineCreate(BaseModel):
     kind: str = Field(default="primitive", max_length=50)
     reasoning_domain: Optional[str] = None
     researcher_question: Optional[str] = None
-    extraction_prompt: str
-    curation_prompt: str
+    # NEW: Stage context for template composition
+    stage_context: Optional[dict] = Field(
+        default=None,
+        description="Stage context for prompt composition (preferred over raw prompts)",
+    )
+    # Legacy prompts (for backwards compatibility)
+    extraction_prompt: Optional[str] = None
+    curation_prompt: Optional[str] = None
     concretization_prompt: Optional[str] = None
     canonical_schema: dict
     extraction_focus: list[str] = Field(default_factory=list)
@@ -45,6 +63,12 @@ class EngineUpdate(BaseModel):
     kind: Optional[str] = None
     reasoning_domain: Optional[str] = None
     researcher_question: Optional[str] = None
+    # NEW: Stage context for template composition
+    stage_context: Optional[dict] = Field(
+        default=None,
+        description="Stage context for prompt composition (preferred over raw prompts)",
+    )
+    # Legacy prompts (for backwards compatibility)
     extraction_prompt: Optional[str] = None
     curation_prompt: Optional[str] = None
     concretization_prompt: Optional[str] = None
@@ -67,9 +91,12 @@ class EngineResponse(BaseModel):
     kind: str
     reasoning_domain: Optional[str]
     researcher_question: Optional[str]
-    extraction_prompt: str
-    curation_prompt: str
-    concretization_prompt: Optional[str]
+    # NEW: Stage context for template composition
+    stage_context: Optional[dict] = None
+    # Legacy prompts (for backwards compatibility - may be None if using stage_context)
+    extraction_prompt: Optional[str] = None
+    curation_prompt: Optional[str] = None
+    concretization_prompt: Optional[str] = None
     canonical_schema: dict
     extraction_focus: list[str]
     primary_output_modes: list[str]
@@ -92,6 +119,7 @@ class EngineSummaryResponse(BaseModel):
     kind: str
     paradigm_keys: list[str]
     status: str
+    has_stage_context: bool = False  # NEW: Indicates if engine uses stage_context
 
 
 # ============================================================================
@@ -207,9 +235,14 @@ async def get_engine_versions(
 @router.get("/{engine_key}/extraction-prompt")
 async def get_extraction_prompt(
     engine_key: str,
+    audience: str = Query("analyst", description="Target audience (researcher, analyst, executive, activist)"),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Get the extraction prompt for an engine."""
+    """Get the extraction prompt for an engine.
+
+    If engine has stage_context, composes prompt at runtime using templates.
+    Otherwise, returns legacy extraction_prompt field.
+    """
     query = select(Engine).where(Engine.engine_key == engine_key)
     result = await db.execute(query)
     engine = result.scalar_one_or_none()
@@ -217,19 +250,186 @@ async def get_extraction_prompt(
     if not engine:
         raise HTTPException(status_code=404, detail=f"Engine '{engine_key}' not found")
 
+    # If engine has stage_context, compose prompt at runtime
+    if engine.stage_context:
+        try:
+            composer = get_composer()
+            stage_context = StageContext(**engine.stage_context)
+            composed = composer.compose(
+                stage="extraction",
+                engine_key=engine_key,
+                stage_context=stage_context,
+                audience=audience,
+                canonical_schema=engine.canonical_schema,
+            )
+            return {
+                "engine_key": engine_key,
+                "prompt_type": "extraction",
+                "prompt": composed.prompt,
+                "audience": audience,
+                "framework_used": composed.framework_used,
+                "composed": True,
+            }
+        except Exception as e:
+            # Fall back to legacy prompt if composition fails
+            if engine.extraction_prompt:
+                return {
+                    "engine_key": engine_key,
+                    "prompt_type": "extraction",
+                    "prompt": engine.extraction_prompt,
+                    "composed": False,
+                    "error": str(e),
+                }
+            raise HTTPException(status_code=500, detail=f"Failed to compose prompt: {e}")
+
+    # Fall back to legacy prompt
+    if not engine.extraction_prompt:
+        raise HTTPException(status_code=404, detail=f"No extraction prompt for engine '{engine_key}'")
+
     return {
         "engine_key": engine_key,
         "prompt_type": "extraction",
         "prompt": engine.extraction_prompt,
+        "composed": False,
     }
 
 
 @router.get("/{engine_key}/curation-prompt")
 async def get_curation_prompt(
     engine_key: str,
+    audience: str = Query("analyst", description="Target audience (researcher, analyst, executive, activist)"),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Get the curation prompt for an engine."""
+    """Get the curation prompt for an engine.
+
+    If engine has stage_context, composes prompt at runtime using templates.
+    Otherwise, returns legacy curation_prompt field.
+    """
+    query = select(Engine).where(Engine.engine_key == engine_key)
+    result = await db.execute(query)
+    engine = result.scalar_one_or_none()
+
+    if not engine:
+        raise HTTPException(status_code=404, detail=f"Engine '{engine_key}' not found")
+
+    # If engine has stage_context, compose prompt at runtime
+    if engine.stage_context:
+        try:
+            composer = get_composer()
+            stage_context = StageContext(**engine.stage_context)
+            composed = composer.compose(
+                stage="curation",
+                engine_key=engine_key,
+                stage_context=stage_context,
+                audience=audience,
+            )
+            return {
+                "engine_key": engine_key,
+                "prompt_type": "curation",
+                "prompt": composed.prompt,
+                "audience": audience,
+                "framework_used": composed.framework_used,
+                "composed": True,
+            }
+        except Exception as e:
+            # Fall back to legacy prompt if composition fails
+            if engine.curation_prompt:
+                return {
+                    "engine_key": engine_key,
+                    "prompt_type": "curation",
+                    "prompt": engine.curation_prompt,
+                    "composed": False,
+                    "error": str(e),
+                }
+            raise HTTPException(status_code=500, detail=f"Failed to compose prompt: {e}")
+
+    # Fall back to legacy prompt
+    if not engine.curation_prompt:
+        raise HTTPException(status_code=404, detail=f"No curation prompt for engine '{engine_key}'")
+
+    return {
+        "engine_key": engine_key,
+        "prompt_type": "curation",
+        "prompt": engine.curation_prompt,
+        "composed": False,
+    }
+
+
+@router.get("/{engine_key}/concretization-prompt")
+async def get_concretization_prompt(
+    engine_key: str,
+    audience: str = Query("analyst", description="Target audience (researcher, analyst, executive, activist)"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Get the concretization prompt for an engine.
+
+    If engine has stage_context, composes prompt at runtime using templates.
+    Otherwise, returns legacy concretization_prompt field.
+    """
+    query = select(Engine).where(Engine.engine_key == engine_key)
+    result = await db.execute(query)
+    engine = result.scalar_one_or_none()
+
+    if not engine:
+        raise HTTPException(status_code=404, detail=f"Engine '{engine_key}' not found")
+
+    # If engine has stage_context, compose prompt at runtime
+    if engine.stage_context:
+        try:
+            composer = get_composer()
+            stage_context = StageContext(**engine.stage_context)
+
+            # Check if concretization is skipped
+            if stage_context.skip_concretization:
+                return {
+                    "engine_key": engine_key,
+                    "prompt_type": "concretization",
+                    "prompt": "",
+                    "skipped": True,
+                    "composed": True,
+                }
+
+            composed = composer.compose(
+                stage="concretization",
+                engine_key=engine_key,
+                stage_context=stage_context,
+                audience=audience,
+            )
+            return {
+                "engine_key": engine_key,
+                "prompt_type": "concretization",
+                "prompt": composed.prompt,
+                "audience": audience,
+                "framework_used": composed.framework_used,
+                "composed": True,
+            }
+        except Exception as e:
+            # Fall back to legacy prompt if composition fails
+            if engine.concretization_prompt:
+                return {
+                    "engine_key": engine_key,
+                    "prompt_type": "concretization",
+                    "prompt": engine.concretization_prompt,
+                    "composed": False,
+                    "error": str(e),
+                }
+            raise HTTPException(status_code=500, detail=f"Failed to compose prompt: {e}")
+
+    # Fall back to legacy prompt
+    return {
+        "engine_key": engine_key,
+        "prompt_type": "concretization",
+        "prompt": engine.concretization_prompt or "",
+        "composed": False,
+    }
+
+
+@router.get("/{engine_key}/stage-context")
+async def get_stage_context(
+    engine_key: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Get the stage context for an engine (for debugging/editing)."""
     query = select(Engine).where(Engine.engine_key == engine_key)
     result = await db.execute(query)
     engine = result.scalar_one_or_none()
@@ -239,8 +439,8 @@ async def get_curation_prompt(
 
     return {
         "engine_key": engine_key,
-        "prompt_type": "curation",
-        "prompt": engine.curation_prompt,
+        "has_stage_context": engine.stage_context is not None,
+        "stage_context": engine.stage_context,
     }
 
 
@@ -383,7 +583,7 @@ async def restore_engine_version(
     snapshot = engine_version.full_snapshot
     for field in [
         "engine_name", "description", "category", "kind", "reasoning_domain",
-        "researcher_question", "extraction_prompt", "curation_prompt",
+        "researcher_question", "stage_context", "extraction_prompt", "curation_prompt",
         "concretization_prompt", "canonical_schema", "extraction_focus",
         "primary_output_modes", "paradigm_keys"
     ]:

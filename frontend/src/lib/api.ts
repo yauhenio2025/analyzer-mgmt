@@ -5,6 +5,7 @@
 import type {
   Engine,
   EngineSummary,
+  EngineUpdate,
   EngineVersion,
   Paradigm,
   ParadigmSummary,
@@ -23,6 +24,10 @@ import type {
   BranchResponse,
   BranchProgressResponse,
   LineageItem,
+  StageContext,
+  StageContextImprovement,
+  ComposedPromptResponse,
+  AudienceType,
 } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
@@ -114,9 +119,28 @@ class ApiClient {
         `/engines/${engineKey}/versions`
       ),
 
-    getPrompt: (engineKey: string, promptType: 'extraction' | 'curation' | 'concretization') =>
-      this.get<{ engine_key: string; prompt_type: string; prompt: string }>(
-        `/engines/${engineKey}/${promptType}-prompt`
+    /**
+     * Get a composed prompt for an engine.
+     * If engine has stage_context, prompt is composed at runtime using templates.
+     * @param engineKey - The engine key
+     * @param promptType - The prompt type (extraction, curation, concretization)
+     * @param audience - Target audience for vocabulary calibration
+     */
+    getPrompt: (
+      engineKey: string,
+      promptType: 'extraction' | 'curation' | 'concretization',
+      audience: AudienceType = 'analyst'
+    ) =>
+      this.get<ComposedPromptResponse>(
+        `/engines/${engineKey}/${promptType}-prompt?audience=${audience}`
+      ),
+
+    /**
+     * Get the stage_context for an engine (for editing/debugging).
+     */
+    getStageContext: (engineKey: string) =>
+      this.get<{ engine_key: string; has_stage_context: boolean; stage_context: StageContext | null }>(
+        `/engines/${engineKey}/stage-context`
       ),
 
     getSchema: (engineKey: string) =>
@@ -124,9 +148,9 @@ class ApiClient {
         `/engines/${engineKey}/schema`
       ),
 
-    create: (data: Partial<Engine>) => this.post<Engine>('/engines', data),
+    create: (data: EngineUpdate) => this.post<Engine>('/engines', data),
 
-    update: (engineKey: string, data: Partial<Engine>) =>
+    update: (engineKey: string, data: EngineUpdate) =>
       this.put<Engine>(`/engines/${engineKey}`, data),
 
     delete: (engineKey: string) =>
@@ -430,6 +454,29 @@ class ApiClient {
         prompt_type: promptType,
         improvement_goal: improvementGoal,
         current_prompt: currentPrompt,
+      }),
+
+    /**
+     * Improve a specific field within stage_context using AI.
+     * @param engineKey - The engine key
+     * @param stage - The stage (extraction, curation, concretization)
+     * @param field - The field to improve (e.g., extraction_steps, core_question)
+     * @param improvementGoal - What to improve about the field
+     * @param currentValue - Current value if not fetching from DB
+     */
+    improveStageContext: (
+      engineKey: string,
+      stage: string,
+      field: string,
+      improvementGoal: string,
+      currentValue?: string
+    ) =>
+      this.post<StageContextImprovement>('/llm/stage-context-improve', {
+        engine_key: engineKey,
+        stage,
+        field,
+        improvement_goal: improvementGoal,
+        current_value: currentValue,
       }),
 
     validateSchema: (engineKey: string, proposedSchema: Record<string, unknown>, changeDescription: string) =>

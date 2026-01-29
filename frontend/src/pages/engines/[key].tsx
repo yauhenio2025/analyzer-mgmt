@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -14,15 +14,18 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  Eye,
+  Settings2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { Engine } from '@/types';
+import type { Engine, EngineUpdate, StageContext, AudienceType } from '@/types';
 import clsx from 'clsx';
+import { StageContextEditor } from '@/components/StageContextEditor';
 
 // Dynamic import for Monaco Editor to avoid SSR issues
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
-type TabId = 'prompts' | 'schema' | 'consumers' | 'history';
+type TabId = 'context' | 'prompts' | 'preview' | 'schema' | 'consumers' | 'history';
 
 interface TabProps {
   id: TabId;
@@ -133,19 +136,39 @@ export default function EngineDetailPage() {
   const { key } = router.query;
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<TabId>('prompts');
+  const [activeTab, setActiveTab] = useState<TabId>('context');
   const [hasChanges, setHasChanges] = useState(false);
   const [localEngine, setLocalEngine] = useState<Partial<Engine> | null>(null);
+  const [previewAudience, setPreviewAudience] = useState<AudienceType>('analyst');
 
   const { data: engine, isLoading, error } = useQuery({
     queryKey: ['engines', key],
     queryFn: () => api.engines.get(key as string),
     enabled: !!key,
-    onSuccess: (data) => {
-      if (!localEngine) {
-        setLocalEngine(data);
+  });
+
+  // Initialize local state when engine data loads
+  useEffect(() => {
+    if (engine && !localEngine) {
+      setLocalEngine(engine);
+      // Set default tab based on whether engine has stage_context
+      if (!engine.stage_context) {
+        setActiveTab('prompts');
       }
-    },
+    }
+  }, [engine, localEngine]);
+
+  // Query for composed prompts (preview tab)
+  const { data: extractionPreview } = useQuery({
+    queryKey: ['engines', key, 'extraction-prompt', previewAudience],
+    queryFn: () => api.engines.getPrompt(key as string, 'extraction', previewAudience),
+    enabled: !!key && activeTab === 'preview' && !!engine?.stage_context,
+  });
+
+  const { data: curationPreview } = useQuery({
+    queryKey: ['engines', key, 'curation-prompt', previewAudience],
+    queryFn: () => api.engines.getPrompt(key as string, 'curation', previewAudience),
+    enabled: !!key && activeTab === 'preview' && !!engine?.stage_context,
   });
 
   const { data: consumers } = useQuery({
@@ -161,7 +184,7 @@ export default function EngineDetailPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<Engine>) => api.engines.update(key as string, data),
+    mutationFn: (data: EngineUpdate) => api.engines.update(key as string, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['engines', key] });
       setHasChanges(false);
@@ -178,14 +201,30 @@ export default function EngineDetailPage() {
     []
   );
 
+  const handleStageContextChange = useCallback(
+    (stageContext: StageContext) => {
+      setLocalEngine((prev) => ({ ...prev, stage_context: stageContext }));
+      setHasChanges(true);
+    },
+    []
+  );
+
   const handleSave = useCallback(() => {
     if (localEngine) {
-      updateMutation.mutate({
-        extraction_prompt: localEngine.extraction_prompt,
-        curation_prompt: localEngine.curation_prompt,
-        concretization_prompt: localEngine.concretization_prompt,
-        change_summary: 'Updated prompts via management console',
-      });
+      // Save stage_context if present, otherwise save legacy prompts
+      if (localEngine.stage_context) {
+        updateMutation.mutate({
+          stage_context: localEngine.stage_context,
+          change_summary: 'Updated stage context via management console',
+        });
+      } else {
+        updateMutation.mutate({
+          extraction_prompt: localEngine.extraction_prompt,
+          curation_prompt: localEngine.curation_prompt,
+          concretization_prompt: localEngine.concretization_prompt,
+          change_summary: 'Updated prompts via management console',
+        });
+      }
     }
   }, [localEngine, updateMutation]);
 
@@ -285,12 +324,32 @@ export default function EngineDetailPage() {
       {/* Tabs */}
       <div className="border-b">
         <div className="flex gap-4">
-          <Tab
-            id="prompts"
-            label="Prompts"
-            active={activeTab === 'prompts'}
-            onClick={() => setActiveTab('prompts')}
-          />
+          {/* Show Stage Context tab if engine has stage_context */}
+          {displayEngine.stage_context && (
+            <>
+              <Tab
+                id="context"
+                label="Stage Context"
+                active={activeTab === 'context'}
+                onClick={() => setActiveTab('context')}
+              />
+              <Tab
+                id="preview"
+                label="Prompt Preview"
+                active={activeTab === 'preview'}
+                onClick={() => setActiveTab('preview')}
+              />
+            </>
+          )}
+          {/* Show legacy Prompts tab if engine uses prompts */}
+          {!displayEngine.stage_context && (
+            <Tab
+              id="prompts"
+              label="Prompts"
+              active={activeTab === 'prompts'}
+              onClick={() => setActiveTab('prompts')}
+            />
+          )}
           <Tab
             id="schema"
             label="Schema"
@@ -313,7 +372,134 @@ export default function EngineDetailPage() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'prompts' && (
+
+      {/* Stage Context Editor (for engines with stage_context) */}
+      {activeTab === 'context' && displayEngine.stage_context && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Stage Context</h3>
+              <p className="text-sm text-gray-500">
+                Configure engine-specific context for prompt composition
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <Settings2 className="h-4 w-4" />
+              Prompts are composed at runtime using templates
+            </div>
+          </div>
+          <StageContextEditor
+            stageContext={displayEngine.stage_context}
+            onChange={handleStageContextChange}
+            onImproveField={async (stage, field) => {
+              setImprovingPrompt(`${stage}.${field}`);
+              try {
+                // Call the improve endpoint
+                const result = await api.llm.improveStageContext(
+                  key as string,
+                  stage,
+                  field,
+                  'Improve clarity and effectiveness'
+                );
+                // Parse the improved value and update
+                console.log('Improvement result:', result);
+                // For now, just log - the user can manually update
+              } catch (error) {
+                console.error('Failed to improve field:', error);
+              } finally {
+                setImprovingPrompt(null);
+              }
+            }}
+            isImproving={improvingPrompt}
+          />
+        </div>
+      )}
+
+      {/* Prompt Preview (for engines with stage_context) */}
+      {activeTab === 'preview' && displayEngine.stage_context && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Composed Prompt Preview</h3>
+              <p className="text-sm text-gray-500">
+                Preview the prompts as they will be composed from templates
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-700">Audience:</label>
+              <select
+                value={previewAudience}
+                onChange={(e) => setPreviewAudience(e.target.value as AudienceType)}
+                className="input py-1 text-sm"
+              >
+                <option value="researcher">Researcher</option>
+                <option value="analyst">Analyst</option>
+                <option value="executive">Executive</option>
+                <option value="activist">Activist</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Extraction Preview */}
+          <div className="border rounded-lg overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 flex items-center justify-between">
+              <span className="font-medium text-gray-900">Extraction Prompt</span>
+              {extractionPreview?.framework_used && (
+                <span className="badge badge-primary text-xs">
+                  Framework: {extractionPreview.framework_used}
+                </span>
+              )}
+            </div>
+            <div className="h-96">
+              <MonacoEditor
+                height="100%"
+                language="markdown"
+                value={extractionPreview?.prompt || 'Loading...'}
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  wordWrap: 'on',
+                  lineNumbers: 'on',
+                  fontSize: 13,
+                  fontFamily: 'JetBrains Mono, monospace',
+                }}
+                theme="vs-light"
+              />
+            </div>
+          </div>
+
+          {/* Curation Preview */}
+          <div className="border rounded-lg overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 flex items-center justify-between">
+              <span className="font-medium text-gray-900">Curation Prompt</span>
+              {curationPreview?.framework_used && (
+                <span className="badge badge-primary text-xs">
+                  Framework: {curationPreview.framework_used}
+                </span>
+              )}
+            </div>
+            <div className="h-96">
+              <MonacoEditor
+                height="100%"
+                language="markdown"
+                value={curationPreview?.prompt || 'Loading...'}
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  wordWrap: 'on',
+                  lineNumbers: 'on',
+                  fontSize: 13,
+                  fontFamily: 'JetBrains Mono, monospace',
+                }}
+                theme="vs-light"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Legacy Prompts tab (for engines without stage_context) */}
+      {activeTab === 'prompts' && !displayEngine.stage_context && (
         <div className="space-y-4">
           <PromptEditor
             title="Extraction Prompt"
