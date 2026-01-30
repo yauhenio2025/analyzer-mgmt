@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -229,11 +229,14 @@ export default function GridDetailPage() {
     queryKey: ['grid', gridKey],
     queryFn: () => api.grids.get(gridKey),
     enabled: !!gridKey,
-    onSuccess: (data: Grid) => {
-      if (editedConditions === null) setEditedConditions(data.conditions);
-      if (editedAxes === null) setEditedAxes(data.axes);
-    },
   });
+
+  useEffect(() => {
+    if (grid) {
+      if (editedConditions === null) setEditedConditions(grid.conditions);
+      if (editedAxes === null) setEditedAxes(grid.axes);
+    }
+  }, [grid]);
 
   const { data: versionsData } = useQuery({
     queryKey: ['grid-versions', gridKey],
