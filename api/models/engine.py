@@ -87,6 +87,9 @@ class Engine(Base):
     # Paradigm associations
     paradigm_keys: Mapped[list] = mapped_column(JSON, default=list)
 
+    # Engine Profile (About section)
+    engine_profile: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
     # Status
     status: Mapped[str] = mapped_column(String(50), default="active")
 
@@ -123,6 +126,7 @@ class Engine(Base):
             "primary_output_modes": self.primary_output_modes,
             "paradigm_keys": self.paradigm_keys,
             "status": self.status,
+            "engine_profile": self.engine_profile,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -139,6 +143,7 @@ class Engine(Base):
             "paradigm_keys": self.paradigm_keys,
             "status": self.status,
             "has_stage_context": self.stage_context is not None,
+            "has_profile": self.engine_profile is not None,
         }
 
     @property

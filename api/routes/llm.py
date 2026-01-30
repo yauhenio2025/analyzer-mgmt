@@ -1066,3 +1066,223 @@ Focus on common analytical gaps that this paradigm would identify."""
         "existing_patterns": paradigm.critique_patterns,
         "suggested_patterns": response,
     }
+
+
+# ============================================================================
+# Engine Profile (About) Generation
+# ============================================================================
+
+
+class ProfileGenerateRequest(BaseModel):
+    """Request to generate engine profile."""
+    engine_key: str = Field(..., description="Key of the engine to generate profile for")
+    regenerate_fields: Optional[list[str]] = Field(
+        default=None,
+        description="Specific fields to regenerate. If None, generates full profile."
+    )
+
+
+class ProfileGenerateResponse(BaseModel):
+    """Response from profile generation."""
+    engine_key: str
+    profile: dict
+    fields_generated: list[str]
+
+
+class ProfileSuggestionRequest(BaseModel):
+    """Request for profile field suggestions."""
+    engine_key: str
+    field: str
+    improvement_goal: str = ""
+
+
+class ProfileSuggestionResponse(BaseModel):
+    """Response with profile suggestions."""
+    engine_key: str
+    field: str
+    suggestions: list[str]
+    improved_content: Optional[dict] = None
+
+
+def get_schema_summary(schema: dict) -> str:
+    """Extract a summary of key fields from a JSON schema."""
+    if not schema:
+        return "No schema available"
+
+    summary_parts = []
+    for key, value in list(schema.items())[:20]:
+        if isinstance(value, list) and len(value) > 0:
+            if isinstance(value[0], dict):
+                inner_keys = list(value[0].keys())[:5]
+                summary_parts.append(f"- {key}: list of objects with {', '.join(inner_keys)}")
+            else:
+                summary_parts.append(f"- {key}: list")
+        elif isinstance(value, dict):
+            inner_keys = list(value.keys())[:5]
+            summary_parts.append(f"- {key}: object with {', '.join(inner_keys)}")
+        else:
+            summary_parts.append(f"- {key}")
+
+    return "\n".join(summary_parts)
+
+
+@router.post("/profile-generate")
+async def generate_profile(
+    request: ProfileGenerateRequest,
+    db: AsyncSession = Depends(get_db)
+) -> ProfileGenerateResponse:
+    """Generate engine profile using LLM."""
+    result = await db.execute(
+        select(Engine).where(Engine.engine_key == request.engine_key)
+    )
+    engine = result.scalar_one_or_none()
+
+    if not engine:
+        raise HTTPException(status_code=404, detail=f"Engine not found: {request.engine_key}")
+
+    schema_summary = get_schema_summary(engine.canonical_schema)
+
+    system_prompt = """You are an expert in analytical methodology and philosophy of science.
+Generate a rich "About" profile for an analytical engine. Be specific and insightful.
+Draw on your knowledge of philosophy, methodology, and analytical frameworks.
+Output ONLY valid JSON, no markdown code fences or other text."""
+
+    user_prompt = f"""Generate a profile for this analytical engine:
+
+**Key**: {engine.engine_key}
+**Name**: {engine.engine_name}
+**Description**: {engine.description}
+**Category**: {engine.category}
+**Kind**: {engine.kind}
+**Reasoning Domain**: {engine.reasoning_domain or 'N/A'}
+**Researcher Question**: {engine.researcher_question or 'N/A'}
+
+**Schema Summary** (what the engine outputs):
+{schema_summary}
+
+Generate a profile as JSON with this structure:
+{{
+  "theoretical_foundations": [
+    {{"name": "Foundation Name", "description": "Brief explanation", "source_thinker": "Key thinker (optional)"}}
+  ],
+  "key_thinkers": [
+    {{"name": "Thinker Name", "contribution": "What they contributed", "works": ["Key work 1"]}}
+  ],
+  "methodology": {{
+    "approach": "Plain-language description (2-3 sentences)",
+    "key_moves": ["Step 1", "Step 2"],
+    "conceptual_tools": ["Tool 1", "Tool 2"]
+  }},
+  "extracts": {{
+    "primary_outputs": ["What it mainly extracts"],
+    "secondary_outputs": ["Supporting extractions"],
+    "relationships": ["Types of relationships identified"]
+  }},
+  "use_cases": [
+    {{"domain": "Domain name", "description": "How the engine helps", "example": "Concrete example"}}
+  ],
+  "strengths": ["Strength 1", "Strength 2"],
+  "limitations": ["Limitation 1", "Limitation 2"],
+  "related_engines": [
+    {{"engine_key": "related_engine_key", "relationship": "complementary|alternative|prerequisite|extends"}}
+  ],
+  "preamble": "Brief paragraph for prompt injection context."
+}}"""
+
+    try:
+        response = await call_llm(system_prompt, user_prompt)
+
+        # Parse JSON from response
+        content = response.strip()
+        if content.startswith("```"):
+            content = content.split("\n", 1)[1]
+        if content.endswith("```"):
+            content = content.rsplit("```", 1)[0]
+        content = content.strip()
+
+        profile = json.loads(content)
+
+        fields_generated = request.regenerate_fields or [
+            "theoretical_foundations", "key_thinkers", "methodology",
+            "extracts", "use_cases", "strengths", "limitations",
+            "related_engines", "preamble"
+        ]
+
+        return ProfileGenerateResponse(
+            engine_key=request.engine_key,
+            profile=profile,
+            fields_generated=fields_generated
+        )
+
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse LLM response: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Profile generation failed: {e}")
+
+
+@router.post("/profile-suggestions")
+async def get_profile_suggestions(
+    request: ProfileSuggestionRequest,
+    db: AsyncSession = Depends(get_db)
+) -> ProfileSuggestionResponse:
+    """Get AI suggestions for improving a profile field."""
+    result = await db.execute(
+        select(Engine).where(Engine.engine_key == request.engine_key)
+    )
+    engine = result.scalar_one_or_none()
+
+    if not engine:
+        raise HTTPException(status_code=404, detail=f"Engine not found: {request.engine_key}")
+
+    current_value = None
+    if engine.engine_profile:
+        current_value = engine.engine_profile.get(request.field)
+
+    system_prompt = """You are an expert in analytical methodology.
+Suggest improvements for a specific field of an engine profile.
+Output as JSON with "suggestions" (list of strings) and optional "improved_content"."""
+
+    user_prompt = f"""Suggest improvements for the "{request.field}" field:
+
+**Engine**: {engine.engine_name}
+**Description**: {engine.description}
+**Category**: {engine.category}
+
+**Current Value**:
+{json.dumps(current_value, indent=2) if current_value else "No current value"}
+
+**Improvement Goal**: {request.improvement_goal or "General improvement"}
+
+Provide 3-5 specific suggestions and an improved version if applicable."""
+
+    try:
+        response = await call_llm(system_prompt, user_prompt)
+
+        content = response.strip()
+        if content.startswith("```"):
+            content = content.split("\n", 1)[1]
+        if content.endswith("```"):
+            content = content.rsplit("```", 1)[0]
+
+        result_data = json.loads(content)
+
+        return ProfileSuggestionResponse(
+            engine_key=request.engine_key,
+            field=request.field,
+            suggestions=result_data.get("suggestions", []),
+            improved_content=result_data.get("improved_content")
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Suggestion generation failed: {e}")
+
+
+@router.get("/status")
+async def llm_status() -> dict:
+    """Check if LLM service is available."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    return {
+        "available": api_key is not None,
+        "model": "claude-opus-4-5-20251101" if api_key else None,
+        "message": "LLM service ready" if api_key else "Set ANTHROPIC_API_KEY to enable LLM features"
+    }

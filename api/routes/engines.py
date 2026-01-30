@@ -604,3 +604,84 @@ async def restore_engine_version(
     db.add(new_version)
 
     return engine.to_dict()
+
+
+# ============================================================================
+# Engine Profile (About) Endpoints
+# ============================================================================
+
+
+class EngineProfileResponse(BaseModel):
+    """Response for engine profile."""
+    engine_key: str
+    engine_name: str
+    has_profile: bool
+    profile: Optional[dict] = None
+
+
+@router.get("/{engine_key}/profile")
+async def get_engine_profile(
+    engine_key: str,
+    db: AsyncSession = Depends(get_db)
+) -> EngineProfileResponse:
+    """Get engine profile/about section."""
+    result = await db.execute(
+        select(Engine).where(Engine.engine_key == engine_key)
+    )
+    engine = result.scalar_one_or_none()
+
+    if not engine:
+        raise HTTPException(status_code=404, detail=f"Engine not found: {engine_key}")
+
+    return EngineProfileResponse(
+        engine_key=engine.engine_key,
+        engine_name=engine.engine_name,
+        has_profile=engine.engine_profile is not None,
+        profile=engine.engine_profile
+    )
+
+
+@router.put("/{engine_key}/profile")
+async def save_engine_profile(
+    engine_key: str,
+    profile: dict,
+    db: AsyncSession = Depends(get_db)
+) -> EngineProfileResponse:
+    """Save engine profile."""
+    result = await db.execute(
+        select(Engine).where(Engine.engine_key == engine_key)
+    )
+    engine = result.scalar_one_or_none()
+
+    if not engine:
+        raise HTTPException(status_code=404, detail=f"Engine not found: {engine_key}")
+
+    engine.engine_profile = profile
+    await db.commit()
+
+    return EngineProfileResponse(
+        engine_key=engine.engine_key,
+        engine_name=engine.engine_name,
+        has_profile=True,
+        profile=engine.engine_profile
+    )
+
+
+@router.delete("/{engine_key}/profile")
+async def delete_engine_profile(
+    engine_key: str,
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Delete engine profile."""
+    result = await db.execute(
+        select(Engine).where(Engine.engine_key == engine_key)
+    )
+    engine = result.scalar_one_or_none()
+
+    if not engine:
+        raise HTTPException(status_code=404, detail=f"Engine not found: {engine_key}")
+
+    engine.engine_profile = None
+    await db.commit()
+
+    return {"message": "Profile deleted", "engine_key": engine_key}
