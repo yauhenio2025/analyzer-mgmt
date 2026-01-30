@@ -26,7 +26,7 @@ import { EngineProfileEditor } from '@/components/EngineProfileEditor';
 // Dynamic import for Monaco Editor to avoid SSR issues
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
-type TabId = 'about' | 'context' | 'prompts' | 'preview' | 'schema' | 'consumers' | 'history';
+type TabId = 'about' | 'context' | 'preview' | 'schema' | 'consumers' | 'history';
 
 interface TabProps {
   id: TabId;
@@ -48,65 +48,6 @@ function Tab({ id, label, active, onClick }: TabProps) {
     >
       {label}
     </button>
-  );
-}
-
-interface PromptEditorProps {
-  title: string;
-  prompt: string | undefined;
-  onChange: (value: string) => void;
-  onImprove: () => void;
-  isImproving: boolean;
-}
-
-function PromptEditor({ title, prompt, onChange, onImprove, isImproving }: PromptEditorProps) {
-  const [expanded, setExpanded] = useState(true);
-
-  return (
-    <div className="border rounded-lg overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between text-left"
-      >
-        <span className="font-medium text-gray-900">{title}</span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onImprove();
-            }}
-            disabled={isImproving}
-            className="btn-secondary text-xs py-1 px-2"
-          >
-            <Sparkles className="h-3 w-3 mr-1" />
-            {isImproving ? 'Improving...' : 'Improve with AI'}
-          </button>
-          {expanded ? (
-            <ChevronUp className="h-5 w-5 text-gray-400" />
-          ) : (
-            <ChevronDown className="h-5 w-5 text-gray-400" />
-          )}
-        </div>
-      </button>
-      {expanded && (
-        <div className="h-96">
-          <MonacoEditor
-            height="100%"
-            language="markdown"
-            value={prompt || ''}
-            onChange={(value) => onChange(value || '')}
-            options={{
-              minimap: { enabled: false },
-              wordWrap: 'on',
-              lineNumbers: 'on',
-              fontSize: 13,
-              fontFamily: 'JetBrains Mono, monospace',
-            }}
-            theme="vs-light"
-          />
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -160,10 +101,6 @@ export default function EngineDetailPage() {
   useEffect(() => {
     if (engine && !localEngine) {
       setLocalEngine(engine);
-      // Set default tab based on whether engine has stage_context
-      if (!engine.stage_context) {
-        setActiveTab('prompts');
-      }
     }
   }, [engine, localEngine]);
 
@@ -223,15 +160,7 @@ export default function EngineDetailPage() {
     },
   });
 
-  const [improvingPrompt, setImprovingPrompt] = useState<string | null>(null);
-
-  const handlePromptChange = useCallback(
-    (field: 'extraction_prompt' | 'curation_prompt' | 'concretization_prompt', value: string) => {
-      setLocalEngine((prev) => ({ ...prev, [field]: value }));
-      setHasChanges(true);
-    },
-    []
-  );
+  const [improvingField, setImprovingField] = useState<string | null>(null);
 
   const handleStageContextChange = useCallback(
     (stageContext: StageContext) => {
@@ -256,46 +185,13 @@ export default function EngineDetailPage() {
       return;
     }
 
-    if (localEngine) {
-      // Save stage_context if present, otherwise save legacy prompts
-      if (localEngine.stage_context) {
-        updateMutation.mutate({
-          stage_context: localEngine.stage_context,
-          change_summary: 'Updated stage context via management console',
-        });
-      } else {
-        updateMutation.mutate({
-          extraction_prompt: localEngine.extraction_prompt,
-          curation_prompt: localEngine.curation_prompt,
-          concretization_prompt: localEngine.concretization_prompt,
-          change_summary: 'Updated prompts via management console',
-        });
-      }
+    if (localEngine?.stage_context) {
+      updateMutation.mutate({
+        stage_context: localEngine.stage_context,
+        change_summary: 'Updated stage context via management console',
+      });
     }
   }, [activeTab, localProfile, localEngine, updateMutation, saveProfileMutation]);
-
-  const handleImprovePrompt = useCallback(
-    async (promptType: string) => {
-      setImprovingPrompt(promptType);
-      try {
-        const result = await api.llm.improvePrompt(
-          key as string,
-          promptType,
-          'Improve clarity and effectiveness'
-        );
-        if (result.improved_prompt) {
-          const field = `${promptType}_prompt` as keyof Engine;
-          setLocalEngine((prev) => ({ ...prev, [field]: result.improved_prompt }));
-          setHasChanges(true);
-        }
-      } catch (error) {
-        console.error('Failed to improve prompt:', error);
-      } finally {
-        setImprovingPrompt(null);
-      }
-    },
-    [key]
-  );
 
   if (isLoading) {
     return (
@@ -394,15 +290,6 @@ export default function EngineDetailPage() {
               />
             </>
           )}
-          {/* Show legacy Prompts tab if engine uses prompts */}
-          {!displayEngine.stage_context && (
-            <Tab
-              id="prompts"
-              label="Prompts"
-              active={activeTab === 'prompts'}
-              onClick={() => setActiveTab('prompts')}
-            />
-          )}
           <Tab
             id="schema"
             label="Schema"
@@ -495,7 +382,7 @@ export default function EngineDetailPage() {
             stageContext={displayEngine.stage_context}
             onChange={handleStageContextChange}
             onImproveField={async (stage, field) => {
-              setImprovingPrompt(`${stage}.${field}`);
+              setImprovingField(`${stage}.${field}`);
               try {
                 // Call the improve endpoint
                 const result = await api.llm.improveStageContext(
@@ -510,10 +397,10 @@ export default function EngineDetailPage() {
               } catch (error) {
                 console.error('Failed to improve field:', error);
               } finally {
-                setImprovingPrompt(null);
+                setImprovingField(null);
               }
             }}
-            isImproving={improvingPrompt}
+            isImproving={improvingField}
           />
         </div>
       )}
@@ -601,34 +488,6 @@ export default function EngineDetailPage() {
         </div>
       )}
 
-      {/* Legacy Prompts tab (for engines without stage_context) */}
-      {activeTab === 'prompts' && !displayEngine.stage_context && (
-        <div className="space-y-4">
-          <PromptEditor
-            title="Extraction Prompt"
-            prompt={displayEngine.extraction_prompt}
-            onChange={(value) => handlePromptChange('extraction_prompt', value)}
-            onImprove={() => handleImprovePrompt('extraction')}
-            isImproving={improvingPrompt === 'extraction'}
-          />
-          <PromptEditor
-            title="Curation Prompt"
-            prompt={displayEngine.curation_prompt}
-            onChange={(value) => handlePromptChange('curation_prompt', value)}
-            onImprove={() => handleImprovePrompt('curation')}
-            isImproving={improvingPrompt === 'curation'}
-          />
-          {(displayEngine.concretization_prompt || engine.concretization_prompt) && (
-            <PromptEditor
-              title="Concretization Prompt"
-              prompt={displayEngine.concretization_prompt}
-              onChange={(value) => handlePromptChange('concretization_prompt', value)}
-              onImprove={() => handleImprovePrompt('concretization')}
-              isImproving={improvingPrompt === 'concretization'}
-            />
-          )}
-        </div>
-      )}
 
       {activeTab === 'schema' && (
         <div>
