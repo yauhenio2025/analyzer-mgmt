@@ -27,6 +27,12 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE grids ADD COLUMN IF NOT EXISTS about TEXT NOT NULL DEFAULT ''"
             )
         )
+        # One-time migration: add 'engine_profile' column to engines if missing
+        await conn.execute(
+            __import__('sqlalchemy').text(
+                "ALTER TABLE engines ADD COLUMN IF NOT EXISTS engine_profile JSONB"
+            )
+        )
     yield
 
 
