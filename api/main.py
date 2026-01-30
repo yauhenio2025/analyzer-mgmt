@@ -39,6 +39,7 @@ app.add_middleware(
         "http://localhost:3001",
         "http://localhost:3002",
         "https://analyzer-mgmt.onrender.com",
+        "https://analyzer-mgmt-frontend.onrender.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
