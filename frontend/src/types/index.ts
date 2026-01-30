@@ -484,6 +484,77 @@ export interface SchemaValidation {
 }
 
 // ============================================================================
+// Grid Types
+// ============================================================================
+
+export interface GridDimension {
+  name: string;
+  description: string;
+  added_version: number;
+}
+
+export interface Grid {
+  id: string;
+  grid_key: string;
+  grid_name: string;
+  description: string;
+  track: 'ideas' | 'process';
+  conditions: GridDimension[];
+  axes: GridDimension[];
+  version: number;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface GridSummary {
+  grid_key: string;
+  grid_name: string;
+  track: 'ideas' | 'process';
+  condition_count: number;
+  axis_count: number;
+  version: number;
+  status: string;
+}
+
+export interface GridDimensions {
+  grid_key: string;
+  version: number;
+  conditions: string[];
+  axes: string[];
+  dimension_hash: string;
+}
+
+export interface GridVersion {
+  id: string;
+  grid_id: string;
+  version: number;
+  full_snapshot: Grid;
+  change_summary?: string;
+  created_at?: string;
+}
+
+export type WildcardStatus = 'suggested' | 'review' | 'promoted' | 'rejected';
+export type WildcardScope = 'universal' | 'project_specific';
+
+export interface WildcardSuggestion {
+  id: string;
+  grid_id: string;
+  dimension_type: 'condition' | 'axis';
+  name: string;
+  description: string;
+  rationale: string;
+  confidence: number;
+  scope: WildcardScope;
+  source_project?: string;
+  source_session_id?: string;
+  evidence_questions?: number[];
+  status: WildcardStatus;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// ============================================================================
 // API Response Types
 // ============================================================================
 

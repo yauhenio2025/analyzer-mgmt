@@ -6,6 +6,7 @@ from models.paradigm import Paradigm
 from models.pipeline import Pipeline, PipelineStage
 from models.consumer import Consumer, ConsumerDependency
 from models.change import ChangeEvent, ChangeNotification
+from models.grid import Grid, GridVersion, WildcardSuggestion
 
 __all__ = [
     "Base",
@@ -20,4 +21,7 @@ __all__ = [
     "ConsumerDependency",
     "ChangeEvent",
     "ChangeNotification",
+    "Grid",
+    "GridVersion",
+    "WildcardSuggestion",
 ]

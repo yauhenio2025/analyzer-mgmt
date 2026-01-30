@@ -28,6 +28,11 @@ import type {
   StageContextImprovement,
   ComposedPromptResponse,
   AudienceType,
+  Grid,
+  GridSummary,
+  GridDimensions,
+  GridVersion,
+  WildcardSuggestion,
 } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
@@ -504,6 +509,68 @@ class ApiClient {
         existing_patterns: Array<{ pattern: string; diagnostic: string; fix: string }>;
         suggested_patterns: string;
       }>(`/llm/generate-critique-patterns?paradigm_key=${paradigmKey}`),
+  };
+
+  // ============================================================================
+  // Grid Endpoints
+  // ============================================================================
+
+  grids = {
+    list: (params?: { track?: string; status?: string }) => {
+      const queryParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) queryParams.set(key, String(value));
+        });
+      }
+      const query = queryParams.toString();
+      return this.get<{ grids: GridSummary[]; total: number }>(
+        `/grids${query ? `?${query}` : ''}`
+      );
+    },
+
+    get: (gridKey: string) => this.get<Grid>(`/grids/${gridKey}`),
+
+    getDimensions: (gridKey: string) =>
+      this.get<GridDimensions>(`/grids/${gridKey}/dimensions`),
+
+    getVersions: (gridKey: string) =>
+      this.get<{ grid_key: string; current_version: number; versions: GridVersion[] }>(
+        `/grids/${gridKey}/versions`
+      ),
+
+    create: (data: Partial<Grid>) => this.post<Grid>('/grids', data),
+
+    update: (gridKey: string, data: Partial<Grid> & { change_summary?: string }) =>
+      this.put<Grid>(`/grids/${gridKey}`, data),
+
+    delete: (gridKey: string) =>
+      this.delete<{ message: string }>(`/grids/${gridKey}`),
+
+    // Wildcards
+    listWildcards: (gridKey: string, params?: { status?: string; scope?: string }) => {
+      const queryParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) queryParams.set(key, String(value));
+        });
+      }
+      const query = queryParams.toString();
+      return this.get<{ wildcards: WildcardSuggestion[]; total: number }>(
+        `/grids/${gridKey}/wildcards${query ? `?${query}` : ''}`
+      );
+    },
+
+    promoteWildcard: (gridKey: string, wildcardId: string) =>
+      this.post<WildcardSuggestion>(`/grids/${gridKey}/wildcards/${wildcardId}/promote`),
+
+    rejectWildcard: (gridKey: string, wildcardId: string) =>
+      this.post<WildcardSuggestion>(`/grids/${gridKey}/wildcards/${wildcardId}/reject`),
+
+    addWildcardToGrid: (gridKey: string, wildcardId: string) =>
+      this.post<{ grid: Grid; added_dimension: Record<string, unknown>; wildcard: WildcardSuggestion }>(
+        `/grids/${gridKey}/wildcards/${wildcardId}/add-to-grid`
+      ),
   };
 
   // ============================================================================

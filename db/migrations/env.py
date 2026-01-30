@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../api'))
 from models.database import Base
 from models import Engine, EngineVersion, Paradigm, Pipeline, PipelineStage
 from models import Consumer, ConsumerDependency, ChangeEvent, ChangeNotification
+from models import Grid, GridVersion, WildcardSuggestion
 
 # this is the Alembic Config object
 config = context.config
