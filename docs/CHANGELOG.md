@@ -11,6 +11,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   - Profile API endpoints in ([frontend/src/lib/api.ts](frontend/src/lib/api.ts)) - getProfile, saveProfile, deleteProfile
   - LLM endpoints for AI profile generation - generateProfile, profileSuggestions
   - EngineProfileEditor component ([frontend/src/components/EngineProfileEditor.tsx](frontend/src/components/EngineProfileEditor.tsx))
+  - Backend profile endpoints: GET/PUT/DELETE /api/engines/{key}/profile ([api/routes/engines.py](api/routes/engines.py))
+  - Backend LLM profile generation: POST /api/llm/profile-generate, POST /api/llm/profile-suggestions ([api/routes/llm.py](api/routes/llm.py))
+  - GET /api/llm/status endpoint to check LLM availability ([api/routes/llm.py](api/routes/llm.py))
+  - engine_profile JSON column on Engine model ([api/models/engine.py](api/models/engine.py))
+  - Database migration for engine_profile column ([db/migrations/versions/003_add_engine_profile.py](db/migrations/versions/003_add_engine_profile.py))
   - About tab on engine detail page as first tab ([frontend/src/pages/engines/[key].tsx](frontend/src/pages/engines/[key].tsx))
   - Collapsible sections for theoretical foundations, key thinkers, methodology, extracts, use cases, strengths, limitations, related engines, preamble
   - "Generate Profile with AI" button using Claude API via analyzer-v2 backend
