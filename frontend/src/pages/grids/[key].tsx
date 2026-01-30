@@ -92,7 +92,7 @@ function DimensionList({
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-          placeholder={`Add ${title.toLowerCase().slice(0, -1)}...`}
+          placeholder="Add dimension..."
           className="flex-1 text-sm border rounded px-2 py-1"
         />
         <button
