@@ -63,7 +63,7 @@ function DimensionList({
           <div key={i} className="flex items-start gap-2 p-2 bg-white rounded border">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400 w-5">{i}</span>
+                <span className="text-xs text-gray-400 w-5">{i + 1}</span>
                 <span className="text-sm font-medium text-gray-900">{dim.name}</span>
                 {dim.added_version > 1 && (
                   <span className="text-xs text-gray-400">v{dim.added_version}</span>
