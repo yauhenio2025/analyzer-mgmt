@@ -31,6 +31,7 @@ class GridCreate(BaseModel):
     grid_key: str = Field(..., min_length=1, max_length=255)
     grid_name: str
     description: str = ""
+    about: str = ""
     track: str = Field(..., pattern="^(ideas|process)$")
     conditions: list[dict] = []
     axes: list[dict] = []
@@ -39,6 +40,7 @@ class GridCreate(BaseModel):
 class GridUpdate(BaseModel):
     grid_name: Optional[str] = None
     description: Optional[str] = None
+    about: Optional[str] = None
     conditions: Optional[list[dict]] = None
     axes: Optional[list[dict]] = None
     status: Optional[str] = None

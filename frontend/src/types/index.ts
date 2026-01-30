@@ -498,6 +498,7 @@ export interface Grid {
   grid_key: string;
   grid_name: string;
   description: string;
+  about: string;
   track: 'ideas' | 'process';
   conditions: GridDimension[];
   axes: GridDimension[];

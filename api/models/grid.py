@@ -24,6 +24,7 @@ class Grid(Base):
     grid_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     grid_name: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    about: Mapped[str] = mapped_column(Text, nullable=False, default="")  # Longer markdown text explaining grid philosophy
     track: Mapped[str] = mapped_column(String(50), nullable=False)  # "ideas" or "process"
 
     # Dimensions stored as rich objects: [{name, description, added_version}]
@@ -59,6 +60,7 @@ class Grid(Base):
             "grid_key": self.grid_key,
             "grid_name": self.grid_name,
             "description": self.description,
+            "about": self.about,
             "track": self.track,
             "conditions": self.conditions,
             "axes": self.axes,

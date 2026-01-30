@@ -220,9 +220,10 @@ export default function GridDetailPage() {
   const gridKey = router.query.key as string;
   const queryClient = useQueryClient();
 
-  const [tab, setTab] = useState<'dimensions' | 'wildcards' | 'versions'>('dimensions');
+  const [tab, setTab] = useState<'about' | 'dimensions' | 'wildcards' | 'versions'>('about');
   const [editedConditions, setEditedConditions] = useState<GridDimension[] | null>(null);
   const [editedAxes, setEditedAxes] = useState<GridDimension[] | null>(null);
+  const [editedAbout, setEditedAbout] = useState<string | null>(null);
   const [changeSummary, setChangeSummary] = useState('');
 
   const { data: grid, isLoading, error } = useQuery({
@@ -235,6 +236,7 @@ export default function GridDetailPage() {
     if (grid) {
       if (editedConditions === null) setEditedConditions(grid.conditions);
       if (editedAxes === null) setEditedAxes(grid.axes);
+      if (editedAbout === null) setEditedAbout(grid.about || '');
     }
   }, [grid]);
 
@@ -245,7 +247,7 @@ export default function GridDetailPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { conditions: GridDimension[]; axes: GridDimension[]; change_summary: string }) =>
+    mutationFn: (data: { conditions: GridDimension[]; axes: GridDimension[]; about?: string; change_summary: string }) =>
       api.grids.update(gridKey, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['grid', gridKey] });
@@ -259,6 +261,7 @@ export default function GridDetailPage() {
     updateMutation.mutate({
       conditions: editedConditions,
       axes: editedAxes,
+      about: editedAbout || undefined,
       change_summary: changeSummary || 'Updated via UI',
     });
   };
@@ -268,7 +271,8 @@ export default function GridDetailPage() {
     editedConditions &&
     editedAxes &&
     (JSON.stringify(editedConditions) !== JSON.stringify(grid.conditions) ||
-      JSON.stringify(editedAxes) !== JSON.stringify(grid.axes));
+      JSON.stringify(editedAxes) !== JSON.stringify(grid.axes) ||
+      (editedAbout !== null && editedAbout !== (grid.about || '')));
 
   if (isLoading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
   if (error) return <div className="text-center py-12 text-red-500">Error loading grid</div>;
@@ -294,7 +298,7 @@ export default function GridDetailPage() {
       {/* Tabs */}
       <div className="border-b mb-4">
         <nav className="flex gap-4">
-          {(['dimensions', 'wildcards', 'versions'] as const).map((t) => (
+          {(['about', 'dimensions', 'wildcards', 'versions'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -311,50 +315,70 @@ export default function GridDetailPage() {
         </nav>
       </div>
 
+      {/* About Tab */}
+      {tab === 'about' && (
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">About This Grid</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Explain how the two axes relate, what each dimension captures, and the grid's conceptual architecture.
+            Markdown supported.
+          </p>
+          <textarea
+            value={editedAbout || ''}
+            onChange={(e) => setEditedAbout(e.target.value)}
+            rows={16}
+            className="w-full text-sm border rounded-lg px-4 py-3 font-mono leading-relaxed focus:ring-2 focus:ring-primary-300 focus:border-primary-300"
+            placeholder="Describe how the rows (Substance — What) and columns (Quality — How) of this grid relate..."
+          />
+        </div>
+      )}
+
       {/* Dimensions Tab */}
       {tab === 'dimensions' && editedConditions && editedAxes && (
         <div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="card p-4">
               <DimensionList
-                title="Conditions (Rows)"
+                title="Substance — What (Rows)"
                 dimensions={editedConditions}
                 onChange={setEditedConditions}
               />
             </div>
             <div className="card p-4">
               <DimensionList
-                title="Axes (Columns)"
+                title="Quality — How (Columns)"
                 dimensions={editedAxes}
                 onChange={setEditedAxes}
               />
             </div>
           </div>
 
-          {hasChanges && (
-            <div className="mt-4 card p-4 bg-yellow-50 border-yellow-200">
-              <div className="flex items-end gap-3">
-                <div className="flex-1">
-                  <label className="text-sm font-medium text-gray-700">Change summary</label>
-                  <input
-                    type="text"
-                    value={changeSummary}
-                    onChange={(e) => setChangeSummary(e.target.value)}
-                    placeholder="Describe your changes..."
-                    className="mt-1 w-full text-sm border rounded px-3 py-1.5"
-                  />
-                </div>
-                <button
-                  onClick={handleSave}
-                  disabled={updateMutation.isPending}
-                  className="flex items-center gap-2 px-4 py-1.5 bg-primary-600 text-white text-sm font-medium rounded hover:bg-primary-700 disabled:opacity-50"
-                >
-                  <Save className="h-4 w-4" />
-                  Save (v{grid.version + 1})
-                </button>
-              </div>
+        </div>
+      )}
+
+      {/* Save Bar (shown on About and Dimensions tabs) */}
+      {hasChanges && (tab === 'about' || tab === 'dimensions') && (
+        <div className="mt-4 card p-4 bg-yellow-50 border-yellow-200">
+          <div className="flex items-end gap-3">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-700">Change summary</label>
+              <input
+                type="text"
+                value={changeSummary}
+                onChange={(e) => setChangeSummary(e.target.value)}
+                placeholder="Describe your changes..."
+                className="mt-1 w-full text-sm border rounded px-3 py-1.5"
+              />
             </div>
-          )}
+            <button
+              onClick={handleSave}
+              disabled={updateMutation.isPending}
+              className="flex items-center gap-2 px-4 py-1.5 bg-primary-600 text-white text-sm font-medium rounded hover:bg-primary-700 disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              Save (v{grid.version + 1})
+            </button>
+          </div>
         </div>
       )}
 
