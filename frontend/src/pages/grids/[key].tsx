@@ -346,7 +346,7 @@ export default function GridDetailPage() {
                 </div>
                 <button
                   onClick={handleSave}
-                  disabled={updateMutation.isLoading}
+                  disabled={updateMutation.isPending}
                   className="flex items-center gap-2 px-4 py-1.5 bg-primary-600 text-white text-sm font-medium rounded hover:bg-primary-700 disabled:opacity-50"
                 >
                   <Save className="h-4 w-4" />
