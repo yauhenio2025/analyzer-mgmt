@@ -18,14 +18,15 @@ import {
   Settings2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { Engine, EngineUpdate, StageContext, AudienceType } from '@/types';
+import type { Engine, EngineUpdate, StageContext, AudienceType, EngineProfile } from '@/types';
 import clsx from 'clsx';
 import { StageContextEditor } from '@/components/StageContextEditor';
+import { EngineProfileEditor } from '@/components/EngineProfileEditor';
 
 // Dynamic import for Monaco Editor to avoid SSR issues
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
-type TabId = 'context' | 'prompts' | 'preview' | 'schema' | 'consumers' | 'history';
+type TabId = 'about' | 'context' | 'prompts' | 'preview' | 'schema' | 'consumers' | 'history';
 
 interface TabProps {
   id: TabId;
@@ -136,14 +137,22 @@ export default function EngineDetailPage() {
   const { key } = router.query;
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<TabId>('context');
+  const [activeTab, setActiveTab] = useState<TabId>('about');
   const [hasChanges, setHasChanges] = useState(false);
   const [localEngine, setLocalEngine] = useState<Partial<Engine> | null>(null);
+  const [localProfile, setLocalProfile] = useState<EngineProfile | null>(null);
   const [previewAudience, setPreviewAudience] = useState<AudienceType>('analyst');
 
   const { data: engine, isLoading, error } = useQuery({
     queryKey: ['engines', key],
     queryFn: () => api.engines.get(key as string),
+    enabled: !!key,
+  });
+
+  // Query for profile
+  const { data: profileData } = useQuery({
+    queryKey: ['engines', key, 'profile'],
+    queryFn: () => api.engines.getProfile(key as string),
     enabled: !!key,
   });
 
@@ -157,6 +166,13 @@ export default function EngineDetailPage() {
       }
     }
   }, [engine, localEngine]);
+
+  // Initialize profile when profile data loads
+  useEffect(() => {
+    if (profileData?.has_profile && profileData.profile && !localProfile) {
+      setLocalProfile(profileData.profile);
+    }
+  }, [profileData, localProfile]);
 
   // Query for composed prompts (preview tab)
   const { data: extractionPreview } = useQuery({
@@ -191,6 +207,22 @@ export default function EngineDetailPage() {
     },
   });
 
+  const generateProfileMutation = useMutation({
+    mutationFn: () => api.llm.generateProfile(key as string),
+    onSuccess: (data) => {
+      setLocalProfile(data.profile);
+      setHasChanges(true);
+    },
+  });
+
+  const saveProfileMutation = useMutation({
+    mutationFn: (profile: EngineProfile) => api.engines.saveProfile(key as string, profile),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['engines', key, 'profile'] });
+      setHasChanges(false);
+    },
+  });
+
   const [improvingPrompt, setImprovingPrompt] = useState<string | null>(null);
 
   const handlePromptChange = useCallback(
@@ -209,7 +241,21 @@ export default function EngineDetailPage() {
     []
   );
 
+  const handleProfileChange = useCallback(
+    (profile: EngineProfile) => {
+      setLocalProfile(profile);
+      setHasChanges(true);
+    },
+    []
+  );
+
   const handleSave = useCallback(() => {
+    // Save profile if on about tab and profile exists
+    if (activeTab === 'about' && localProfile) {
+      saveProfileMutation.mutate(localProfile);
+      return;
+    }
+
     if (localEngine) {
       // Save stage_context if present, otherwise save legacy prompts
       if (localEngine.stage_context) {
@@ -226,7 +272,7 @@ export default function EngineDetailPage() {
         });
       }
     }
-  }, [localEngine, updateMutation]);
+  }, [activeTab, localProfile, localEngine, updateMutation, saveProfileMutation]);
 
   const handleImprovePrompt = useCallback(
     async (promptType: string) => {
@@ -302,11 +348,11 @@ export default function EngineDetailPage() {
           )}
           <button
             onClick={handleSave}
-            disabled={!hasChanges || updateMutation.isPending}
+            disabled={!hasChanges || updateMutation.isPending || saveProfileMutation.isPending}
             className="btn-primary"
           >
             <Save className="h-4 w-4 mr-2" />
-            {updateMutation.isPending ? 'Saving...' : 'Save'}
+            {updateMutation.isPending || saveProfileMutation.isPending ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
@@ -324,6 +370,13 @@ export default function EngineDetailPage() {
       {/* Tabs */}
       <div className="border-b">
         <div className="flex gap-4">
+          {/* About tab - always shown first */}
+          <Tab
+            id="about"
+            label="About"
+            active={activeTab === 'about'}
+            onClick={() => setActiveTab('about')}
+          />
           {/* Show Stage Context tab if engine has stage_context */}
           {displayEngine.stage_context && (
             <>
@@ -372,6 +425,56 @@ export default function EngineDetailPage() {
       </div>
 
       {/* Tab Content */}
+
+      {/* About Tab */}
+      {activeTab === 'about' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Engine Profile</h3>
+              <p className="text-sm text-gray-500">
+                Theoretical foundations, methodology, use cases, and more
+              </p>
+            </div>
+            {!localProfile && (
+              <button
+                onClick={() => generateProfileMutation.mutate()}
+                disabled={generateProfileMutation.isPending}
+                className="btn-primary"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                {generateProfileMutation.isPending ? 'Generating...' : 'Generate Profile with AI'}
+              </button>
+            )}
+          </div>
+
+          {localProfile ? (
+            <EngineProfileEditor
+              profile={localProfile}
+              onChange={handleProfileChange}
+            />
+          ) : (
+            <div className="card p-8 text-center">
+              <div className="max-w-md mx-auto">
+                <Sparkles className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Profile Yet</h3>
+                <p className="text-gray-500 mb-4">
+                  Generate a rich profile for this engine using AI. The profile will include
+                  theoretical foundations, key thinkers, methodology, use cases, and more.
+                </p>
+                <button
+                  onClick={() => generateProfileMutation.mutate()}
+                  disabled={generateProfileMutation.isPending}
+                  className="btn-primary"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {generateProfileMutation.isPending ? 'Generating...' : 'Generate Profile'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stage Context Editor (for engines with stage_context) */}
       {activeTab === 'context' && displayEngine.stage_context && (

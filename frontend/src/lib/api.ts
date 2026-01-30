@@ -7,6 +7,8 @@ import type {
   EngineSummary,
   EngineUpdate,
   EngineVersion,
+  EngineProfile,
+  EngineProfileResponse,
   Paradigm,
   ParadigmSummary,
   Pipeline,
@@ -166,6 +168,24 @@ class ApiClient {
 
     getCategories: () =>
       this.get<{ categories: Record<string, number> }>('/engines/categories'),
+
+    /**
+     * Get the profile/about section for an engine.
+     */
+    getProfile: (engineKey: string) =>
+      this.get<EngineProfileResponse>(`/engines/${engineKey}/profile`),
+
+    /**
+     * Save or update the profile for an engine.
+     */
+    saveProfile: (engineKey: string, profile: EngineProfile) =>
+      this.put<EngineProfileResponse>(`/engines/${engineKey}/profile`, profile),
+
+    /**
+     * Delete the profile for an engine.
+     */
+    deleteProfile: (engineKey: string) =>
+      this.delete<{ status: string; engine_key: string }>(`/engines/${engineKey}/profile`),
   };
 
   // ============================================================================
@@ -509,6 +529,44 @@ class ApiClient {
         existing_patterns: Array<{ pattern: string; diagnostic: string; fix: string }>;
         suggested_patterns: string;
       }>(`/llm/generate-critique-patterns?paradigm_key=${paradigmKey}`),
+
+    /**
+     * Generate a full profile for an engine using AI.
+     */
+    generateProfile: (engineKey: string, regenerateFields?: string[]) =>
+      this.post<{
+        engine_key: string;
+        profile: EngineProfile;
+        fields_generated: string[];
+      }>('/llm/profile-generate', {
+        engine_key: engineKey,
+        regenerate_fields: regenerateFields,
+      }),
+
+    /**
+     * Get AI suggestions for improving a specific profile field.
+     */
+    profileSuggestions: (engineKey: string, field: string, improvementGoal: string) =>
+      this.post<{
+        engine_key: string;
+        field: string;
+        suggestions: string[];
+        improved_content: Record<string, unknown> | null;
+      }>('/llm/profile-suggestions', {
+        engine_key: engineKey,
+        field,
+        improvement_goal: improvementGoal,
+      }),
+
+    /**
+     * Check if LLM service is available.
+     */
+    getStatus: () =>
+      this.get<{
+        available: boolean;
+        model: string | null;
+        message: string;
+      }>('/llm/status'),
   };
 
   // ============================================================================

@@ -81,6 +81,64 @@ export interface ComposedPrompts {
 }
 
 // ============================================================================
+// Engine Profile Types (About Section)
+// ============================================================================
+
+export interface TheoreticalFoundation {
+  name: string;
+  description: string;
+  source_thinker?: string;
+}
+
+export interface KeyThinker {
+  name: string;
+  contribution: string;
+  works?: string[];
+}
+
+export interface Methodology {
+  approach: string;
+  key_moves: string[];
+  conceptual_tools: string[];
+}
+
+export interface EngineExtracts {
+  primary_outputs: string[];
+  secondary_outputs: string[];
+  relationships: string[];
+}
+
+export interface UseCase {
+  domain: string;
+  description: string;
+  example?: string;
+}
+
+export interface RelatedEngine {
+  engine_key: string;
+  relationship: 'complementary' | 'alternative' | 'prerequisite' | 'extends';
+}
+
+export interface EngineProfile {
+  theoretical_foundations: TheoreticalFoundation[];
+  key_thinkers: KeyThinker[];
+  methodology?: Methodology;
+  extracts?: EngineExtracts;
+  use_cases: UseCase[];
+  strengths: string[];
+  limitations: string[];
+  related_engines: RelatedEngine[];
+  preamble: string;
+}
+
+export interface EngineProfileResponse {
+  engine_key: string;
+  engine_name: string;
+  has_profile: boolean;
+  profile: EngineProfile | null;
+}
+
+// ============================================================================
 // Engine Types
 // ============================================================================
 
@@ -105,6 +163,7 @@ export interface Engine {
   primary_output_modes: string[];
   paradigm_keys: string[];
   status: EngineStatus;
+  engine_profile?: EngineProfile;
   created_at?: string;
   updated_at?: string;
 }
@@ -118,7 +177,8 @@ export interface EngineSummary {
   kind: EngineKind;
   paradigm_keys: string[];
   status: EngineStatus;
-  has_stage_context?: boolean;  // NEW: Indicates if engine uses stage_context
+  has_stage_context?: boolean;  // Indicates if engine uses stage_context
+  has_profile?: boolean;        // Indicates if engine has rich profile/about section
 }
 
 export interface EngineVersion {
