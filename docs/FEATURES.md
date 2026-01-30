@@ -1,6 +1,6 @@
 # Feature Inventory
 
-> Auto-maintained by Claude Code. Last updated: 2026-01-29 (Stage Context Prompt Composition)
+> Auto-maintained by Claude Code. Last updated: 2026-01-30 (Engine Profile / About Feature)
 
 ## Backend API
 
@@ -38,6 +38,19 @@
   - `frontend/src/pages/engines/[key].tsx:200-350` - Integration in engine detail page
 - **Dependencies**: React, Lucide icons
 - **Added**: 2026-01-29
+
+### Engine Profile / About Feature
+- **Status**: Active
+- **Description**: Rich metadata for engines including theoretical foundations, key thinkers, methodology, use cases, and AI-powered profile generation
+- **Entry Points**:
+  - `frontend/src/types/index.ts:87-139` - EngineProfile and nested TypeScript types
+  - `frontend/src/lib/api.ts:110-135` - Profile API endpoints (getProfile, saveProfile, deleteProfile)
+  - `frontend/src/lib/api.ts:320-340` - LLM endpoints (generateProfile, profileSuggestions)
+  - `frontend/src/components/EngineProfileEditor.tsx:1-530` - Full profile editor component
+  - `frontend/src/pages/engines/[key].tsx:140-180` - Profile state and queries
+  - `frontend/src/pages/engines/[key].tsx:400-460` - About tab content
+- **Dependencies**: React, TanStack Query, analyzer-v2 backend (profile & LLM endpoints)
+- **Added**: 2026-01-30
 
 ### Paradigm Management
 - **Status**: Active

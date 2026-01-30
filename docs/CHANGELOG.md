@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- Engine Profile / About feature for engines
+  - EngineProfile TypeScript types in ([frontend/src/types/index.ts](frontend/src/types/index.ts))
+  - Profile API endpoints in ([frontend/src/lib/api.ts](frontend/src/lib/api.ts)) - getProfile, saveProfile, deleteProfile
+  - LLM endpoints for AI profile generation - generateProfile, profileSuggestions
+  - EngineProfileEditor component ([frontend/src/components/EngineProfileEditor.tsx](frontend/src/components/EngineProfileEditor.tsx))
+  - About tab on engine detail page as first tab ([frontend/src/pages/engines/[key].tsx](frontend/src/pages/engines/[key].tsx))
+  - Collapsible sections for theoretical foundations, key thinkers, methodology, extracts, use cases, strengths, limitations, related engines, preamble
+  - "Generate Profile with AI" button using Claude API via analyzer-v2 backend
 - Stage context prompt composition system ([api/stages/](api/stages/))
   - Jinja2 templates for extraction, curation, concretization prompts
   - Framework primers (brandomian, dennett, toulmin)
