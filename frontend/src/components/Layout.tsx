@@ -11,6 +11,7 @@ import {
   X,
   LayoutGrid,
   Palette,
+  Shapes,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -27,6 +28,7 @@ const navigation: NavItem[] = [
   { name: 'Pipelines', href: '/pipelines', icon: GitBranch },
   { name: 'Grids', href: '/grids', icon: LayoutGrid },
   { name: 'Styles', href: '/styles', icon: Palette },
+  { name: 'Primitives', href: '/primitives', icon: Shapes },
   { name: 'Consumers', href: '/consumers', icon: Users },
   { name: 'Changes', href: '/changes', icon: History },
 ];

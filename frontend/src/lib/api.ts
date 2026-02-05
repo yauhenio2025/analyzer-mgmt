@@ -39,6 +39,9 @@ import type {
   StyleGuide,
   AffinitySet,
   EngineStyleMapping,
+  AnalyticalPrimitive,
+  PrimitiveSummary,
+  EnginePrimitiveMapping,
 } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
@@ -730,6 +733,85 @@ class ApiClient {
         engine_affinities: number;
         format_affinities: number;
         audience_affinities: number;
+      }>;
+    },
+  };
+
+  // ============================================================================
+  // Primitives Endpoints (from analyzer-v2)
+  // ============================================================================
+
+  primitives = {
+    /**
+     * List all analytical primitives.
+     */
+    list: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/primitives`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<PrimitiveSummary[]>;
+    },
+
+    /**
+     * Get all primitives with full details.
+     */
+    getAll: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/primitives/all`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<AnalyticalPrimitive[]>;
+    },
+
+    /**
+     * Get a specific primitive.
+     */
+    get: async (key: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/primitives/${key}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<AnalyticalPrimitive>;
+    },
+
+    /**
+     * Get primitives for an engine.
+     */
+    getForEngine: async (engineKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/primitives/for-engine/${engineKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<AnalyticalPrimitive[]>;
+    },
+
+    /**
+     * Get Gemini guidance for an engine.
+     */
+    getGuidance: async (engineKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/primitives/for-engine/${engineKey}/guidance`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{
+        engine_key: string;
+        has_guidance: boolean;
+        primitive_count: number;
+        primitive_keys: string[];
+        gemini_guidance: string | null;
+      }>;
+    },
+
+    /**
+     * Get engine-primitive mappings.
+     */
+    getEngineMappings: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/primitives/engine-mappings`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<EnginePrimitiveMapping[]>;
+    },
+
+    /**
+     * Get stats.
+     */
+    getStats: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/primitives/stats`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{
+        primitives_loaded: number;
+        engines_with_primitives: number;
+        total_associations: number;
       }>;
     },
   };

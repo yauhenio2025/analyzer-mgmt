@@ -696,6 +696,37 @@ export interface EngineStyleMapping {
 }
 
 // ============================================================================
+// Primitive Types (from analyzer-v2)
+// ============================================================================
+
+export interface AnalyticalPrimitive {
+  key: string;
+  name: string;
+  description: string;
+  visual_hint: string;
+  visual_forms: string[];
+  style_hint: string;
+  style_leanings: string[];
+  gemini_guidance: string;
+  associated_engines: string[];
+}
+
+export interface PrimitiveSummary {
+  key: string;
+  name: string;
+  description: string;
+  engine_count: number;
+  visual_forms_preview: string[];
+}
+
+export interface EnginePrimitiveMapping {
+  engine_key: string;
+  engine_name: string;
+  primitives: string[];
+  has_primitive: boolean;
+}
+
+// ============================================================================
 // API Response Types
 // ============================================================================
 
