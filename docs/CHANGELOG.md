@@ -14,6 +14,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   - Seed script for initial rhetoric data ([scripts/seed_rhetoric.py](scripts/seed_rhetoric.py))
   - Sanitization script to remove all hardcoded author references ([scripts/sanitize_rhetoric_prompts.py](scripts/sanitize_rhetoric_prompts.py))
   - All prompts use generic placeholders: {SUBJECT_AUTHOR}, {CRITIQUE_AUTHOR}, {RESPONSE_AUTHOR}, {USER_AUTHOR}
+  - Output schema population script with proper JSON schemas for all 18 analyzers ([scripts/populate_rhetoric_schemas.py](scripts/populate_rhetoric_schemas.py))
   - Frontend types: RhetoricCategory, Rhetoric, RhetoricSummary, RhetoricVersion, RhetoricUpdate ([frontend/src/types/index.ts](frontend/src/types/index.ts))
   - Frontend API client with rhetoric namespace ([frontend/src/lib/api.ts](frontend/src/lib/api.ts))
   - Rhetoric list page with Round 1/Round 2 category tabs ([frontend/src/pages/rhetoric/index.tsx](frontend/src/pages/rhetoric/index.tsx))

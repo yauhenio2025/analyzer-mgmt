@@ -60,6 +60,7 @@
   - `api/routes/rhetoric.py:1-240` - Full CRUD API with prompt rendering and /seed endpoint
   - `scripts/seed_rhetoric.py:1-750` - Seed script with all 18 prompts
   - `scripts/sanitize_rhetoric_prompts.py:1-336` - Removes hardcoded author names, converts to generic placeholders
+  - `scripts/populate_rhetoric_schemas.py:1-382` - Populates JSON output schemas for all 18 analyzers
   - `frontend/src/types/index.ts:350-380` - RhetoricCategory, Rhetoric, RhetoricSummary, RhetoricVersion, RhetoricUpdate types
   - `frontend/src/lib/api.ts:400-480` - Rhetoric API client namespace
   - `frontend/src/pages/rhetoric/index.tsx:1-214` - List page with Round 1/Round 2 tabs
