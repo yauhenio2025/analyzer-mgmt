@@ -12,6 +12,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   - Full CRUD API routes at /api/rhetoric ([api/routes/rhetoric.py](api/routes/rhetoric.py))
   - Prompt template rendering with author context parameters
   - Seed script for initial rhetoric data ([scripts/seed_rhetoric.py](scripts/seed_rhetoric.py))
+  - Sanitization script to remove all hardcoded author references ([scripts/sanitize_rhetoric_prompts.py](scripts/sanitize_rhetoric_prompts.py))
+  - All prompts use generic placeholders: {SUBJECT_AUTHOR}, {CRITIQUE_AUTHOR}, {RESPONSE_AUTHOR}, {USER_AUTHOR}
   - Frontend types: RhetoricCategory, Rhetoric, RhetoricSummary, RhetoricVersion, RhetoricUpdate ([frontend/src/types/index.ts](frontend/src/types/index.ts))
   - Frontend API client with rhetoric namespace ([frontend/src/lib/api.ts](frontend/src/lib/api.ts))
   - Rhetoric list page with Round 1/Round 2 category tabs ([frontend/src/pages/rhetoric/index.tsx](frontend/src/pages/rhetoric/index.tsx))

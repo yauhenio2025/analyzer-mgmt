@@ -54,16 +54,18 @@
 
 ### Rhetoric Analyzers Management
 - **Status**: Active
-- **Description**: CRUD operations for 18 rhetoric analyzers from the-critic with version tracking and prompt editing
+- **Description**: CRUD operations for 18 rhetoric analyzers from the-critic with version tracking, prompt editing, and generic author placeholders
 - **Entry Points**:
   - `api/models/rhetoric.py:1-70` - Rhetoric and RhetoricVersion models
-  - `api/routes/rhetoric.py:1-240` - Full CRUD API with prompt rendering
+  - `api/routes/rhetoric.py:1-240` - Full CRUD API with prompt rendering and /seed endpoint
   - `scripts/seed_rhetoric.py:1-750` - Seed script with all 18 prompts
+  - `scripts/sanitize_rhetoric_prompts.py:1-336` - Removes hardcoded author names, converts to generic placeholders
   - `frontend/src/types/index.ts:350-380` - RhetoricCategory, Rhetoric, RhetoricSummary, RhetoricVersion, RhetoricUpdate types
   - `frontend/src/lib/api.ts:400-480` - Rhetoric API client namespace
   - `frontend/src/pages/rhetoric/index.tsx:1-214` - List page with Round 1/Round 2 tabs
   - `frontend/src/pages/rhetoric/[key].tsx:1-400` - Detail page with prompt editor, preview, schema, history
   - `frontend/src/components/Layout.tsx:28` - Rhetoric navigation link
+- **Placeholders**: `{SUBJECT_AUTHOR}`, `{CRITIQUE_AUTHOR}`, `{RESPONSE_AUTHOR}`, `{USER_AUTHOR}`
 - **Dependencies**: FastAPI, SQLAlchemy, Monaco Editor, React Query
 - **Added**: 2026-02-05
 
