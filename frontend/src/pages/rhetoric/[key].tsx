@@ -492,7 +492,7 @@ export default function RhetoricDetailPage() {
               JSON schema defining the expected output structure
             </p>
           </div>
-          <SchemaViewer schema={rhetoric.output_schema} />
+          <SchemaViewer schema={rhetoric.output_schema || {}} />
         </div>
       )}
 
