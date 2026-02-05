@@ -815,6 +815,242 @@ class ApiClient {
       }>;
     },
   };
+
+  // ============================================================================
+  // Display Endpoints (from analyzer-v2)
+  // ============================================================================
+
+  display = {
+    /**
+     * Get complete display configuration.
+     */
+    getConfig: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/config`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<DisplayConfig>;
+    },
+
+    /**
+     * Get display instructions for Gemini.
+     */
+    getInstructions: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/instructions`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<DisplayInstructions>;
+    },
+
+    /**
+     * Get display instructions as plain text.
+     */
+    getInstructionsText: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/instructions/text`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{ text: string }>;
+    },
+
+    /**
+     * Get hidden fields configuration.
+     */
+    getHiddenFields: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/hidden-fields`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{
+        hidden_fields: string[];
+        hidden_suffixes: string[];
+      }>;
+    },
+
+    /**
+     * Check if a field should be hidden.
+     */
+    checkField: async (fieldName: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/check-field`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field_name: fieldName }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{
+        field_name: string;
+        should_hide: boolean;
+      }>;
+    },
+
+    /**
+     * Convert numeric value to descriptive label.
+     */
+    getNumericLabel: async (value: number) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/numeric-label`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{
+        value: number;
+        label: string;
+      }>;
+    },
+
+    /**
+     * List all visual format categories.
+     */
+    listFormatCategories: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/formats`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<CategorySummary[]>;
+    },
+
+    /**
+     * List all visual formats.
+     */
+    listAllFormats: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/formats/all`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<FormatSummary[]>;
+    },
+
+    /**
+     * Get a specific format category.
+     */
+    getFormatCategory: async (categoryKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/formats/category/${categoryKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<VisualFormatCategory>;
+    },
+
+    /**
+     * Get a specific format.
+     */
+    getFormat: async (formatKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/formats/${formatKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<VisualFormat>;
+    },
+
+    /**
+     * Get the prompt pattern for a format.
+     */
+    getFormatPrompt: async (formatKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/formats/${formatKey}/prompt`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{
+        format_key: string;
+        format_name: string;
+        prompt_pattern: string;
+        example_prompt: string | null;
+        has_example: boolean;
+      }>;
+    },
+
+    /**
+     * List all data type mappings.
+     */
+    listDataMappings: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/mappings`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<DataTypeMapping[]>;
+    },
+
+    /**
+     * Get format recommendation for a data type.
+     */
+    getMappingForDataType: async (dataType: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/mappings/for-data-type?data_type=${encodeURIComponent(dataType)}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{
+        data_type: string;
+        found: boolean;
+        primary_format: string | null;
+        secondary_formats: string[];
+        avoid: string[];
+      }>;
+    },
+
+    /**
+     * Get quality criteria for visualizations.
+     */
+    getQualityCriteria: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/quality-criteria`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{
+        must_have: string[];
+        should_have: string[];
+        avoid: string[];
+      }>;
+    },
+
+    /**
+     * Get display stats.
+     */
+    getStats: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/display/stats`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{
+        hidden_fields_count: number;
+        hidden_suffixes_count: number;
+        format_categories: number;
+        total_formats: number;
+        data_mappings: number;
+      }>;
+    },
+  };
+}
+
+// Types for Display API
+interface DisplayConfig {
+  instructions: DisplayInstructions;
+  hidden_fields: {
+    hidden_fields: string[];
+    hidden_suffixes: string[];
+  };
+  numeric_rules: Array<{ min_value: number; max_value: number; label: string }>;
+  acronyms: string[];
+}
+
+interface DisplayInstructions {
+  branding_rules: string;
+  label_formatting: string;
+  numeric_display: string;
+  field_cleanup: string;
+  full_text: string;
+}
+
+interface CategorySummary {
+  key: string;
+  name: string;
+  description: string;
+  format_count: number;
+}
+
+interface FormatSummary {
+  key: string;
+  name: string;
+  data_structure: string;
+  use_when: string;
+}
+
+interface VisualFormatCategory {
+  key: string;
+  name: string;
+  description: string;
+  formats: VisualFormat[];
+}
+
+interface VisualFormat {
+  key: string;
+  name: string;
+  data_structure: string;
+  use_when: string;
+  gemini_prompt_pattern: string;
+  example_prompt?: string;
+}
+
+interface DataTypeMapping {
+  data_type: string;
+  primary_format: string;
+  secondary_formats: string[];
+  avoid: string[];
 }
 
 // Export singleton instance
