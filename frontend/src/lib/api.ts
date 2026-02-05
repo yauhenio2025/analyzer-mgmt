@@ -35,9 +35,14 @@ import type {
   GridDimensions,
   GridVersion,
   WildcardSuggestion,
+  StyleSummary,
+  StyleGuide,
+  AffinitySet,
+  EngineStyleMapping,
 } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
+const ANALYZER_V2_URL = process.env.NEXT_PUBLIC_ANALYZER_V2_URL || 'https://analyzer-v2.onrender.com';
 
 // ============================================================================
 // HTTP Client
@@ -643,6 +648,90 @@ class ApiClient {
         pipelines: { total: number; active: number };
         consumers: { total: number; registered: number };
       }>('/stats'),
+  };
+
+  // ============================================================================
+  // Styles Endpoints (from analyzer-v2)
+  // ============================================================================
+
+  styles = {
+    /**
+     * List all style schools with summaries.
+     * Calls analyzer-v2 directly.
+     */
+    list: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/styles`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<StyleSummary[]>;
+    },
+
+    /**
+     * Get full style guide by key.
+     */
+    get: async (styleKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/styles/schools/${styleKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<StyleGuide>;
+    },
+
+    /**
+     * Get all engine-style affinity mappings.
+     */
+    getEngineAffinities: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/styles/affinities/engine`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<AffinitySet>;
+    },
+
+    /**
+     * Get all format-style affinity mappings.
+     */
+    getFormatAffinities: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/styles/affinities/format`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<AffinitySet>;
+    },
+
+    /**
+     * Get all audience-style affinity mappings.
+     */
+    getAudienceAffinities: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/styles/affinities/audience`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<AffinitySet>;
+    },
+
+    /**
+     * Get all engines with their style mappings (for UI display).
+     */
+    getEngineMappings: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/styles/engine-mappings`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<EngineStyleMapping[]>;
+    },
+
+    /**
+     * Get style mapping for a specific engine.
+     */
+    getEngineMapping: async (engineKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/styles/engine-mappings/${engineKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<EngineStyleMapping>;
+    },
+
+    /**
+     * Get registry stats.
+     */
+    getStats: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/styles/stats`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{
+        styles_loaded: number;
+        engine_affinities: number;
+        format_affinities: number;
+        audience_affinities: number;
+      }>;
+    },
   };
 }
 

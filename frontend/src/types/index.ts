@@ -616,6 +616,86 @@ export interface WildcardSuggestion {
 }
 
 // ============================================================================
+// Style Types (from analyzer-v2)
+// ============================================================================
+
+export type StyleSchool =
+  | 'tufte'
+  | 'nyt_cox'
+  | 'ft_burn_murdoch'
+  | 'lupi_data_humanism'
+  | 'stefaner_truth_beauty'
+  | 'activist_agitprop';
+
+export interface ColorPalette {
+  primary: string;
+  secondary: string;
+  tertiary: string;
+  accent: string;
+  background: string;
+  text: string;
+  accent_alt?: string;
+  highlight?: string;
+  muted?: string;
+  positive?: string;
+  negative?: string;
+  series_palette?: string[];
+}
+
+export interface Typography {
+  primary_font: string;
+  title_font: string;
+  caption_font: string;
+  number_font: string;
+  title_size: string;
+  label_size: string;
+  annotation_size: string;
+  line_height: string;
+  title_weight: string;
+}
+
+export interface StyleGuide {
+  key: StyleSchool;
+  name: string;
+  philosophy: string;
+  color_palette: ColorPalette;
+  typography: Typography;
+  layout_principles: string[];
+  annotation_style: string;
+  gemini_modifiers: string;
+  best_for: string[];
+  avoid_for: string[];
+  practitioners?: string[];
+  references?: string[];
+}
+
+export interface StyleSummary {
+  key: StyleSchool;
+  name: string;
+  philosophy_summary: string;
+  color_preview: {
+    primary: string;
+    accent: string;
+    background: string;
+  };
+  best_for_summary: string[];
+}
+
+export interface AffinitySet {
+  category: string;
+  affinities: Record<string, StyleSchool[]>;
+  default: StyleSchool[];
+}
+
+export interface EngineStyleMapping {
+  engine_key: string;
+  engine_name: string;
+  style_affinities: StyleSchool[];
+  has_semantic_intent: boolean;
+  recommended_visual_patterns: string[];
+}
+
+// ============================================================================
 // API Response Types
 // ============================================================================
 
