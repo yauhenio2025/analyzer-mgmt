@@ -6,6 +6,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- Rhetoric Analyzers management feature
+  - Backend model for rhetoric analyzers with version tracking ([api/models/rhetoric.py](api/models/rhetoric.py))
+  - 18 rhetoric analyzers: 9 Round 1 (Rhetoric) and 9 Round 2 (Vulnerability)
+  - Full CRUD API routes at /api/rhetoric ([api/routes/rhetoric.py](api/routes/rhetoric.py))
+  - Prompt template rendering with author context parameters
+  - Seed script for initial rhetoric data ([scripts/seed_rhetoric.py](scripts/seed_rhetoric.py))
+  - Frontend types: RhetoricCategory, Rhetoric, RhetoricSummary, RhetoricVersion, RhetoricUpdate ([frontend/src/types/index.ts](frontend/src/types/index.ts))
+  - Frontend API client with rhetoric namespace ([frontend/src/lib/api.ts](frontend/src/lib/api.ts))
+  - Rhetoric list page with Round 1/Round 2 category tabs ([frontend/src/pages/rhetoric/index.tsx](frontend/src/pages/rhetoric/index.tsx))
+  - Rhetoric detail page with prompt editor, preview, schema viewer, version history ([frontend/src/pages/rhetoric/[key].tsx](frontend/src/pages/rhetoric/[key].tsx))
+  - Rhetoric navigation in sidebar ([frontend/src/components/Layout.tsx](frontend/src/components/Layout.tsx))
 - Engine Profile / About feature for engines
   - EngineProfile TypeScript types in ([frontend/src/types/index.ts](frontend/src/types/index.ts))
   - Profile API endpoints in ([frontend/src/lib/api.ts](frontend/src/lib/api.ts)) - getProfile, saveProfile, deleteProfile

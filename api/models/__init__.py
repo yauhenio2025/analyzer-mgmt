@@ -7,6 +7,7 @@ from models.pipeline import Pipeline, PipelineStage
 from models.consumer import Consumer, ConsumerDependency
 from models.change import ChangeEvent, ChangeNotification
 from models.grid import Grid, GridVersion, WildcardSuggestion
+from models.rhetoric import Rhetoric, RhetoricVersion
 
 __all__ = [
     "Base",
@@ -24,4 +25,6 @@ __all__ = [
     "Grid",
     "GridVersion",
     "WildcardSuggestion",
+    "Rhetoric",
+    "RhetoricVersion",
 ]

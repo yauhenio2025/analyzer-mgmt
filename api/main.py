@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routes import engines, paradigms, pipelines, consumers, changes, llm, grids
+from routes import engines, paradigms, pipelines, consumers, changes, llm, grids, rhetoric
 from models.database import engine, Base
 
 
@@ -66,6 +66,7 @@ app.include_router(consumers.router, prefix="/api/consumers", tags=["Consumers"]
 app.include_router(changes.router, prefix="/api/changes", tags=["Changes"])
 app.include_router(llm.router, prefix="/api/llm", tags=["LLM"])
 app.include_router(grids.router, prefix="/api/grids", tags=["Grids"])
+app.include_router(rhetoric.router, prefix="/api/rhetoric", tags=["Rhetoric"])
 
 
 @app.get("/")

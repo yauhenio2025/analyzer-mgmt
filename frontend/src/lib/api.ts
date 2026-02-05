@@ -995,6 +995,120 @@ class ApiClient {
       }>;
     },
   };
+
+  // ============================================================================
+  // Rhetoric API
+  // ============================================================================
+
+  rhetoric = {
+    /**
+     * List all rhetoric analyzers with optional filtering.
+     */
+    list: async (params?: {
+      category?: string;
+      status?: string;
+      search?: string;
+      limit?: number;
+      offset?: number;
+    }) => {
+      const queryParams = new URLSearchParams();
+      if (params?.category) queryParams.set('category', params.category);
+      if (params?.status) queryParams.set('status', params.status);
+      if (params?.search) queryParams.set('search', params.search);
+      if (params?.limit) queryParams.set('limit', params.limit.toString());
+      if (params?.offset) queryParams.set('offset', params.offset.toString());
+      const query = queryParams.toString();
+      return this.get<{
+        rhetoric: import('@/types').RhetoricSummary[];
+        total: number;
+        limit: number;
+        offset: number;
+      }>(`/rhetoric${query ? `?${query}` : ''}`);
+    },
+
+    /**
+     * Get category counts.
+     */
+    getCategories: async () => {
+      return this.get<{ categories: Record<string, number> }>('/rhetoric/categories');
+    },
+
+    /**
+     * Get a single rhetoric analyzer by key.
+     */
+    get: async (rhetricKey: string) => {
+      return this.get<import('@/types').Rhetoric>(`/rhetoric/${rhetricKey}`);
+    },
+
+    /**
+     * Get version history for a rhetoric analyzer.
+     */
+    getVersions: async (rhetricKey: string) => {
+      return this.get<{
+        rhetoric_key: string;
+        current_version: number;
+        versions: import('@/types').RhetoricVersion[];
+      }>(`/rhetoric/${rhetricKey}/versions`);
+    },
+
+    /**
+     * Get rendered prompt with context parameters.
+     */
+    getPrompt: async (
+      rhetricKey: string,
+      context?: {
+        subject_author?: string;
+        critique_author?: string;
+        response_author?: string;
+        user_author?: string;
+        subject_work?: string;
+        critique_work?: string;
+        response_work?: string;
+      }
+    ) => {
+      const queryParams = new URLSearchParams();
+      if (context?.subject_author) queryParams.set('subject_author', context.subject_author);
+      if (context?.critique_author) queryParams.set('critique_author', context.critique_author);
+      if (context?.response_author) queryParams.set('response_author', context.response_author);
+      if (context?.user_author) queryParams.set('user_author', context.user_author);
+      if (context?.subject_work) queryParams.set('subject_work', context.subject_work);
+      if (context?.critique_work) queryParams.set('critique_work', context.critique_work);
+      if (context?.response_work) queryParams.set('response_work', context.response_work);
+      const query = queryParams.toString();
+      return this.get<{
+        rhetoric_key: string;
+        name: string;
+        category: string;
+        rendered_prompt: string;
+        context_used: Record<string, string>;
+        document_requirements: string[];
+        model: string;
+        thinking_budget: number;
+        max_tokens: number;
+      }>(`/rhetoric/${rhetricKey}/prompt${query ? `?${query}` : ''}`);
+    },
+
+    /**
+     * Update a rhetoric analyzer.
+     */
+    update: async (rhetricKey: string, data: import('@/types').RhetoricUpdate) => {
+      return this.put<import('@/types').Rhetoric>(`/rhetoric/${rhetricKey}`, data);
+    },
+
+    /**
+     * Create a new rhetoric analyzer.
+     */
+    create: async (data: import('@/types').RhetoricCreate) => {
+      return this.post<import('@/types').Rhetoric>('/rhetoric', data);
+    },
+
+    /**
+     * Restore a previous version.
+     */
+    restore: async (rhetricKey: string, version: number) => {
+      return this.post<import('@/types').Rhetoric>(`/rhetoric/${rhetricKey}/restore/${version}`, {});
+    },
+  };
 }
 
 // Types for Display API

@@ -727,6 +727,89 @@ export interface EnginePrimitiveMapping {
 }
 
 // ============================================================================
+// Rhetoric Types
+// ============================================================================
+
+export type RhetoricCategory = 'rhetoric' | 'vulnerability';
+export type RhetoricStatus = 'active' | 'draft' | 'deprecated' | 'archived';
+
+export interface Rhetoric {
+  id: string;
+  rhetoric_key: string;
+  name: string;
+  description: string;
+  version: number;
+  category: RhetoricCategory;
+  prompt_template: string;
+  output_schema: Record<string, unknown> | null;
+  requires_subject: boolean;
+  requires_critique: boolean;
+  requires_response: boolean;
+  requires_counter_response: boolean;
+  model: string;
+  thinking_budget: number;
+  max_tokens: number;
+  status: RhetoricStatus;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RhetoricSummary {
+  rhetoric_key: string;
+  name: string;
+  description: string;
+  version: number;
+  category: RhetoricCategory;
+  status: RhetoricStatus;
+  document_requirements: string[];
+  model: string;
+  thinking_budget: number;
+}
+
+export interface RhetoricVersion {
+  id: string;
+  rhetoric_id: string;
+  version: number;
+  full_snapshot: Rhetoric;
+  change_summary?: string;
+  changed_by?: string;
+  created_at?: string;
+}
+
+export interface RhetoricUpdate {
+  name?: string;
+  description?: string;
+  category?: RhetoricCategory;
+  prompt_template?: string;
+  output_schema?: Record<string, unknown> | null;
+  requires_subject?: boolean;
+  requires_critique?: boolean;
+  requires_response?: boolean;
+  requires_counter_response?: boolean;
+  model?: string;
+  thinking_budget?: number;
+  max_tokens?: number;
+  status?: RhetoricStatus;
+  change_summary?: string;
+}
+
+export interface RhetoricCreate {
+  rhetoric_key: string;
+  name: string;
+  description: string;
+  category: RhetoricCategory;
+  prompt_template: string;
+  output_schema?: Record<string, unknown> | null;
+  requires_subject?: boolean;
+  requires_critique?: boolean;
+  requires_response?: boolean;
+  requires_counter_response?: boolean;
+  model?: string;
+  thinking_budget?: number;
+  max_tokens?: number;
+}
+
+// ============================================================================
 // API Response Types
 // ============================================================================
 
