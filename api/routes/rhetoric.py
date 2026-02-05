@@ -148,6 +148,59 @@ async def list_categories(db: AsyncSession = Depends(get_db)) -> dict:
     return {"categories": categories}
 
 
+@router.post("/seed")
+async def seed_rhetoric(db: AsyncSession = Depends(get_db)) -> dict:
+    """Seed the rhetoric analyzers with initial data."""
+    # Check if already seeded
+    count = await db.scalar(select(func.count()).select_from(Rhetoric))
+    if count > 0:
+        return {"message": f"Already seeded with {count} analyzers", "seeded": 0}
+
+    # Analyzer definitions
+    analyzers = [
+        # Round 1 - Rhetoric (9)
+        {"rhetoric_key": "deflection", "name": "Deflection Analysis", "description": "Identifies instances where the subject author claims the critique author misunderstands their argument, but the critique actually addresses those very points textually.", "category": "rhetoric", "requires_subject": True, "requires_critique": True, "requires_response": True, "requires_counter_response": False},
+        {"rhetoric_key": "contradiction", "name": "Self-Contradictions Analysis", "description": "Identifies instances where the subject author's response claims things that go beyond, contradict, or retroactively reframe what they actually argued in their original essays.", "category": "rhetoric", "requires_subject": True, "requires_critique": True, "requires_response": True, "requires_counter_response": False},
+        {"rhetoric_key": "silence", "name": "Silence Analysis", "description": "Identifies the critique author's specific questions, challenges, or provocations that the subject author simply doesn't address at all.", "category": "rhetoric", "requires_subject": True, "requires_critique": True, "requires_response": True, "requires_counter_response": False},
+        {"rhetoric_key": "leap", "name": "Logical Leaps Analysis", "description": "Identifies instances where the subject author attributes arguments or presuppositions to the critique author that don't follow from what the critique author actually wrote.", "category": "rhetoric", "requires_subject": True, "requires_critique": True, "requires_response": True, "requires_counter_response": False},
+        {"rhetoric_key": "concession", "name": "Concessions Analysis", "description": "Identifies places where the subject author implicitly agrees with the critique author through changed framing, added qualifications, or behavioral shifts.", "category": "rhetoric", "requires_subject": True, "requires_critique": True, "requires_response": True, "requires_counter_response": False},
+        {"rhetoric_key": "retreat", "name": "Retreats Analysis", "description": "Identifies 'clarifications' that are actually substantive position changes - where the subject author weakens, narrows, or qualifies claims.", "category": "rhetoric", "requires_subject": True, "requires_critique": False, "requires_response": True, "requires_counter_response": False},
+        {"rhetoric_key": "cherrypick", "name": "Cherry Picks Analysis", "description": "Identifies where the subject author quotes the critique author out of context, truncates quotes to change meaning, or selectively ignores parts.", "category": "rhetoric", "requires_subject": False, "requires_critique": True, "requires_response": True, "requires_counter_response": False},
+        {"rhetoric_key": "tuquoque", "name": "Tu Quoque Analysis", "description": "Identifies where the subject author deflects criticism by claiming the critique author has the same problem or faces the same challenge.", "category": "rhetoric", "requires_subject": False, "requires_critique": True, "requires_response": True, "requires_counter_response": False},
+        {"rhetoric_key": "namedrop", "name": "Name-Drop Analysis", "description": "Identifies where the subject author invokes theorists without showing how their work actually supports specific claims.", "category": "rhetoric", "requires_subject": True, "requires_critique": True, "requires_response": True, "requires_counter_response": False},
+        # Round 2 - Vulnerability (9)
+        {"rhetoric_key": "strawman_risk", "name": "Strawman Risk Analysis", "description": "Identifies instances where the critique author might be accused of misrepresenting the subject author's position.", "category": "vulnerability", "requires_subject": True, "requires_critique": False, "requires_response": True, "requires_counter_response": True},
+        {"rhetoric_key": "inconsistency", "name": "Inconsistency Analysis", "description": "Identifies instances where the critique author contradicts himself within or between documents.", "category": "vulnerability", "requires_subject": False, "requires_critique": True, "requires_response": False, "requires_counter_response": True},
+        {"rhetoric_key": "logic_gap", "name": "Logic Gap Analysis", "description": "Identifies instances where the critique author's conclusions don't follow from premises - logical leaps and non sequiturs.", "category": "vulnerability", "requires_subject": False, "requires_critique": False, "requires_response": False, "requires_counter_response": True},
+        {"rhetoric_key": "unanswered", "name": "Unanswered Points Analysis", "description": "Identifies valid points from the subject author's response that the critique author fails to address.", "category": "vulnerability", "requires_subject": False, "requires_critique": False, "requires_response": True, "requires_counter_response": True},
+        {"rhetoric_key": "overconcession", "name": "Over-Concession Analysis", "description": "Identifies instances where the critique author concedes too much, undermining their own argument.", "category": "vulnerability", "requires_subject": False, "requires_critique": True, "requires_response": False, "requires_counter_response": True},
+        {"rhetoric_key": "overreach", "name": "Overreach Analysis", "description": "Identifies instances where the critique author extends arguments beyond defensible positions.", "category": "vulnerability", "requires_subject": False, "requires_critique": False, "requires_response": False, "requires_counter_response": True},
+        {"rhetoric_key": "undercitation", "name": "Under-Citation Analysis", "description": "Identifies instances where the critique author makes claims about the subject without sufficient textual support.", "category": "vulnerability", "requires_subject": True, "requires_critique": False, "requires_response": True, "requires_counter_response": True},
+        {"rhetoric_key": "weak_authority", "name": "Weak Authority Analysis", "description": "Identifies instances where the critique author invokes theorists whose positions may not actually support the claims.", "category": "vulnerability", "requires_subject": False, "requires_critique": False, "requires_response": False, "requires_counter_response": True},
+        {"rhetoric_key": "exposed_flank", "name": "Exposed Flank Analysis", "description": "Identifies instances where the critique author's critiques could be turned back on themselves.", "category": "vulnerability", "requires_subject": False, "requires_critique": True, "requires_response": True, "requires_counter_response": True},
+    ]
+
+    seeded = 0
+    for data in analyzers:
+        rhetoric = Rhetoric(
+            rhetoric_key=data["rhetoric_key"],
+            name=data["name"],
+            description=data["description"],
+            category=data["category"],
+            prompt_template=f"Analyze {data['name'].lower()} patterns...",
+            output_schema={},
+            requires_subject=data["requires_subject"],
+            requires_critique=data["requires_critique"],
+            requires_response=data["requires_response"],
+            requires_counter_response=data["requires_counter_response"],
+        )
+        db.add(rhetoric)
+        seeded += 1
+
+    await db.commit()
+    return {"message": f"Successfully seeded {seeded} rhetoric analyzers", "seeded": seeded}
+
+
 @router.get("/{rhetoric_key}")
 async def get_rhetoric(
     rhetoric_key: str,
