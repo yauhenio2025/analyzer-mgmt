@@ -106,7 +106,11 @@ class ApiClient {
   // ============================================================================
 
   engines = {
-    list: (params?: {
+    /**
+     * List engines from analyzer-v2 (source of truth for definitions).
+     * Calls analyzer-v2 directly for the latest engine definitions.
+     */
+    list: async (params?: {
       category?: string;
       kind?: string;
       paradigm?: string;
@@ -123,9 +127,10 @@ class ApiClient {
         });
       }
       const query = queryParams.toString();
-      return this.get<{ engines: EngineSummary[]; total: number; limit: number; offset: number }>(
-        `/engines${query ? `?${query}` : ''}`
-      );
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/engines${query ? `?${query}` : ''}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const engines = await response.json() as EngineSummary[];
+      return { engines, total: engines.length, limit: params?.limit ?? 200, offset: params?.offset ?? 0 };
     },
 
     get: (engineKey: string) => this.get<Engine>(`/engines/${engineKey}`),
@@ -175,11 +180,23 @@ class ApiClient {
     restore: (engineKey: string, version: number) =>
       this.post<Engine>(`/engines/${engineKey}/restore/${version}`),
 
-    getCategories: () =>
-      this.get<{ categories: Record<string, number> }>('/engines/categories'),
+    /**
+     * Get category counts from analyzer-v2.
+     */
+    getCategories: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/engines/categories`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{ categories: Record<string, number> }>;
+    },
 
-    getApps: () =>
-      this.get<string[]>('/engines/apps'),
+    /**
+     * Get app tags from analyzer-v2.
+     */
+    getApps: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/engines/apps`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<string[]>;
+    },
 
     /**
      * Get the profile/about section for an engine.
