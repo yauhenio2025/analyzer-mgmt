@@ -112,6 +112,7 @@ class ApiClient {
       paradigm?: string;
       status?: string;
       search?: string;
+      app?: string;
       limit?: number;
       offset?: number;
     }) => {
@@ -176,6 +177,9 @@ class ApiClient {
 
     getCategories: () =>
       this.get<{ categories: Record<string, number> }>('/engines/categories'),
+
+    getApps: () =>
+      this.get<string[]>('/engines/apps'),
 
     /**
      * Get the profile/about section for an engine.

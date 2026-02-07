@@ -20,6 +20,8 @@ const CATEGORIES: EngineCategory[] = [
   'market',
   'rhetoric',
   'scholarly',
+  'vulnerability',
+  'outline',
 ];
 
 const CATEGORY_COLORS: Record<EngineCategory, string> = {
@@ -35,6 +37,8 @@ const CATEGORY_COLORS: Record<EngineCategory, string> = {
   market: 'bg-emerald-100 text-emerald-800',
   rhetoric: 'bg-pink-100 text-pink-800',
   scholarly: 'bg-slate-100 text-slate-800',
+  vulnerability: 'bg-amber-100 text-amber-800',
+  outline: 'bg-teal-100 text-teal-800',
 };
 
 function EngineCard({ engine }: { engine: EngineSummary }) {
@@ -76,14 +80,16 @@ export default function EnginesPage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedApp, setSelectedApp] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['engines', { search, category: selectedCategory }],
+    queryKey: ['engines', { search, category: selectedCategory, app: selectedApp }],
     queryFn: () =>
       api.engines.list({
         search: search || undefined,
         category: selectedCategory || undefined,
+        app: selectedApp || undefined,
         limit: 200,
       }),
   });
@@ -93,8 +99,14 @@ export default function EnginesPage() {
     queryFn: () => api.engines.getCategories(),
   });
 
+  const { data: appsData } = useQuery({
+    queryKey: ['engines', 'apps'],
+    queryFn: () => api.engines.getApps(),
+  });
+
   const engines = data?.engines ?? [];
   const categories = categoriesData?.categories ?? {};
+  const apps = appsData ?? [];
 
   if (error) {
     return (
@@ -138,44 +150,84 @@ export default function EnginesPage() {
             onClick={() => setShowFilters(!showFilters)}
             className={clsx(
               'btn-secondary',
-              showFilters && 'bg-primary-100 text-primary-700'
+              (showFilters || selectedApp || selectedCategory) && 'bg-primary-100 text-primary-700'
             )}
           >
             <Filter className="h-4 w-4 mr-2" />
             Filters
+            {(selectedApp || selectedCategory) && (
+              <span className="ml-1 bg-primary-500 text-white text-xs rounded-full px-1.5">
+                {(selectedApp ? 1 : 0) + (selectedCategory ? 1 : 0)}
+              </span>
+            )}
           </button>
         </div>
 
-        {/* Category Filters */}
+        {/* App and Category Filters */}
         {showFilters && (
-          <div className="pt-4 border-t">
-            <p className="text-sm font-medium text-gray-700 mb-2">Category</p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setSelectedCategory(null)}
-                className={clsx(
-                  'badge cursor-pointer',
-                  selectedCategory === null ? 'badge-primary' : 'badge-gray hover:bg-gray-200'
-                )}
-              >
-                All ({Object.values(categories).reduce((a, b) => a + b, 0)})
-              </button>
-              {CATEGORIES.map((category) => (
+          <div className="pt-4 border-t space-y-4">
+            {/* App Filter */}
+            {apps.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">App</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedApp(null)}
+                    className={clsx(
+                      'badge cursor-pointer',
+                      selectedApp === null ? 'badge-primary' : 'badge-gray hover:bg-gray-200'
+                    )}
+                  >
+                    All Apps
+                  </button>
+                  {apps.map((app) => (
+                    <button
+                      key={app}
+                      onClick={() => setSelectedApp(selectedApp === app ? null : app)}
+                      className={clsx(
+                        'badge cursor-pointer capitalize',
+                        selectedApp === app
+                          ? 'bg-violet-100 text-violet-800'
+                          : 'badge-gray hover:bg-gray-200'
+                      )}
+                    >
+                      {app}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Category Filter */}
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Category</p>
+              <div className="flex flex-wrap gap-2">
                 <button
-                  key={category}
-                  onClick={() =>
-                    setSelectedCategory(selectedCategory === category ? null : category)
-                  }
+                  onClick={() => setSelectedCategory(null)}
                   className={clsx(
-                    'badge cursor-pointer capitalize',
-                    selectedCategory === category
-                      ? CATEGORY_COLORS[category]
-                      : 'badge-gray hover:bg-gray-200'
+                    'badge cursor-pointer',
+                    selectedCategory === null ? 'badge-primary' : 'badge-gray hover:bg-gray-200'
                   )}
                 >
-                  {category} ({categories[category] ?? 0})
+                  All ({Object.values(categories).reduce((a, b) => a + b, 0)})
                 </button>
-              ))}
+                {CATEGORIES.map((category) => (
+                  <button
+                    key={category}
+                    onClick={() =>
+                      setSelectedCategory(selectedCategory === category ? null : category)
+                    }
+                    className={clsx(
+                      'badge cursor-pointer capitalize',
+                      selectedCategory === category
+                        ? CATEGORY_COLORS[category]
+                        : 'badge-gray hover:bg-gray-200'
+                    )}
+                  >
+                    {category} ({categories[category] ?? 0})
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}

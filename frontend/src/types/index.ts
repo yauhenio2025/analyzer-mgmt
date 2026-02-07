@@ -20,7 +20,9 @@ export type EngineCategory =
   | 'institutional'
   | 'market'
   | 'rhetoric'
-  | 'scholarly';
+  | 'scholarly'
+  | 'vulnerability'
+  | 'outline';
 
 export type EngineStatus = 'active' | 'deprecated' | 'draft' | 'archived';
 
@@ -179,6 +181,7 @@ export interface EngineSummary {
   status: EngineStatus;
   has_stage_context?: boolean;  // Indicates if engine uses stage_context
   has_profile?: boolean;        // Indicates if engine has rich profile/about section
+  apps?: string[];              // Apps that use this engine (e.g., 'critic')
 }
 
 export interface EngineVersion {
