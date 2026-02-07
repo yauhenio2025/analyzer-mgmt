@@ -83,20 +83,15 @@ export default function EnginesPage() {
   const [selectedApp, setSelectedApp] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['engines', { search, category: selectedCategory, app: selectedApp }],
+  // Fetch engines with app filter only (for category counts)
+  const { data: appFilteredData, isLoading, error } = useQuery({
+    queryKey: ['engines', { search, app: selectedApp }],
     queryFn: () =>
       api.engines.list({
         search: search || undefined,
-        category: selectedCategory || undefined,
         app: selectedApp || undefined,
-        limit: 200,
+        limit: 500,
       }),
-  });
-
-  const { data: categoriesData } = useQuery({
-    queryKey: ['engines', 'categories'],
-    queryFn: () => api.engines.getCategories(),
   });
 
   const { data: appsData } = useQuery({
@@ -104,9 +99,19 @@ export default function EnginesPage() {
     queryFn: () => api.engines.getApps(),
   });
 
-  const engines = data?.engines ?? [];
-  const categories = categoriesData?.categories ?? {};
+  const appFilteredEngines = appFilteredData?.engines ?? [];
   const apps = appsData ?? [];
+
+  // Calculate category counts from app-filtered engines
+  const categoryCounts: Record<string, number> = {};
+  for (const engine of appFilteredEngines) {
+    categoryCounts[engine.category] = (categoryCounts[engine.category] ?? 0) + 1;
+  }
+
+  // Apply category filter client-side
+  const engines = selectedCategory
+    ? appFilteredEngines.filter((e) => e.category === selectedCategory)
+    : appFilteredEngines;
 
   if (error) {
     return (
@@ -124,7 +129,9 @@ export default function EnginesPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Engines</h1>
           <p className="mt-1 text-gray-500">
-            {data?.total ?? 0} analytical engines
+            {engines.length} analytical engines
+            {selectedApp && ` in ${selectedApp}`}
+            {selectedCategory && ` • ${selectedCategory}`}
           </p>
         </div>
         <Link href="/engines/new" className="btn-primary">
@@ -209,24 +216,34 @@ export default function EnginesPage() {
                     selectedCategory === null ? 'badge-primary' : 'badge-gray hover:bg-gray-200'
                   )}
                 >
-                  All ({Object.values(categories).reduce((a, b) => a + b, 0)})
+                  All ({appFilteredEngines.length})
                 </button>
-                {CATEGORIES.map((category) => (
-                  <button
-                    key={category}
-                    onClick={() =>
-                      setSelectedCategory(selectedCategory === category ? null : category)
-                    }
-                    className={clsx(
-                      'badge cursor-pointer capitalize',
-                      selectedCategory === category
-                        ? CATEGORY_COLORS[category]
-                        : 'badge-gray hover:bg-gray-200'
-                    )}
-                  >
-                    {category} ({categories[category] ?? 0})
-                  </button>
-                ))}
+                {CATEGORIES.map((category) => {
+                  const count = categoryCounts[category] ?? 0;
+                  const isEmpty = count === 0;
+                  return (
+                    <button
+                      key={category}
+                      onClick={() =>
+                        !isEmpty && setSelectedCategory(selectedCategory === category ? null : category)
+                      }
+                      disabled={isEmpty}
+                      className={clsx(
+                        'badge capitalize',
+                        isEmpty
+                          ? 'opacity-40 cursor-not-allowed'
+                          : 'cursor-pointer',
+                        selectedCategory === category
+                          ? CATEGORY_COLORS[category]
+                          : isEmpty
+                            ? 'badge-gray'
+                            : 'badge-gray hover:bg-gray-200'
+                      )}
+                    >
+                      {category} ({count})
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
