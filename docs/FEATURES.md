@@ -1,6 +1,6 @@
 # Feature Inventory
 
-> Auto-maintained by Claude Code. Last updated: 2026-02-05 (Rhetoric Analyzers Feature)
+> Auto-maintained by Claude Code. Last updated: 2026-02-12
 
 ## Backend API
 
@@ -139,6 +139,23 @@
   - `frontend/src/pages/paradigms/[key].tsx:200-270` - handleAskAI and handleAcceptSuggestion functions
 - **Dependencies**: React, Lucide icons
 - **Added**: 2026-01-28
+
+### Functions Browsing UI
+- **Status**: Active
+- **Description**: Browse decider-v2 LLM function definitions from analyzer-v2's functions registry. List page with card grid, search, and category/tier/project filters. Detail page with 3 tabs: Overview, Prompts, Implementations.
+- **Entry Points**:
+  - `frontend/src/pages/functions/index.tsx:1-238` - List page with search, category/tier/project filters, color-coded badges
+  - `frontend/src/pages/functions/[key].tsx:1-532` - Detail page with 3 tabs (Overview, Prompts, Implementations)
+  - `frontend/src/types/index.ts` - FunctionCategory, FunctionTier, InvocationPattern, PromptTemplate, ModelConfigSpec, IOContract, FunctionImplementation, FunctionDefinition, FunctionSummary types
+  - `frontend/src/lib/api.ts:740-798` - Functions API namespace (list, get, getCategories, getProjects, getPrompts, getImplementations)
+  - `frontend/src/components/Layout.tsx:28` - Functions navigation link (Zap icon)
+- **Detail Page Tabs**:
+  - **Overview**: Description, model config grid, I/O contract with expandable schemas, DAG links, tags
+  - **Prompts**: Expandable accordion per prompt template, dark code viewer, copy button, variable badges
+  - **Implementations**: Grouped by project, GitHub source links with line numbers, "Primary" badge
+- **Data Source**: Fetches directly from analyzer-v2 `/v1/functions` endpoints (no mgmt backend)
+- **Dependencies**: React Query, Next.js, Lucide icons (Zap), analyzer-v2 API
+- **Added**: 2026-02-12
 
 ## Frontend UI
 

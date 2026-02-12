@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Functions Browsing UI** - Browse decider-v2 LLM function definitions
+  - List page at `/functions` with card grid, search, category/tier/project filters
+  - Detail page at `/functions/[key]` with 3 tabs: Overview, Prompts, Implementations
+  - Color-coded badges for category (6 colors), tier (3 colors), track (3 colors)
+  - Prompts tab: expandable accordion with dark code viewer, copy button, variable badges
+  - Implementations tab: GitHub source links with line numbers, grouped by project
+  - Functions API namespace in `frontend/src/lib/api.ts` (fetches from analyzer-v2 directly)
+  - TypeScript types for all function-related entities
+  - Zap icon navigation link in sidebar
+
 - Rhetoric Analyzers management feature
   - Backend model for rhetoric analyzers with version tracking ([api/models/rhetoric.py](api/models/rhetoric.py))
   - 18 rhetoric analyzers: 9 Round 1 (Rhetoric) and 9 Round 2 (Vulnerability)
