@@ -42,6 +42,9 @@ import type {
   AnalyticalPrimitive,
   PrimitiveSummary,
   EnginePrimitiveMapping,
+  AudienceDefinition,
+  AudienceSummary,
+  AudienceIdentity,
 } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
@@ -658,6 +661,38 @@ class ApiClient {
       this.post<{ grid: Grid; added_dimension: Record<string, unknown>; wildcard: WildcardSuggestion }>(
         `/grids/${gridKey}/wildcards/${wildcardId}/add-to-grid`
       ),
+  };
+
+  // ============================================================================
+  // Audience Endpoints
+  // ============================================================================
+
+  audiences = {
+    list: () =>
+      this.get<AudienceSummary[]>('/audiences'),
+
+    get: (audienceKey: string) =>
+      this.get<AudienceDefinition>(`/audiences/${audienceKey}`),
+
+    getIdentity: (audienceKey: string) =>
+      this.get<AudienceIdentity>(`/audiences/${audienceKey}/identity`),
+
+    getGuidance: (audienceKey: string) =>
+      this.get<{ audience_key: string; guidance: string; vocabulary_guidance: string }>(
+        `/audiences/${audienceKey}/guidance`
+      ),
+
+    create: (data: Partial<AudienceDefinition>) =>
+      this.post<AudienceDefinition>('/audiences', data),
+
+    update: (audienceKey: string, data: Partial<AudienceDefinition>) =>
+      this.put<AudienceDefinition>(`/audiences/${audienceKey}`, data),
+
+    delete: (audienceKey: string) =>
+      this.delete<{ status: string; audience_key: string }>(`/audiences/${audienceKey}`),
+
+    reload: () =>
+      this.post<{ status: string; count: number }>('/audiences/reload'),
   };
 
   // ============================================================================

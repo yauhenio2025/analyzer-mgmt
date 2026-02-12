@@ -14,6 +14,7 @@ import {
   Shapes,
   Brush,
   MessageSquareWarning,
+  UserCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -27,6 +28,7 @@ interface NavItem {
 const navigation: NavItem[] = [
   { name: 'Engines', href: '/engines', icon: Cpu },
   { name: 'Paradigms', href: '/paradigms', icon: Layers },
+  { name: 'Audiences', href: '/audiences', icon: UserCircle },
   { name: 'Pipelines', href: '/pipelines', icon: GitBranch },
   { name: 'Grids', href: '/grids', icon: LayoutGrid },
   { name: 'Styles', href: '/styles', icon: Palette },

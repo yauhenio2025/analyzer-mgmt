@@ -827,3 +827,101 @@ export interface ApiError {
   detail: string;
   status_code: number;
 }
+
+// ============================================================================
+// Audience Types
+// ============================================================================
+
+export interface AudienceIdentity {
+  core_questions: string[];
+  priorities: string[];
+  deprioritize: string[];
+  detail_level: string;
+}
+
+export interface EngineAffinities {
+  preferred_categories: string[];
+  high_affinity_engines: string[];
+  low_affinity_engines: string[];
+  category_weights: Record<string, number>;
+}
+
+export interface VisualStyleConfig {
+  style_preference: string;
+  aesthetic: string;
+  color_palette: string;
+  typography: string;
+  layout: string;
+  visual_elements: string;
+  information_density: string;
+  emotional_tone: string;
+  key_principle: string;
+  style_affinities: string[];
+}
+
+export interface TextualStyleConfig {
+  voice: string;
+  structure: string;
+  evidence_handling: string;
+  sentence_style: string;
+  what_to_emphasize: string;
+  what_to_avoid: string;
+  word_count_guidance: string;
+  opening_style: string;
+  key_principle: string;
+}
+
+export interface CurationGuidanceConfig {
+  curation_emphasis: string;
+  fidelity_constraint: string;
+}
+
+export interface StrategistGuidanceConfig {
+  num_visualizations: string;
+  visualization_complexity: string;
+  table_purposes: string[];
+  table_differentiation: string;
+  narrative_focus: string;
+  what_matters_most: string;
+  what_to_avoid_in_strategy: string;
+}
+
+export interface PatternDiscoveryConfig {
+  pattern_types_priority: string[];
+  meta_insight_focus: string;
+  what_counts_as_significant: string;
+  surprise_definition: string;
+}
+
+export interface VocabularyConfig {
+  translations: Record<string, string>;
+  guidance_intro: string;
+  guidance_outro: string;
+}
+
+export interface AudienceDefinition {
+  audience_key: string;
+  audience_name: string;
+  description: string;
+  version: number;
+  status: string;
+  identity: AudienceIdentity;
+  engine_affinities: EngineAffinities;
+  visual_style: VisualStyleConfig;
+  textual_style: TextualStyleConfig;
+  curation: CurationGuidanceConfig;
+  strategist: StrategistGuidanceConfig;
+  pattern_discovery: PatternDiscoveryConfig;
+  vocabulary: VocabularyConfig;
+}
+
+export interface AudienceSummary {
+  audience_key: string;
+  audience_name: string;
+  description: string;
+  detail_level: string;
+  style_preference: string;
+  engine_affinity_count: number;
+  vocabulary_term_count: number;
+  status: string;
+}
