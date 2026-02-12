@@ -330,6 +330,57 @@ export interface BranchProgressResponse {
 }
 
 // ============================================================================
+// Workflow Types (from analyzer-v2)
+// ============================================================================
+
+export type WorkflowCategory =
+  | 'synthesis'
+  | 'influence'
+  | 'outline'
+  | 'analysis'
+  | 'genealogy'
+  | 'decision_support';
+
+export interface WorkflowPass {
+  pass_number: number;
+  pass_name: string;
+  pass_description: string;
+  engine_key: string;
+  function_key: string | null;
+  prompt_template: string | null;
+  requires_external_docs: boolean;
+  caches_result: boolean;
+  depends_on_passes: number[];
+  output_schema: Record<string, unknown> | null;
+}
+
+export interface Workflow {
+  workflow_key: string;
+  workflow_name: string;
+  description: string;
+  category: WorkflowCategory;
+  version: number;
+  passes: WorkflowPass[];
+  required_inputs: string[];
+  optional_inputs: string[];
+  output_description: string;
+  final_output_schema: Record<string, unknown> | null;
+  estimated_passes: number;
+  source_project: string;
+}
+
+export interface WorkflowSummary {
+  workflow_key: string;
+  workflow_name: string;
+  description: string;
+  category: WorkflowCategory;
+  version: number;
+  pass_count: number;
+  source_project: string;
+  required_inputs: string[];
+}
+
+// ============================================================================
 // Pipeline Types
 // ============================================================================
 

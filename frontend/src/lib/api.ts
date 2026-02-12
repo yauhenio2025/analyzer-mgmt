@@ -49,6 +49,9 @@ import type {
   FunctionDefinition,
   PromptTemplate,
   FunctionImplementation,
+  Workflow,
+  WorkflowSummary,
+  WorkflowPass,
 } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
@@ -354,6 +357,59 @@ class ApiClient {
 
     reorderStages: (pipelineKey: string, newOrder: number[]) =>
       this.post<Pipeline>(`/pipelines/${pipelineKey}/reorder`, newOrder),
+  };
+
+  // ============================================================================
+  // Workflow Endpoints (from analyzer-v2)
+  // ============================================================================
+
+  workflows = {
+    /**
+     * List all workflows from analyzer-v2.
+     */
+    list: async (params?: { category?: string }): Promise<{ workflows: WorkflowSummary[]; total: number }> => {
+      const queryParams = new URLSearchParams();
+      if (params?.category) queryParams.set('category', params.category);
+      const query = queryParams.toString();
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/workflows${query ? `?${query}` : ''}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const workflows = await response.json() as Workflow[];
+      const summaries: WorkflowSummary[] = workflows.map((w) => ({
+        workflow_key: w.workflow_key,
+        workflow_name: w.workflow_name,
+        description: w.description,
+        category: w.category,
+        version: w.version,
+        pass_count: w.passes?.length ?? w.estimated_passes ?? 0,
+        source_project: w.source_project,
+        required_inputs: w.required_inputs ?? [],
+      }));
+      return { workflows: summaries, total: summaries.length };
+    },
+
+    /**
+     * Get a single workflow from analyzer-v2 with full pass details.
+     */
+    get: async (workflowKey: string): Promise<Workflow> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/workflows/${workflowKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+
+    /**
+     * Get the composed prompt for a specific pass of a workflow.
+     */
+    getPassPrompt: async (
+      workflowKey: string,
+      passNumber: number,
+      audience: AudienceType = 'analyst'
+    ): Promise<ComposedPromptResponse> => {
+      const response = await fetch(
+        `${ANALYZER_V2_URL}/v1/workflows/${workflowKey}/pass/${passNumber}/prompt?audience=${audience}`
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
   };
 
   // ============================================================================
