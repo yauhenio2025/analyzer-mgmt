@@ -668,31 +668,65 @@ class ApiClient {
   // ============================================================================
 
   audiences = {
-    list: () =>
-      this.get<AudienceSummary[]>('/audiences'),
+    list: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/audiences`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<AudienceSummary[]>;
+    },
 
-    get: (audienceKey: string) =>
-      this.get<AudienceDefinition>(`/audiences/${audienceKey}`),
+    get: async (audienceKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/audiences/${audienceKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<AudienceDefinition>;
+    },
 
-    getIdentity: (audienceKey: string) =>
-      this.get<AudienceIdentity>(`/audiences/${audienceKey}/identity`),
+    getIdentity: async (audienceKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/audiences/${audienceKey}/identity`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<AudienceIdentity>;
+    },
 
-    getGuidance: (audienceKey: string) =>
-      this.get<{ audience_key: string; guidance: string; vocabulary_guidance: string }>(
-        `/audiences/${audienceKey}/guidance`
-      ),
+    getGuidance: async (audienceKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/audiences/${audienceKey}/guidance`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{ audience_key: string; guidance: string; vocabulary_guidance: string }>;
+    },
 
-    create: (data: Partial<AudienceDefinition>) =>
-      this.post<AudienceDefinition>('/audiences', data),
+    create: async (data: Partial<AudienceDefinition>) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/audiences`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<AudienceDefinition>;
+    },
 
-    update: (audienceKey: string, data: Partial<AudienceDefinition>) =>
-      this.put<AudienceDefinition>(`/audiences/${audienceKey}`, data),
+    update: async (audienceKey: string, data: Partial<AudienceDefinition>) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/audiences/${audienceKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<AudienceDefinition>;
+    },
 
-    delete: (audienceKey: string) =>
-      this.delete<{ status: string; audience_key: string }>(`/audiences/${audienceKey}`),
+    delete: async (audienceKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/audiences/${audienceKey}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{ status: string; audience_key: string }>;
+    },
 
-    reload: () =>
-      this.post<{ status: string; count: number }>('/audiences/reload'),
+    reload: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/audiences/reload`, {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{ status: string; count: number }>;
+    },
   };
 
   // ============================================================================
