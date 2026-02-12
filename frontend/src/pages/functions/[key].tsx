@@ -295,7 +295,7 @@ function PromptsTab({ func }: { func: FunctionDefinition }) {
                 <div className="absolute top-2 right-2 z-10">
                   <CopyButton text={prompt.template_text} />
                 </div>
-                <pre className="px-6 py-4 text-sm text-gray-800 whitespace-pre-wrap font-mono bg-gray-900 text-gray-100 overflow-x-auto max-h-[600px] overflow-y-auto">
+                <pre className="px-6 py-4 text-sm whitespace-pre-wrap font-mono bg-gray-50 text-gray-900 overflow-x-auto max-h-[600px] overflow-y-auto border-t">
                   {prompt.template_text}
                 </pre>
               </div>
