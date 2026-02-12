@@ -813,6 +813,93 @@ export interface RhetoricCreate {
 }
 
 // ============================================================================
+// Function Types (from analyzer-v2)
+// ============================================================================
+
+export type FunctionCategory =
+  | 'coordination'
+  | 'generation'
+  | 'analysis'
+  | 'synthesis'
+  | 'tool'
+  | 'infrastructure';
+
+export type FunctionTier = 'strategic' | 'tactical' | 'lightweight';
+
+export type InvocationPattern =
+  | 'every_question'
+  | 'periodic'
+  | 'on_demand'
+  | 'once_per_session'
+  | 'per_vector';
+
+export interface PromptTemplate {
+  role: string;
+  template_text: string;
+  variables: string[];
+  notes: string;
+}
+
+export interface ModelConfigSpec {
+  model: string;
+  max_tokens: number;
+  thinking_budget: number | null;
+  streaming: boolean;
+  temperature: number | null;
+}
+
+export interface IOContract {
+  input_description: string;
+  output_description: string;
+  input_schema: Record<string, unknown> | null;
+  output_schema: Record<string, unknown> | null;
+}
+
+export interface FunctionImplementation {
+  project: string;
+  file_path: string;
+  symbol: string | null;
+  line_start: number | null;
+  line_end: number | null;
+  repo_url: string | null;
+  is_primary: boolean;
+  description: string;
+}
+
+export interface FunctionDefinition {
+  function_key: string;
+  function_name: string;
+  description: string;
+  version: number;
+  category: FunctionCategory;
+  tier: FunctionTier;
+  invocation_pattern: InvocationPattern;
+  model_config_spec: ModelConfigSpec;
+  prompt_templates: PromptTemplate[];
+  io_contract: IOContract;
+  implementations: FunctionImplementation[];
+  source_projects: string[];
+  depends_on_functions: string[];
+  feeds_into_functions: string[];
+  track: string | null;
+  tags: string[];
+  notes: string;
+}
+
+export interface FunctionSummary {
+  function_key: string;
+  function_name: string;
+  description: string;
+  category: FunctionCategory;
+  tier: FunctionTier;
+  invocation_pattern: InvocationPattern;
+  source_projects: string[];
+  implementation_count: number;
+  track: string | null;
+  tags: string[];
+}
+
+// ============================================================================
 // API Response Types
 // ============================================================================
 

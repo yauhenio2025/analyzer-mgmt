@@ -45,6 +45,10 @@ import type {
   AudienceDefinition,
   AudienceSummary,
   AudienceIdentity,
+  FunctionSummary,
+  FunctionDefinition,
+  PromptTemplate,
+  FunctionImplementation,
 } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
@@ -726,6 +730,71 @@ class ApiClient {
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json() as Promise<{ status: string; count: number }>;
+    },
+  };
+
+  // ============================================================================
+  // Functions Endpoints (from analyzer-v2)
+  // ============================================================================
+
+  functions = {
+    list: async (params?: {
+      category?: string;
+      tier?: string;
+      project?: string;
+      track?: string;
+      search?: string;
+    }) => {
+      const queryParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) queryParams.set(key, String(value));
+        });
+      }
+      const query = queryParams.toString();
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/functions${query ? `?${query}` : ''}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<FunctionSummary[]>;
+    },
+
+    get: async (functionKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/functions/${functionKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<FunctionDefinition>;
+    },
+
+    getCategories: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/functions/categories`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{ categories: Record<string, number> }>;
+    },
+
+    getProjects: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/functions/projects`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<string[]>;
+    },
+
+    getPrompts: async (functionKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/functions/${functionKey}/prompts`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{
+        function_key: string;
+        function_name: string;
+        prompt_count: number;
+        prompts: PromptTemplate[];
+      }>;
+    },
+
+    getImplementations: async (functionKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/functions/${functionKey}/implementations`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{
+        function_key: string;
+        function_name: string;
+        implementation_count: number;
+        implementations: FunctionImplementation[];
+      }>;
     },
   };
 
