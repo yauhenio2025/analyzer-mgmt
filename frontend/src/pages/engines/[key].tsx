@@ -126,13 +126,27 @@ export default function EngineDetailPage() {
 
   const { data: consumers } = useQuery({
     queryKey: ['consumers', 'by-construct', 'engine', key],
-    queryFn: () => api.consumers.getByConstruct('engine', key as string),
+    queryFn: async () => {
+      try {
+        return await api.consumers.getByConstruct('engine', key as string);
+      } catch {
+        // Engine may only exist in analyzer-v2, not in mgmt DB
+        return { construct_type: 'engine', construct_key: key as string, consumers: [], total: 0 };
+      }
+    },
     enabled: !!key && activeTab === 'consumers',
   });
 
   const { data: versions } = useQuery({
     queryKey: ['engines', key, 'versions'],
-    queryFn: () => api.engines.getVersions(key as string),
+    queryFn: async () => {
+      try {
+        return await api.engines.getVersions(key as string);
+      } catch {
+        // Engine may only exist in analyzer-v2, not in mgmt DB
+        return { engine_key: key as string, current_version: 0, versions: [] };
+      }
+    },
     enabled: !!key && activeTab === 'history',
   });
 

@@ -143,7 +143,20 @@ class ApiClient {
       return { engines, total: engines.length, limit: params?.limit ?? 200, offset: params?.offset ?? 0 };
     },
 
-    get: (engineKey: string) => this.get<Engine>(`/engines/${engineKey}`),
+    /**
+     * Get a single engine from analyzer-v2 (source of truth for definitions).
+     */
+    get: async (engineKey: string): Promise<Engine> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/engines/${engineKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      // Map v2 response to Engine type — fill in fields v2 doesn't have
+      return {
+        ...data,
+        id: data.engine_key,
+        status: 'active' as const,
+      } as Engine;
+    },
 
     getVersions: (engineKey: string) =>
       this.get<{ engine_key: string; current_version: number; versions: EngineVersion[] }>(
@@ -151,20 +164,23 @@ class ApiClient {
       ),
 
     /**
-     * Get a composed prompt for an engine.
-     * If engine has stage_context, prompt is composed at runtime using templates.
+     * Get a composed prompt for an engine from analyzer-v2.
+     * Prompts are composed at runtime using templates + stage_context.
      * @param engineKey - The engine key
      * @param promptType - The prompt type (extraction, curation, concretization)
      * @param audience - Target audience for vocabulary calibration
      */
-    getPrompt: (
+    getPrompt: async (
       engineKey: string,
       promptType: 'extraction' | 'curation' | 'concretization',
       audience: AudienceType = 'analyst'
-    ) =>
-      this.get<ComposedPromptResponse>(
-        `/engines/${engineKey}/${promptType}-prompt?audience=${audience}`
-      ),
+    ): Promise<ComposedPromptResponse> => {
+      const response = await fetch(
+        `${ANALYZER_V2_URL}/v1/engines/${engineKey}/${promptType}-prompt?audience=${audience}`
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
 
     /**
      * Get the stage_context for an engine (for editing/debugging).
@@ -209,16 +225,26 @@ class ApiClient {
     },
 
     /**
-     * Get the profile/about section for an engine.
+     * Get the profile/about section for an engine from analyzer-v2.
      */
-    getProfile: (engineKey: string) =>
-      this.get<EngineProfileResponse>(`/engines/${engineKey}/profile`),
+    getProfile: async (engineKey: string): Promise<EngineProfileResponse> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/engines/${engineKey}/profile`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
 
     /**
-     * Save or update the profile for an engine.
+     * Save or update the profile for an engine via analyzer-v2.
      */
-    saveProfile: (engineKey: string, profile: EngineProfile) =>
-      this.put<EngineProfileResponse>(`/engines/${engineKey}/profile`, profile),
+    saveProfile: async (engineKey: string, profile: EngineProfile): Promise<EngineProfileResponse> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/engines/${engineKey}/profile`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
 
     /**
      * Delete the profile for an engine.
