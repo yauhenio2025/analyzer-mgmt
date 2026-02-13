@@ -7,6 +7,8 @@ from typing import Optional
 
 import asyncio
 import logging
+import sys
+import traceback
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +20,12 @@ from models.database import get_db, async_session
 from models.engine import Engine
 from models.paradigm import Paradigm
 
+# Configure logging to stdout so Render captures it
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -932,12 +940,14 @@ Be specific to this synthesized paradigm. Do not be generic."""
 
             generated_fields.append(field_path)
 
-            # Flush to persist progress
-            await db.flush()
-            logger.info(f"[BranchGen] Saved field: {field_path} ({len(generated_fields)}/{len(BRANCH_GENERATION_SEQUENCE)})")
+            # Commit to persist progress (must commit, not just flush,
+            # so the progress endpoint's separate session can see updates)
+            await db.commit()
+            print(f"[BranchGen] Saved field: {field_path} ({len(generated_fields)}/{len(BRANCH_GENERATION_SEQUENCE)})", flush=True)
 
         except Exception as e:
-            logger.error(f"[BranchGen] Error generating field '{field_path}': {e}")
+            print(f"[BranchGen] Error generating field '{field_path}': {e}", flush=True)
+            traceback.print_exc()
             errors.append({"field": field_path, "error": str(e)})
 
     # Update metadata with completion time
@@ -956,7 +966,8 @@ Be specific to this synthesized paradigm. Do not be generic."""
         paradigm.generation_status = "complete"
         paradigm.status = "active"
 
-    await db.flush()
+    await db.commit()
+    print(f"[BranchGen] Final status: {paradigm.generation_status}, fields: {len(generated_fields)}, errors: {len(errors)}", flush=True)
 
     return {
         "paradigm_key": paradigm_key,
@@ -968,36 +979,44 @@ Be specific to this synthesized paradigm. Do not be generic."""
 
 async def _run_generation_background(paradigm_key: str) -> None:
     """Run paradigm generation in a background task with its own DB session."""
-    logger.info(f"[BranchGen] Starting background generation for '{paradigm_key}'")
-    async with async_session() as db:
-        try:
-            result = await generate_branched_paradigm_content(db, paradigm_key)
-            await db.commit()
-            logger.info(
-                f"[BranchGen] Completed generation for '{paradigm_key}': "
-                f"{len(result.get('generated_fields', []))} fields, "
-                f"{len(result.get('errors', []))} errors, "
-                f"status={result.get('generation_status')}"
-            )
-        except Exception as e:
-            logger.error(f"[BranchGen] Background generation failed for '{paradigm_key}': {e}")
-            await db.rollback()
-            # Mark as failed so frontend stops polling
+    print(f"[BranchGen] Starting background generation for '{paradigm_key}'", flush=True)
+    try:
+        async with async_session() as db:
             try:
-                query = select(Paradigm).where(Paradigm.paradigm_key == paradigm_key)
-                res = await db.execute(query)
-                paradigm = res.scalar_one_or_none()
-                if paradigm:
-                    paradigm.generation_status = "failed"
-                    branch_metadata = paradigm.branch_metadata or {}
-                    branch_metadata["generation_errors"] = [
-                        {"field": "background_task", "error": str(e)}
-                    ]
-                    paradigm.branch_metadata = branch_metadata
-                    flag_modified(paradigm, "branch_metadata")
-                    await db.commit()
-            except Exception as inner_e:
-                logger.error(f"[BranchGen] Failed to mark generation as failed: {inner_e}")
+                result = await generate_branched_paradigm_content(db, paradigm_key)
+                # generate_branched_paradigm_content already commits after each field
+                # and after final status update, so no extra commit needed here
+                print(
+                    f"[BranchGen] Completed generation for '{paradigm_key}': "
+                    f"{len(result.get('generated_fields', []))} fields, "
+                    f"{len(result.get('errors', []))} errors, "
+                    f"status={result.get('generation_status')}",
+                    flush=True,
+                )
+            except Exception as e:
+                print(f"[BranchGen] Generation error for '{paradigm_key}': {e}", flush=True)
+                traceback.print_exc()
+                await db.rollback()
+                # Mark as failed so frontend stops polling
+                try:
+                    query = select(Paradigm).where(Paradigm.paradigm_key == paradigm_key)
+                    res = await db.execute(query)
+                    paradigm = res.scalar_one_or_none()
+                    if paradigm:
+                        paradigm.generation_status = "failed"
+                        branch_metadata = paradigm.branch_metadata or {}
+                        branch_metadata["generation_errors"] = [
+                            {"field": "background_task", "error": str(e)}
+                        ]
+                        paradigm.branch_metadata = branch_metadata
+                        flag_modified(paradigm, "branch_metadata")
+                        await db.commit()
+                        print(f"[BranchGen] Marked '{paradigm_key}' as failed", flush=True)
+                except Exception as inner_e:
+                    print(f"[BranchGen] Failed to mark as failed: {inner_e}", flush=True)
+    except Exception as outer_e:
+        print(f"[BranchGen] FATAL: Could not even open DB session: {outer_e}", flush=True)
+        traceback.print_exc()
 
 
 @router.post("/generate-branch/{paradigm_key}")
