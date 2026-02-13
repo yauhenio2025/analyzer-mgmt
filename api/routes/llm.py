@@ -5,15 +5,20 @@ import os
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+import asyncio
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm.attributes import flag_modified
 from pydantic import BaseModel, Field
 
-from models.database import get_db
+from models.database import get_db, async_session
 from models.engine import Engine
 from models.paradigm import Paradigm
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -220,9 +225,9 @@ async def call_llm(system_prompt: str, user_prompt: str) -> str:
     if api_key:
         try:
             import anthropic
-            client = anthropic.Anthropic(api_key=api_key)
-            message = client.messages.create(
-                model="claude-sonnet-4-20250514",
+            client = anthropic.AsyncAnthropic(api_key=api_key)
+            message = await client.messages.create(
+                model="claude-sonnet-4-5-20250929",
                 max_tokens=4096,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}]
@@ -789,7 +794,19 @@ async def generate_branched_paradigm_content(
     errors = []
 
     for field_path, layer_name, field_description in BRANCH_GENERATION_SEQUENCE:
+        # Skip fields that already have content (resume support)
+        existing_value = get_field_value(paradigm, field_path)
+        is_populated = (
+            (isinstance(existing_value, list) and len(existing_value) > 0)
+            or (isinstance(existing_value, str) and bool(existing_value))
+        )
+        if is_populated:
+            logger.info(f"[BranchGen] Skipping already-populated field: {field_path}")
+            generated_fields.append(field_path)
+            continue
+
         try:
+            logger.info(f"[BranchGen] Generating field: {field_path} ({layer_name})")
             context = build_generation_context(paradigm, field_path)
 
             # Determine expected response format based on field type
@@ -917,8 +934,10 @@ Be specific to this synthesized paradigm. Do not be generic."""
 
             # Flush to persist progress
             await db.flush()
+            logger.info(f"[BranchGen] Saved field: {field_path} ({len(generated_fields)}/{len(BRANCH_GENERATION_SEQUENCE)})")
 
         except Exception as e:
+            logger.error(f"[BranchGen] Error generating field '{field_path}': {e}")
             errors.append({"field": field_path, "error": str(e)})
 
     # Update metadata with completion time
@@ -947,15 +966,50 @@ Be specific to this synthesized paradigm. Do not be generic."""
     }
 
 
+async def _run_generation_background(paradigm_key: str) -> None:
+    """Run paradigm generation in a background task with its own DB session."""
+    logger.info(f"[BranchGen] Starting background generation for '{paradigm_key}'")
+    async with async_session() as db:
+        try:
+            result = await generate_branched_paradigm_content(db, paradigm_key)
+            await db.commit()
+            logger.info(
+                f"[BranchGen] Completed generation for '{paradigm_key}': "
+                f"{len(result.get('generated_fields', []))} fields, "
+                f"{len(result.get('errors', []))} errors, "
+                f"status={result.get('generation_status')}"
+            )
+        except Exception as e:
+            logger.error(f"[BranchGen] Background generation failed for '{paradigm_key}': {e}")
+            await db.rollback()
+            # Mark as failed so frontend stops polling
+            try:
+                query = select(Paradigm).where(Paradigm.paradigm_key == paradigm_key)
+                res = await db.execute(query)
+                paradigm = res.scalar_one_or_none()
+                if paradigm:
+                    paradigm.generation_status = "failed"
+                    branch_metadata = paradigm.branch_metadata or {}
+                    branch_metadata["generation_errors"] = [
+                        {"field": "background_task", "error": str(e)}
+                    ]
+                    paradigm.branch_metadata = branch_metadata
+                    flag_modified(paradigm, "branch_metadata")
+                    await db.commit()
+            except Exception as inner_e:
+                logger.error(f"[BranchGen] Failed to mark generation as failed: {inner_e}")
+
+
 @router.post("/generate-branch/{paradigm_key}")
 async def generate_branch_content(
     paradigm_key: str,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Trigger content generation for a branched paradigm.
 
-    This endpoint starts the sequential LLM generation process for all
-    18 fields of a branched paradigm.
+    Launches generation as a background task and returns immediately.
+    Poll /branch-progress/{paradigm_key} to track progress.
     """
     # Verify paradigm exists and is a branch
     query = select(Paradigm).where(Paradigm.paradigm_key == paradigm_key)
@@ -971,10 +1025,14 @@ async def generate_branch_content(
     if paradigm.generation_status == "complete":
         raise HTTPException(status_code=400, detail="Paradigm generation already complete")
 
-    # Run generation
-    result = await generate_branched_paradigm_content(db, paradigm_key)
+    # Launch generation in background (own DB session, won't timeout)
+    background_tasks.add_task(_run_generation_background, paradigm_key)
 
-    return result
+    return {
+        "paradigm_key": paradigm_key,
+        "generation_status": "generating",
+        "message": "Generation started in background. Poll /branch-progress for updates.",
+    }
 
 
 @router.get("/branch-progress/{paradigm_key}")

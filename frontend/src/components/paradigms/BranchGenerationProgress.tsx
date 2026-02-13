@@ -167,9 +167,9 @@ export default function BranchGenerationProgress({
         })}
       </div>
 
-      {/* Start generation button (if not started) */}
+      {/* Start/Resume generation button */}
       {progress.generation_status === 'generating' &&
-        progress.progress.completed === 0 && (
+        progress.progress.completed < progress.progress.total && (
           <div className="px-4 py-3 border-t bg-gray-50">
             <button
               onClick={() => generateMutation.mutate()}
@@ -179,12 +179,12 @@ export default function BranchGenerationProgress({
               {generateMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Starting Generation...
+                  {progress.progress.completed > 0 ? 'Resuming Generation...' : 'Starting Generation...'}
                 </>
               ) : (
                 <>
                   <Play className="h-4 w-4 mr-2" />
-                  Start Generation
+                  {progress.progress.completed > 0 ? 'Resume Generation' : 'Start Generation'}
                 </>
               )}
             </button>
