@@ -288,6 +288,10 @@ export default function EnginesPage() {
   const capKeySet = useMemo(() => new Set(capabilityKeys ?? []), [capabilityKeys]);
 
   const allEnginesRaw = engineData?.engines ?? [];
+  const capMatchCount = useMemo(
+    () => allEnginesRaw.filter(e => capKeySet.has(e.engine_key)).length,
+    [allEnginesRaw, capKeySet]
+  );
   const allEngines = capabilityOnly
     ? allEnginesRaw.filter(e => capKeySet.has(e.engine_key))
     : allEnginesRaw;
@@ -413,7 +417,7 @@ export default function EnginesPage() {
           )}
 
           {/* Capability filter toggle */}
-          {capKeySet.size > 0 && (
+          {capMatchCount > 0 && (
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -431,7 +435,7 @@ export default function EnginesPage() {
                 'text-[10px] px-1.5 py-0.5 rounded-full font-medium',
                 capabilityOnly ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500'
               )}>
-                {capKeySet.size}
+                {capMatchCount}
               </span>
             </label>
           )}
