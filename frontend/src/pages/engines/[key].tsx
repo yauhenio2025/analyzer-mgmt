@@ -77,9 +77,13 @@ function SchemaViewer({ schema }: { schema: Record<string, unknown> }) {
   );
 }
 
-/** Convert snake_case to Title Case */
-function humanize(s: string): string {
-  return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+/** Convert snake_case to Title Case. Handles objects with .name property. */
+function humanize(s: string | { name: string } | unknown): string {
+  if (typeof s === 'object' && s !== null && 'name' in (s as Record<string, unknown>)) {
+    return humanize((s as { name: string }).name);
+  }
+  const str = String(s ?? '');
+  return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 /** Prose block: either a plain paragraph or a definition-list term */
