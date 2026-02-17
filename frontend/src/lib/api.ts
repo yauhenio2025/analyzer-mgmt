@@ -265,6 +265,16 @@ class ApiClient {
     },
 
     /**
+     * List engine keys that have capability definitions (v2 prose-mode).
+     */
+    listCapabilityKeys: async (): Promise<string[]> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/engines/capability-definitions`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json() as Array<{ engine_key: string }>;
+      return data.map(d => d.engine_key);
+    },
+
+    /**
      * Get the capability-based prompt for an engine from analyzer-v2.
      */
     getCapabilityPrompt: async (engineKey: string, depth: string = 'standard'): Promise<{ engine_key: string; depth: string; prompt: string } | null> => {

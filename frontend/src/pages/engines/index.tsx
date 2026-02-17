@@ -262,6 +262,7 @@ function SearchResults({ engines }: { engines: EngineSummary[] }) {
 export default function EnginesPage() {
   const [search, setSearch] = useState('');
   const [selectedApp, setSelectedApp] = useState<string | null>(null);
+  const [capabilityOnly, setCapabilityOnly] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   const { data: engineData, isLoading, error } = useQuery({
@@ -279,7 +280,17 @@ export default function EnginesPage() {
     queryFn: () => api.engines.getApps(),
   });
 
-  const allEngines = engineData?.engines ?? [];
+  const { data: capabilityKeys } = useQuery({
+    queryKey: ['engines', 'capability-keys'],
+    queryFn: () => api.engines.listCapabilityKeys(),
+  });
+
+  const capKeySet = useMemo(() => new Set(capabilityKeys ?? []), [capabilityKeys]);
+
+  const allEnginesRaw = engineData?.engines ?? [];
+  const allEngines = capabilityOnly
+    ? allEnginesRaw.filter(e => capKeySet.has(e.engine_key))
+    : allEnginesRaw;
   const apps = appsData ?? [];
 
   // Group engines by category
@@ -370,35 +381,61 @@ export default function EnginesPage() {
           )}
         </div>
 
-        {/* App filter */}
-        {apps.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <Layers className="h-3.5 w-3.5 text-gray-400" />
-            <button
-              onClick={() => setSelectedApp(null)}
-              className={clsx(
-                'badge cursor-pointer text-xs',
-                selectedApp === null ? 'badge-primary' : 'badge-gray hover:bg-gray-200'
-              )}
-            >
-              All Apps
-            </button>
-            {apps.map((app) => (
+        {/* App filter + Capability toggle */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          {apps.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Layers className="h-3.5 w-3.5 text-gray-400" />
               <button
-                key={app}
-                onClick={() => setSelectedApp(selectedApp === app ? null : app)}
+                onClick={() => setSelectedApp(null)}
                 className={clsx(
-                  'badge cursor-pointer capitalize text-xs',
-                  selectedApp === app
-                    ? 'bg-violet-100 text-violet-800'
-                    : 'badge-gray hover:bg-gray-200'
+                  'badge cursor-pointer text-xs',
+                  selectedApp === null ? 'badge-primary' : 'badge-gray hover:bg-gray-200'
                 )}
               >
-                {app}
+                All Apps
               </button>
-            ))}
-          </div>
-        )}
+              {apps.map((app) => (
+                <button
+                  key={app}
+                  onClick={() => setSelectedApp(selectedApp === app ? null : app)}
+                  className={clsx(
+                    'badge cursor-pointer capitalize text-xs',
+                    selectedApp === app
+                      ? 'bg-violet-100 text-violet-800'
+                      : 'badge-gray hover:bg-gray-200'
+                  )}
+                >
+                  {app}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Capability filter toggle */}
+          {capKeySet.size > 0 && (
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={capabilityOnly}
+                onChange={(e) => setCapabilityOnly(e.target.checked)}
+                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-3.5 w-3.5"
+              />
+              <span className={clsx(
+                'text-xs font-medium',
+                capabilityOnly ? 'text-primary-700' : 'text-gray-500'
+              )}>
+                Capability-enabled only
+              </span>
+              <span className={clsx(
+                'text-[10px] px-1.5 py-0.5 rounded-full font-medium',
+                capabilityOnly ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500'
+              )}>
+                {capKeySet.size}
+              </span>
+            </label>
+          )}
+        </div>
       </div>
 
       {/* Loading */}

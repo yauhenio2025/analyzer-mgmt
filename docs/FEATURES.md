@@ -81,13 +81,15 @@
 
 ### Paradigm Branching
 - **Status**: Active
-- **Description**: Create derivative paradigms from existing ones with LLM-powered content generation
+- **Description**: Create derivative paradigms from existing ones with LLM-powered content generation. Generation runs as a background task with resume support.
 - **Entry Points**:
-  - `api/routes/paradigms.py:340-460` - Branch creation, lineage, and branches endpoints
-  - `api/routes/llm.py:568-780` - LLM generation service for branches (18-field sequential generation)
+  - `api/routes/paradigms.py:370-441` - Branch creation, lineage, and branches endpoints
+  - `api/routes/llm.py:655-948` - LLM generation service for branches (18-field sequential generation with resume)
+  - `api/routes/llm.py:966-1003` - Background task runner with error handling
+  - `api/routes/llm.py:1006-1040` - Generate endpoint (launches background task, returns immediately)
   - `api/models/paradigm.py:53-63` - Branching fields (parent_paradigm_key, branch_metadata, branch_depth, generation_status)
   - `frontend/src/components/paradigms/BranchParadigmModal.tsx:1-170` - Modal for creating branches
-  - `frontend/src/components/paradigms/BranchGenerationProgress.tsx:1-180` - Generation progress display
+  - `frontend/src/components/paradigms/BranchGenerationProgress.tsx:1-248` - Generation progress display with resume button
   - `frontend/src/components/paradigms/ParadigmLineage.tsx:1-150` - Lineage visualization
 - **Dependencies**: Anthropic SDK, React Query
 - **Added**: 2026-01-28
