@@ -127,8 +127,189 @@ function formatProse(text: string): ProseBlock[] {
 
 const SERIF = "'Source Serif 4', Georgia, serif";
 
-function DimensionCard({ dimension, index }: { dimension: CapabilityEngineDefinition['analytical_dimensions'][number]; index: number }) {
+/** Stance → visual config mapping */
+const STANCE_STYLES: Record<string, { bg: string; text: string; dot: string; border: string }> = {
+  discovery:      { bg: 'bg-sky-100',     text: 'text-sky-700',     dot: 'bg-sky-400',     border: 'border-sky-200' },
+  inference:      { bg: 'bg-violet-100',  text: 'text-violet-700',  dot: 'bg-violet-400',  border: 'border-violet-200' },
+  confrontation:  { bg: 'bg-rose-100',    text: 'text-rose-700',    dot: 'bg-rose-400',    border: 'border-rose-200' },
+  architecture:   { bg: 'bg-amber-100',   text: 'text-amber-700',   dot: 'bg-amber-400',   border: 'border-amber-200' },
+  integration:    { bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-400', border: 'border-emerald-200' },
+  reflection:     { bg: 'bg-slate-100',   text: 'text-slate-600',   dot: 'bg-slate-400',   border: 'border-slate-200' },
+  dialectical:    { bg: 'bg-teal-100',    text: 'text-teal-700',    dot: 'bg-teal-400',    border: 'border-teal-200' },
+};
+const DEFAULT_STANCE_STYLE = { bg: 'bg-stone-100', text: 'text-stone-600', dot: 'bg-stone-400', border: 'border-stone-200' };
+
+function getStanceStyle(stance: string) {
+  return STANCE_STYLES[stance] || DEFAULT_STANCE_STYLE;
+}
+
+/** Info about which pass targets a dimension at a given depth */
+interface PassHit {
+  passNumber: number;
+  stance: string;
+  label: string;
+}
+
+/** Pre-computed map: dimensionKey → { surface: PassHit[], standard: PassHit[], deep: PassHit[] } */
+type DimensionPassMap = Record<string, Record<string, PassHit[]>>;
+
+function buildDimensionPassMap(depthLevels: CapabilityEngineDefinition['depth_levels']): DimensionPassMap {
+  const map: DimensionPassMap = {};
+  for (const dl of depthLevels) {
+    if (!dl.passes) continue;
+    for (const pass of dl.passes) {
+      for (const dimKey of (pass.focus_dimensions || [])) {
+        if (!map[dimKey]) map[dimKey] = {};
+        if (!map[dimKey][dl.key]) map[dimKey][dl.key] = [];
+        map[dimKey][dl.key].push({
+          passNumber: pass.pass_number,
+          stance: pass.stance,
+          label: pass.label || `Pass ${pass.pass_number}`,
+        });
+      }
+    }
+  }
+  return map;
+}
+
+/** Dimension × Pass pipeline matrix: shows which passes target which dimensions */
+function DimensionPassMatrix({ depthLevels, dimensions, selectedDepth, onDepthChange }: {
+  depthLevels: CapabilityEngineDefinition['depth_levels'];
+  dimensions: CapabilityEngineDefinition['analytical_dimensions'];
+  selectedDepth: string;
+  onDepthChange: (d: string) => void;
+}) {
+  const dl = depthLevels.find(d => d.key === selectedDepth);
+  if (!dl?.passes?.length) return null;
+
+  const passes = [...dl.passes].sort((a, b) => a.pass_number - b.pass_number);
+
+  return (
+    <div className="rounded-xl border border-stone-200 overflow-hidden bg-white">
+      {/* Header */}
+      <div className="px-5 py-3 bg-stone-50/80 border-b border-stone-200 flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400">
+          Pipeline View
+        </span>
+        <div className="flex items-center gap-1">
+          {depthLevels.map(d => (
+            <button
+              key={d.key}
+              onClick={() => onDepthChange(d.key)}
+              className={clsx(
+                'text-[10px] font-medium px-2.5 py-1 rounded-full transition-all',
+                d.key === selectedDepth
+                  ? 'bg-stone-800 text-white'
+                  : 'text-stone-400 hover:text-stone-600 hover:bg-stone-100'
+              )}
+            >
+              {d.key}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Matrix grid */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="border-b border-stone-100">
+              <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400 w-52 min-w-[13rem]">
+                Dimension
+              </th>
+              {passes.map(pass => {
+                const s = getStanceStyle(pass.stance);
+                return (
+                  <th key={pass.pass_number} className="px-3 py-2.5 text-center min-w-[5.5rem]">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-[10px] font-mono text-stone-300">P{pass.pass_number}</span>
+                      <span className={clsx('text-[9px] font-semibold px-2 py-0.5 rounded-full', s.bg, s.text)}>
+                        {pass.stance}
+                      </span>
+                    </div>
+                  </th>
+                );
+              })}
+              <th className="px-3 py-2.5 text-center min-w-[3rem]">
+                <span className="text-[10px] text-stone-300">=</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {dimensions.map((dim, di) => {
+              const focusedPasses = passes.filter(p =>
+                (p.focus_dimensions || []).includes(dim.key)
+              );
+              const coverageRatio = passes.length > 0 ? focusedPasses.length / passes.length : 0;
+              return (
+                <tr key={dim.key} className={clsx(
+                  'border-b border-stone-50',
+                  di % 2 === 0 ? 'bg-white' : 'bg-stone-50/30'
+                )}>
+                  <td className="px-4 py-2 text-[12px] text-stone-700 font-medium">
+                    {humanize(dim.key)}
+                  </td>
+                  {passes.map(pass => {
+                    const hit = (pass.focus_dimensions || []).includes(dim.key);
+                    const s = getStanceStyle(pass.stance);
+                    return (
+                      <td key={pass.pass_number} className="px-3 py-2 text-center">
+                        {hit ? (
+                          <span className={clsx('inline-block w-3 h-3 rounded-full', s.dot)} title={`${pass.stance} examines ${humanize(dim.key)}`} />
+                        ) : (
+                          <span className="inline-block w-3 h-3 rounded-full bg-stone-100" />
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2 text-center">
+                    <span className={clsx(
+                      'text-[10px] font-mono',
+                      coverageRatio >= 0.6 ? 'text-emerald-600' : coverageRatio >= 0.3 ? 'text-amber-600' : 'text-stone-300'
+                    )}>
+                      {focusedPasses.length}/{passes.length}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Legend */}
+      <div className="px-5 py-2.5 bg-stone-50/50 border-t border-stone-100 flex items-center gap-4 flex-wrap">
+        <span className="text-[9px] text-stone-400 uppercase tracking-wider">Stances:</span>
+        {passes.map(p => p.stance).filter((v, i, a) => a.indexOf(v) === i).map(stance => {
+          const s = getStanceStyle(stance);
+          return (
+            <span key={stance} className="flex items-center gap-1.5">
+              <span className={clsx('w-2 h-2 rounded-full', s.dot)} />
+              <span className="text-[10px] text-stone-500">{stance}</span>
+            </span>
+          );
+        })}
+        <span className="ml-auto text-[10px] text-stone-400 italic">
+          {passes.length} pass{passes.length !== 1 ? 'es' : ''} at {selectedDepth} depth
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function DimensionCard({ dimension, index, passMap }: {
+  dimension: CapabilityEngineDefinition['analytical_dimensions'][number];
+  index: number;
+  passMap: DimensionPassMap;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const dimPasses = passMap[dimension.key] || {};
+  const depths = ['surface', 'standard', 'deep'];
+  // Count total unique stances that ever touch this dimension
+  const allStances = new Set<string>();
+  for (const d of depths) {
+    for (const hit of (dimPasses[d] || [])) allStances.add(hit.stance);
+  }
 
   return (
     <div className="group">
@@ -145,6 +326,31 @@ function DimensionCard({ dimension, index }: { dimension: CapabilityEngineDefini
         <div className="flex-1 min-w-0">
           <p className="text-[15px] font-medium text-stone-800">{humanize(dimension.key)}</p>
           <p className="text-sm text-stone-500 mt-1 leading-relaxed line-clamp-2">{dimension.description.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()}</p>
+          {/* Compact pass indicators in header */}
+          {allStances.size > 0 && (
+            <div className="flex items-center gap-1.5 mt-2">
+              {depths.map(depth => {
+                const hits = dimPasses[depth] || [];
+                if (hits.length === 0) return null;
+                return (
+                  <div key={depth} className="flex items-center gap-0.5">
+                    <span className="text-[9px] text-stone-300 uppercase mr-0.5">{depth[0]}</span>
+                    {hits.map(h => {
+                      const s = getStanceStyle(h.stance);
+                      return (
+                        <span
+                          key={h.passNumber}
+                          className={clsx('w-2 h-2 rounded-full', s.dot)}
+                          title={`${depth}: P${h.passNumber} ${h.stance}`}
+                        />
+                      );
+                    })}
+                    <span className="w-px h-3 bg-stone-200 mx-1 last:hidden" />
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 mt-1.5">
           <span className="text-[11px] text-stone-400">{dimension.probing_questions.length}q</span>
@@ -179,24 +385,59 @@ function DimensionCard({ dimension, index }: { dimension: CapabilityEngineDefini
             </div>
           )}
 
-          {/* Depth Guidance */}
+          {/* Depth Guidance + Pass Coverage */}
           {Object.keys(dimension.depth_guidance).length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-[0.15em] mb-3">By Depth</p>
               <div className="grid grid-cols-3 gap-px bg-stone-200 rounded-lg overflow-hidden">
                 {['surface', 'standard', 'deep']
                   .filter(level => dimension.depth_guidance[level])
-                  .map((level, i) => (
-                    <div key={level} className={clsx(
-                      'p-3.5',
-                      i === 0 && 'bg-amber-50/50',
-                      i === 1 && 'bg-amber-50',
-                      i === 2 && 'bg-amber-100/70',
-                    )}>
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-500 mb-1.5">{level}</p>
-                      <p className="text-xs text-stone-600 leading-relaxed">{dimension.depth_guidance[level]}</p>
-                    </div>
-                  ))}
+                  .map((level, i) => {
+                    const hits = dimPasses[level] || [];
+                    return (
+                      <div key={level} className={clsx(
+                        'p-3.5',
+                        i === 0 && 'bg-amber-50/50',
+                        i === 1 && 'bg-amber-50',
+                        i === 2 && 'bg-amber-100/70',
+                      )}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-500">{level}</p>
+                          {hits.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              {hits.map(h => {
+                                const s = getStanceStyle(h.stance);
+                                return (
+                                  <span
+                                    key={h.passNumber}
+                                    className={clsx('text-[8px] font-bold px-1.5 py-0.5 rounded-full border', s.bg, s.text, s.border)}
+                                    title={h.label}
+                                  >
+                                    P{h.passNumber}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-stone-600 leading-relaxed">{dimension.depth_guidance[level]}</p>
+                        {hits.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-stone-200/50">
+                            {hits.map(h => {
+                              const s = getStanceStyle(h.stance);
+                              return (
+                                <p key={h.passNumber} className="text-[10px] text-stone-400 flex items-center gap-1.5">
+                                  <span className={clsx('w-1.5 h-1.5 rounded-full flex-shrink-0', s.dot)} />
+                                  <span className={clsx('font-medium', s.text)}>{h.stance}</span>
+                                  <span className="text-stone-300">examines this</span>
+                                </p>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           )}
@@ -239,6 +480,7 @@ export default function EngineDetailPage() {
 
   // Query for capability prompt (only when viewing capability tab)
   const [capabilityDepth, setCapabilityDepth] = useState<string>('standard');
+  const [matrixDepth, setMatrixDepth] = useState<string>('deep');
   const { data: capabilityPrompt } = useQuery({
     queryKey: ['engines', key, 'capability-prompt', capabilityDepth],
     queryFn: () => api.engines.getCapabilityPrompt(key as string, capabilityDepth),
@@ -679,19 +921,11 @@ export default function EngineDetailPage() {
                           <div className="flex items-center gap-2">
                             {dl.passes.map((pass, pi) => (
                               <div key={pass.pass_number} className="flex items-center gap-1.5">
-                                <span className={clsx(
-                                  'text-[10px] font-semibold px-2 py-0.5 rounded-full',
-                                  pass.stance === 'discovery' && 'bg-sky-100 text-sky-700',
-                                  pass.stance === 'inference' && 'bg-violet-100 text-violet-700',
-                                  pass.stance === 'confrontation' && 'bg-rose-100 text-rose-700',
-                                  pass.stance === 'architecture' && 'bg-amber-100 text-amber-700',
-                                  pass.stance === 'integration' && 'bg-emerald-100 text-emerald-700',
-                                  pass.stance === 'reflection' && 'bg-slate-100 text-slate-600',
-                                  pass.stance === 'dialectical' && 'bg-teal-100 text-teal-700',
-                                  !['discovery','inference','confrontation','architecture','integration','reflection','dialectical'].includes(pass.stance) && 'bg-stone-100 text-stone-600',
-                                )}>
+                                {(() => { const s = getStanceStyle(pass.stance); return (
+                                <span className={clsx('text-[10px] font-semibold px-2 py-0.5 rounded-full', s.bg, s.text)}>
                                   {pass.stance}
                                 </span>
+                                ); })()}
                                 {pi < dl.passes.length - 1 && (
                                   <span className="text-stone-300 text-[10px]">→</span>
                                 )}
@@ -713,24 +947,40 @@ export default function EngineDetailPage() {
             )}
 
             {/* ── Analytical Dimensions ─────────────────────────── */}
-            <div>
-              <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-4">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400">
-                    Analytical Dimensions
-                  </span>
-                  <div className="h-px w-16 bg-stone-200" />
+            {(() => {
+              const passMap = buildDimensionPassMap(capabilityDef.depth_levels);
+              return (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400">
+                        Analytical Dimensions
+                      </span>
+                      <div className="h-px w-16 bg-stone-200" />
+                    </div>
+                    <span className="text-[11px] text-stone-400">
+                      {capabilityDef.analytical_dimensions.length} dimensions
+                    </span>
+                  </div>
+
+                  {/* Pipeline matrix: dimension × pass coverage */}
+                  {capabilityDef.depth_levels.some(d => d.passes && d.passes.length > 0) && (
+                    <DimensionPassMatrix
+                      depthLevels={capabilityDef.depth_levels}
+                      dimensions={capabilityDef.analytical_dimensions}
+                      selectedDepth={matrixDepth}
+                      onDepthChange={setMatrixDepth}
+                    />
+                  )}
+
+                  <div className="divide-y divide-stone-100">
+                    {capabilityDef.analytical_dimensions.map((dim, i) => (
+                      <DimensionCard key={dim.key} dimension={dim} index={i} passMap={passMap} />
+                    ))}
+                  </div>
                 </div>
-                <span className="text-[11px] text-stone-400">
-                  {capabilityDef.analytical_dimensions.length} dimensions
-                </span>
-              </div>
-              <div className="divide-y divide-stone-100">
-                {capabilityDef.analytical_dimensions.map((dim, i) => (
-                  <DimensionCard key={dim.key} dimension={dim} index={i} />
-                ))}
-              </div>
-            </div>
+              );
+            })()}
 
             {/* ── Capabilities + Composability ──────────────────── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
