@@ -172,6 +172,210 @@ function buildDimensionPassMap(depthLevels: CapabilityEngineDefinition['depth_le
   return map;
 }
 
+/** Pre-computed map: capabilityKey → { surface: PassHit[], standard: PassHit[], deep: PassHit[] } */
+type CapabilityPassMap = Record<string, Record<string, PassHit[]>>;
+
+function buildCapabilityPassMap(depthLevels: CapabilityEngineDefinition['depth_levels']): CapabilityPassMap {
+  const map: CapabilityPassMap = {};
+  for (const dl of depthLevels) {
+    if (!dl.passes) continue;
+    for (const pass of dl.passes) {
+      for (const capKey of (pass.focus_capabilities || [])) {
+        if (!map[capKey]) map[capKey] = {};
+        if (!map[capKey][dl.key]) map[capKey][dl.key] = [];
+        map[capKey][dl.key].push({
+          passNumber: pass.pass_number,
+          stance: pass.stance,
+          label: pass.label || `Pass ${pass.pass_number}`,
+        });
+      }
+    }
+  }
+  return map;
+}
+
+/** Enriched capability card with expandable detail */
+function CapabilityCard({ cap, passMap, index }: {
+  cap: import('@/types').EngineCapabilityItem;
+  passMap: Record<string, PassHit[]>;  // depth → PassHit[]
+  index: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const hasRichContent = !!(cap.extended_description || cap.intellectual_grounding || cap.indicators?.length);
+
+  // Collect all stances that exercise this capability
+  const allHits = Object.values(passMap).flat();
+  const uniqueStances = [...new Set(allHits.map(h => h.stance))];
+
+  return (
+    <div className="group">
+      {/* ── Collapsed header ── */}
+      <button
+        onClick={() => hasRichContent && setExpanded(!expanded)}
+        className={clsx(
+          'w-full text-left',
+          hasRichContent && 'cursor-pointer',
+          !hasRichContent && 'cursor-default',
+        )}
+      >
+        <div className="flex items-start gap-3">
+          {/* Number badge */}
+          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-stone-100 text-stone-400 text-[10px] font-semibold flex items-center justify-center mt-0.5">
+            {String(index + 1).padStart(2, '0')}
+          </span>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-stone-800">{humanize(cap.key)}</span>
+
+              {/* Grounding badge (collapsed) */}
+              {cap.intellectual_grounding && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-medium">
+                  {cap.intellectual_grounding.thinker}
+                </span>
+              )}
+
+              {/* Stance dots (collapsed) */}
+              {uniqueStances.length > 0 && (
+                <span className="flex items-center gap-0.5 ml-auto">
+                  {uniqueStances.map(stance => {
+                    const s = getStanceStyle(stance);
+                    return (
+                      <span key={stance} className={clsx('w-2 h-2 rounded-full', s.dot)} title={stance} />
+                    );
+                  })}
+                </span>
+              )}
+
+              {/* Expand indicator */}
+              {hasRichContent && (
+                <ChevronDown className={clsx(
+                  'w-3.5 h-3.5 text-stone-300 transition-transform flex-shrink-0',
+                  expanded && 'rotate-180'
+                )} />
+              )}
+            </div>
+
+            <p className="text-sm text-stone-500 mt-0.5 leading-relaxed">{cap.description}</p>
+
+            {/* Dimension flow */}
+            {(cap.produces_dimensions.length > 0 || cap.requires_dimensions.length > 0) && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+                {cap.requires_dimensions.length > 0 && (
+                  <span className="text-[11px] text-stone-400 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-300 inline-block flex-shrink-0" />
+                    needs {cap.requires_dimensions.map(d => humanize(d)).join(', ')}
+                  </span>
+                )}
+                {cap.produces_dimensions.length > 0 && (
+                  <span className="text-[11px] text-stone-400 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block flex-shrink-0" />
+                    produces {cap.produces_dimensions.map(d => humanize(d)).join(', ')}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </button>
+
+      {/* ── Expanded detail ── */}
+      {expanded && hasRichContent && (
+        <div className="ml-9 mt-4 space-y-4 pb-2">
+          {/* Extended description */}
+          {cap.extended_description && (
+            <div className="text-[13px] text-stone-600 leading-[1.7] space-y-3">
+              {cap.extended_description.split('\n\n').map((para, i) => (
+                <p key={i}>{para}</p>
+              ))}
+            </div>
+          )}
+
+          {/* Intellectual grounding */}
+          {cap.intellectual_grounding && (
+            <div className="bg-indigo-50/50 border border-indigo-100 rounded-lg px-4 py-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-400">Grounded in</span>
+                <span className="text-sm font-medium text-indigo-700">{humanize(cap.intellectual_grounding.thinker)}</span>
+                <span className="text-[11px] text-indigo-500">/ {cap.intellectual_grounding.concept}</span>
+              </div>
+              <p className="text-[12px] text-indigo-600/80 leading-relaxed">{cap.intellectual_grounding.method}</p>
+            </div>
+          )}
+
+          {/* Indicators */}
+          {cap.indicators && cap.indicators.length > 0 && (
+            <div>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 block mb-2">
+                Textual Indicators
+              </span>
+              <ul className="space-y-1.5">
+                {cap.indicators.map((ind, i) => (
+                  <li key={i} className="text-[12px] text-stone-500 leading-relaxed flex items-start gap-2">
+                    <span className="w-1 h-1 rounded-full bg-stone-300 flex-shrink-0 mt-1.5" />
+                    {ind}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Depth scaling */}
+          {cap.depth_scaling && Object.keys(cap.depth_scaling).length > 0 && (
+            <div>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 block mb-2">
+                Depth Scaling
+              </span>
+              <div className="grid grid-cols-3 gap-3">
+                {['surface', 'standard', 'deep'].filter(d => cap.depth_scaling?.[d]).map(depth => (
+                  <div key={depth} className="bg-stone-50 rounded-md px-3 py-2">
+                    <span className={clsx(
+                      'text-[10px] font-semibold uppercase tracking-wide block mb-1',
+                      depth === 'surface' && 'text-sky-500',
+                      depth === 'standard' && 'text-amber-500',
+                      depth === 'deep' && 'text-rose-500',
+                    )}>{depth}</span>
+                    <p className="text-[11px] text-stone-500 leading-relaxed">{cap.depth_scaling![depth]}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pass coverage (Level 1 cross-reference) */}
+          {Object.keys(passMap).length > 0 && (
+            <div>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 block mb-2">
+                Exercised In
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {['surface', 'standard', 'deep'].map(depth => {
+                  const hits = passMap[depth] || [];
+                  if (!hits.length) return null;
+                  return hits.map(h => {
+                    const s = getStanceStyle(h.stance);
+                    return (
+                      <span key={`${depth}-${h.passNumber}`} className={clsx('inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px]', s.bg, s.text)}>
+                        <span className={clsx('w-1.5 h-1.5 rounded-full', s.dot)} />
+                        <span className="font-medium">P{h.passNumber}</span>
+                        <span className="opacity-60">{h.stance}</span>
+                        <span className="text-[9px] opacity-40 ml-1">{depth[0].toUpperCase()}</span>
+                      </span>
+                    );
+                  });
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Separator */}
+      <div className="h-px bg-stone-100 mt-4" />
+    </div>
+  );
+}
+
 /** Dimension × Pass pipeline matrix: shows which passes target which dimensions */
 function DimensionPassMatrix({ depthLevels, dimensions, selectedDepth, onDepthChange }: {
   depthLevels: CapabilityEngineDefinition['depth_levels'];
@@ -982,109 +1186,97 @@ export default function EngineDetailPage() {
               );
             })()}
 
-            {/* ── Capabilities + Composability ──────────────────── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              {/* Capabilities */}
-              <div>
-                <div className="flex items-center gap-4 mb-6">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400">
-                    Capabilities
-                  </span>
-                  <div className="h-px flex-1 bg-stone-200" />
-                  <span className="text-[11px] text-stone-400">{capabilityDef.capabilities.length}</span>
+            {/* ── Capabilities ──────────────────────────────── */}
+            {(() => {
+              const capPassMap = buildCapabilityPassMap(capabilityDef.depth_levels);
+              return (
+                <div>
+                  <div className="flex items-center gap-4 mb-6">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400">
+                      Capabilities
+                    </span>
+                    <div className="h-px flex-1 bg-stone-200" />
+                    <span className="text-[11px] text-stone-400">{capabilityDef.capabilities.length}</span>
+                  </div>
+                  <div className="space-y-1">
+                    {capabilityDef.capabilities.map((cap, i) => (
+                      <CapabilityCard
+                        key={cap.key}
+                        cap={cap}
+                        passMap={capPassMap[cap.key] || {}}
+                        index={i}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-5">
-                  {capabilityDef.capabilities.map((cap) => (
-                    <div key={cap.key}>
-                      <p className="text-sm font-medium text-stone-800">{humanize(cap.key)}</p>
-                      <p className="text-sm text-stone-500 mt-1 leading-relaxed">{cap.description}</p>
-                      {(cap.produces_dimensions.length > 0 || cap.requires_dimensions.length > 0) && (
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
-                          {cap.requires_dimensions.length > 0 && (
-                            <span className="text-[11px] text-stone-400 flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-amber-300 inline-block flex-shrink-0" />
-                              needs {cap.requires_dimensions.map(d => humanize(d)).join(', ')}
-                            </span>
-                          )}
-                          {cap.produces_dimensions.length > 0 && (
-                            <span className="text-[11px] text-stone-400 flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block flex-shrink-0" />
-                              produces {cap.produces_dimensions.map(d => humanize(d)).join(', ')}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+              );
+            })()}
+
+            {/* ── Composability ──────────────────────────────── */}
+            <div>
+              <div className="flex items-center gap-4 mb-6">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400">
+                  Composability
+                </span>
+                <div className="h-px flex-1 bg-stone-200" />
               </div>
-
-              {/* Composability */}
-              <div>
-                <div className="flex items-center gap-4 mb-6">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400">
-                    Composability
-                  </span>
-                  <div className="h-px flex-1 bg-stone-200" />
-                </div>
-                <div className="space-y-8">
-                  {/* Receives from */}
-                  {Object.entries(capabilityDef.composability.consumes_from).length > 0 && (
-                    <div>
-                      <p className="text-[11px] font-medium text-stone-500 mb-3 flex items-center gap-2">
-                        <span className="w-5 h-px bg-amber-400" />
-                        Receives context from
-                      </p>
-                      <div className="space-y-3 ml-7">
-                        {Object.entries(capabilityDef.composability.consumes_from).map(([dim, desc]) => (
-                          <div key={dim}>
-                            <p className="text-sm font-medium text-stone-700">{humanize(dim)}</p>
-                            <p className="text-xs text-stone-400 mt-0.5 leading-relaxed">{desc as string}</p>
-                          </div>
-                        ))}
-                      </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Receives from */}
+                {Object.entries(capabilityDef.composability.consumes_from).length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-medium text-stone-500 mb-3 flex items-center gap-2">
+                      <span className="w-5 h-px bg-amber-400" />
+                      Receives context from
+                    </p>
+                    <div className="space-y-3 ml-7">
+                      {Object.entries(capabilityDef.composability.consumes_from).map(([dim, desc]) => (
+                        <div key={dim}>
+                          <p className="text-sm font-medium text-stone-700">{humanize(dim)}</p>
+                          <p className="text-xs text-stone-400 mt-0.5 leading-relaxed">{desc as string}</p>
+                        </div>
+                      ))}
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {/* Shares with */}
-                  {Object.entries(capabilityDef.composability.shares_with).length > 0 && (
-                    <div>
-                      <p className="text-[11px] font-medium text-stone-500 mb-3 flex items-center gap-2">
-                        <span className="w-5 h-px bg-emerald-400" />
-                        Shares findings with
-                      </p>
-                      <div className="space-y-3 ml-7">
-                        {Object.entries(capabilityDef.composability.shares_with).map(([eng, desc]) => (
-                          <div key={eng}>
-                            <p className="text-sm font-medium text-stone-700">{humanize(eng)}</p>
-                            <p className="text-xs text-stone-400 mt-0.5 leading-relaxed">{desc as string}</p>
-                          </div>
-                        ))}
-                      </div>
+                {/* Shares with */}
+                {Object.entries(capabilityDef.composability.shares_with).length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-medium text-stone-500 mb-3 flex items-center gap-2">
+                      <span className="w-5 h-px bg-emerald-400" />
+                      Shares findings with
+                    </p>
+                    <div className="space-y-3 ml-7">
+                      {Object.entries(capabilityDef.composability.shares_with).map(([eng, desc]) => (
+                        <div key={eng}>
+                          <p className="text-sm font-medium text-stone-700">{humanize(eng)}</p>
+                          <p className="text-xs text-stone-400 mt-0.5 leading-relaxed">{desc as string}</p>
+                        </div>
+                      ))}
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {/* Synergy */}
-                  {capabilityDef.composability.synergy_engines.length > 0 && (
-                    <div>
-                      <p className="text-[11px] font-medium text-stone-500 mb-3 flex items-center gap-2">
-                        <span className="w-5 h-px bg-stone-400" />
-                        Best combined with
-                      </p>
-                      <div className="flex flex-wrap gap-2 ml-7">
-                        {capabilityDef.composability.synergy_engines.map(e => (
-                          <Link
-                            key={e}
-                            href={`/engines/${e}`}
-                            className="text-[12px] px-3 py-1.5 rounded-full bg-stone-100 text-stone-600 hover:bg-stone-800 hover:text-white transition-all duration-200 border border-stone-200 hover:border-stone-800"
-                          >
-                            {humanize(e)}
-                          </Link>
-                        ))}
-                      </div>
+                {/* Synergy */}
+                {capabilityDef.composability.synergy_engines.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-medium text-stone-500 mb-3 flex items-center gap-2">
+                      <span className="w-5 h-px bg-stone-400" />
+                      Best combined with
+                    </p>
+                    <div className="flex flex-wrap gap-2 ml-7">
+                      {capabilityDef.composability.synergy_engines.map(e => (
+                        <Link
+                          key={e}
+                          href={`/engines/${e}`}
+                          className="text-[12px] px-3 py-1.5 rounded-full bg-stone-100 text-stone-600 hover:bg-stone-800 hover:text-white transition-all duration-200 border border-stone-200 hover:border-stone-800"
+                        >
+                          {humanize(e)}
+                        </Link>
+                      ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
 

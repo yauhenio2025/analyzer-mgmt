@@ -6,6 +6,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Dimension × Pass Pipeline Matrix** on engine detail Capability tab — visual grid showing which analytical dimensions each pass targets at each depth level
+  - Rows = dimensions, columns = passes with colored dots per stance
+  - Depth toggle buttons (surface/standard/deep) recalculate the matrix
+  - Coverage ratios per dimension (e.g., 3/4 passes cover it)
+  - Stance legend with color-coded labels
+  - Enhanced `DimensionCard` with pass coverage indicators in collapsed headers and pass badges (P1, P2) with stance labels in expanded "By Depth" section
+  - Shared `STANCE_STYLES` constant and `getStanceStyle()` helper replacing inline 7-way conditionals
+  - `buildDimensionPassMap()` helper pre-computes dimension → pass relationships from `capabilityDef.depth_levels[].passes[].focus_dimensions`
+- **Compact stance flow** in Analysis Depth section — replaced detailed pass cards with a concise horizontal flow showing pass numbers, stance badges, and focus dimension counts
+- **Operationalizations management UI** — full coverage grid list page and engine detail pages
+  - Coverage grid showing stance × engine operationalization status
+  - Per-engine detail with stance cards and depth sequence viewer
+  - Interactive depth sequence editor with drag-and-drop pass reordering, automatic renumbering, consumes_from rewiring
+  - Add pass (+) with stance picker dropdown, remove pass (x) on hover
+  - Save/reset with dirty tracking and unsaved-changes banner
+  - Per-stance Generate button (LLM regeneration) and Compose Preview button
+  - Navigation item in sidebar
+- **Stances section** in sidebar — list and detail pages for analytical stances
+- **Teal color** for dialectical stance across all badge/accent maps
 - **Capability Definition tab** on engine detail page — view v2 prose-mode capability definitions
   - Displays problematique, intellectual lineage, analytical dimensions, capabilities, composability, depth levels
   - Collapsible dimension cards with probing questions and per-depth guidance

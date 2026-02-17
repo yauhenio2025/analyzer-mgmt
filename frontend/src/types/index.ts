@@ -1146,9 +1146,19 @@ export interface AnalyticalDimension {
   depth_guidance: Record<string, string>;  // surface/standard/deep → guidance text
 }
 
+export interface CapabilityGrounding {
+  thinker: string;
+  concept: string;
+  method: string;
+}
+
 export interface EngineCapabilityItem {
   key: string;
   description: string;
+  extended_description?: string;
+  intellectual_grounding?: CapabilityGrounding;
+  indicators?: string[];
+  depth_scaling?: Record<string, string>;  // surface/standard/deep → scaling description
   requires_dimensions: string[];
   produces_dimensions: string[];
 }
