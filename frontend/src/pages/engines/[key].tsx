@@ -73,46 +73,71 @@ function SchemaViewer({ schema }: { schema: Record<string, unknown> }) {
   );
 }
 
-function DimensionCard({ dimension }: { dimension: CapabilityEngineDefinition['analytical_dimensions'][number] }) {
+/** Convert snake_case to Title Case */
+function humanize(s: string): string {
+  return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function DimensionCard({ dimension, index }: { dimension: CapabilityEngineDefinition['analytical_dimensions'][number]; index: number }) {
   const [expanded, setExpanded] = useState(false);
+  const depthOrder = ['surface', 'standard', 'deep'];
+  const depthColors: Record<string, string> = {
+    surface: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    standard: 'bg-blue-50 text-blue-700 border-blue-200',
+    deep: 'bg-purple-50 text-purple-700 border-purple-200',
+  };
+
   return (
-    <div className="border rounded-lg p-3">
+    <div className="border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-start justify-between text-left"
+        className="w-full px-4 py-3 flex items-center gap-3 text-left"
       >
-        <div>
-          <p className="font-medium text-gray-900">{dimension.key}</p>
-          <p className="text-sm text-gray-600 mt-0.5">{dimension.description}</p>
+        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 text-gray-500 text-xs font-medium flex items-center justify-center">
+          {index + 1}
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-gray-900 text-sm">{humanize(dimension.key)}</p>
+          <p className="text-xs text-gray-500 mt-0.5 truncate">{dimension.description}</p>
         </div>
+        <span className="text-xs text-gray-400 flex-shrink-0 mr-1">
+          {dimension.probing_questions.length} questions
+        </span>
         {expanded ? (
-          <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0 mt-1" />
+          <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0 mt-1" />
+          <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
         )}
       </button>
       {expanded && (
-        <div className="mt-3 pt-3 border-t space-y-3">
+        <div className="px-4 pb-4 space-y-4 border-t border-gray-100 pt-3">
+          <p className="text-sm text-gray-700 leading-relaxed">{dimension.description}</p>
+
           {dimension.probing_questions.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Probing Questions</p>
-              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Probing Questions</p>
+              <div className="space-y-1.5">
                 {dimension.probing_questions.map((q, i) => (
-                  <li key={i}>{q}</li>
+                  <p key={i} className="text-sm text-gray-600 pl-4 relative before:content-[''] before:absolute before:left-0 before:top-2 before:w-1.5 before:h-1.5 before:rounded-full before:bg-gray-300">
+                    {q}
+                  </p>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
+
           {Object.keys(dimension.depth_guidance).length > 0 && (
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Depth Guidance</p>
-              <div className="space-y-1">
-                {Object.entries(dimension.depth_guidance).map(([level, guidance]) => (
-                  <div key={level} className="text-sm">
-                    <span className="font-medium text-gray-900 capitalize">{level}: </span>
-                    <span className="text-gray-600">{guidance}</span>
-                  </div>
-                ))}
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Depth Guidance</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                {depthOrder
+                  .filter(level => dimension.depth_guidance[level])
+                  .map((level) => (
+                    <div key={level} className={`rounded-md border p-2.5 ${depthColors[level] || 'bg-gray-50 text-gray-700 border-gray-200'}`}>
+                      <p className="text-xs font-semibold uppercase tracking-wide mb-1">{level}</p>
+                      <p className="text-xs leading-relaxed opacity-90">{dimension.depth_guidance[level]}</p>
+                    </div>
+                  ))}
               </div>
             </div>
           )}
@@ -453,186 +478,222 @@ export default function EngineDetailPage() {
       {/* Capability Definition Tab (v2 prose-mode engines) */}
       {activeTab === 'capability' && capabilityDef && (
         <div className="space-y-6">
-          {/* Problematique */}
-          <div className="card p-5">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Problematique</h3>
-            <p className="text-gray-700 whitespace-pre-line leading-relaxed">
-              {capabilityDef.problematique}
-            </p>
-          </div>
+          {/* Hero: Problematique + Lineage side by side */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Problematique — 2/3 width */}
+            <div className="lg:col-span-2 card p-6">
+              <p className="text-xs font-semibold text-primary-600 uppercase tracking-wider mb-3">Problematique</p>
+              <p className="text-gray-700 leading-relaxed text-[15px]">
+                {capabilityDef.problematique.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()}
+              </p>
+            </div>
 
-          {/* Intellectual Lineage */}
-          <div className="card p-5">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">Intellectual Lineage</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Primary</p>
-                <p className="text-sm font-medium text-gray-900 capitalize">{capabilityDef.intellectual_lineage.primary}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Secondary</p>
-                <div className="flex flex-wrap gap-1">
-                  {capabilityDef.intellectual_lineage.secondary.map((s) => (
-                    <span key={s} className="badge badge-gray text-xs capitalize">{s}</span>
-                  ))}
+            {/* Intellectual Lineage — 1/3 width */}
+            <div className="card p-6">
+              <p className="text-xs font-semibold text-primary-600 uppercase tracking-wider mb-3">Intellectual Lineage</p>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-lg font-semibold text-gray-900 capitalize">
+                    {humanize(capabilityDef.intellectual_lineage.primary)}
+                  </p>
+                  {capabilityDef.intellectual_lineage.secondary.length > 0 && (
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      + {capabilityDef.intellectual_lineage.secondary.map(s => humanize(s)).join(', ')}
+                    </p>
+                  )}
                 </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Traditions</p>
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1.5">
                   {capabilityDef.intellectual_lineage.traditions.map((t) => (
-                    <span key={t} className="badge badge-primary text-xs capitalize">{t}</span>
+                    <span key={t} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
+                      {humanize(t)}
+                    </span>
                   ))}
                 </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Key Concepts</p>
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1.5">
                   {capabilityDef.intellectual_lineage.key_concepts.map((c) => (
-                    <span key={c} className="badge badge-success text-xs">{c}</span>
+                    <span key={c} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                      {c.replace(/_/g, ' ')}
+                    </span>
                   ))}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Analytical Dimensions */}
-          <div className="card p-5">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">
-              Analytical Dimensions ({capabilityDef.analytical_dimensions.length})
-            </h3>
-            <div className="space-y-4">
-              {capabilityDef.analytical_dimensions.map((dim) => (
-                <DimensionCard key={dim.key} dimension={dim} />
-              ))}
-            </div>
-          </div>
-
-          {/* Capabilities */}
-          <div className="card p-5">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">
-              Capabilities ({capabilityDef.capabilities.length})
-            </h3>
-            <div className="space-y-3">
-              {capabilityDef.capabilities.map((cap) => (
-                <div key={cap.key} className="border rounded-lg p-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900">{cap.key}</p>
-                      <p className="text-sm text-gray-600 mt-0.5">{cap.description}</p>
-                    </div>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-3 text-xs">
-                    {cap.produces_dimensions.length > 0 && (
-                      <div>
-                        <span className="text-gray-500">Produces: </span>
-                        {cap.produces_dimensions.map((d) => (
-                          <span key={d} className="badge badge-success text-xs mr-1">{d}</span>
-                        ))}
-                      </div>
-                    )}
-                    {cap.requires_dimensions.length > 0 && (
-                      <div>
-                        <span className="text-gray-500">Requires: </span>
-                        {cap.requires_dimensions.map((d) => (
-                          <span key={d} className="badge badge-gray text-xs mr-1">{d}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Composability */}
-          <div className="card p-5">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">Composability</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Shares With</p>
-                {Object.entries(capabilityDef.composability.shares_with).length > 0 ? (
-                  <div className="space-y-1">
-                    {Object.entries(capabilityDef.composability.shares_with).map(([eng, desc]) => (
-                      <div key={eng} className="text-sm">
-                        <span className="font-medium text-gray-900">{eng}</span>
-                        <span className="text-gray-500"> — {desc}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400 italic">None</p>
-                )}
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Consumes From</p>
-                {Object.entries(capabilityDef.composability.consumes_from).length > 0 ? (
-                  <div className="space-y-1">
-                    {Object.entries(capabilityDef.composability.consumes_from).map(([dim, desc]) => (
-                      <div key={dim} className="text-sm">
-                        <span className="font-medium text-gray-900">{dim}</span>
-                        <span className="text-gray-500"> — {desc}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400 italic">None</p>
-                )}
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Synergy Engines</p>
-                {capabilityDef.composability.synergy_engines.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {capabilityDef.composability.synergy_engines.map((e) => (
-                      <Link key={e} href={`/engines/${e}`} className="badge badge-primary text-xs hover:opacity-80">
-                        {e}
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400 italic">None</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Depth Levels */}
+          {/* Depth Levels — compact horizontal bar */}
           {capabilityDef.depth_levels.length > 0 && (
-            <div className="card p-5">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Depth Levels</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {capabilityDef.depth_levels.map((dl) => (
-                  <div key={dl.key} className="border rounded-lg p-3">
-                    <p className="font-medium text-gray-900 capitalize">{dl.key}</p>
-                    <p className="text-sm text-gray-600 mt-1">{dl.description}</p>
-                    <div className="mt-2 flex items-center gap-3 text-xs text-gray-500">
-                      <span>Typical passes: {dl.typical_passes}</span>
-                      {dl.suitable_for && <span>For: {dl.suitable_for}</span>}
+            <div className="card px-6 py-4">
+              <div className="flex items-center gap-6">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex-shrink-0">Depth</p>
+                <div className="flex gap-3 flex-1">
+                  {capabilityDef.depth_levels.map((dl) => {
+                    const colors: Record<string, string> = {
+                      surface: 'border-emerald-200 bg-emerald-50',
+                      standard: 'border-blue-200 bg-blue-50',
+                      deep: 'border-purple-200 bg-purple-50',
+                    };
+                    return (
+                      <div key={dl.key} className={`flex-1 rounded-lg border p-3 ${colors[dl.key] || 'border-gray-200 bg-gray-50'}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-semibold text-gray-900 capitalize">{dl.key}</span>
+                          <span className="text-xs text-gray-500">{dl.typical_passes} pass{dl.typical_passes !== 1 ? 'es' : ''}</span>
+                        </div>
+                        <p className="text-xs text-gray-600 leading-snug">{dl.description}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Analytical Dimensions — compact list */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-xs font-semibold text-primary-600 uppercase tracking-wider">
+                Analytical Dimensions
+              </p>
+              <span className="text-xs text-gray-400">{capabilityDef.analytical_dimensions.length} dimensions — click to expand</span>
+            </div>
+            <div className="space-y-2">
+              {capabilityDef.analytical_dimensions.map((dim, i) => (
+                <DimensionCard key={dim.key} dimension={dim} index={i} />
+              ))}
+            </div>
+          </div>
+
+          {/* Capabilities + Composability side by side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Capabilities */}
+            <div className="card p-6">
+              <p className="text-xs font-semibold text-primary-600 uppercase tracking-wider mb-4">
+                Capabilities ({capabilityDef.capabilities.length})
+              </p>
+              <div className="space-y-2.5">
+                {capabilityDef.capabilities.map((cap) => (
+                  <div key={cap.key} className="flex items-start gap-3 group">
+                    <div className="flex-shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full bg-primary-400" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{humanize(cap.key)}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{cap.description}</p>
+                      {(cap.requires_dimensions.length > 0 || cap.produces_dimensions.length > 0) && (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                          {cap.requires_dimensions.length > 0 && (
+                            <>
+                              <span className="text-[10px] text-gray-400 uppercase">needs</span>
+                              {cap.requires_dimensions.map(d => (
+                                <span key={d} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                  {humanize(d)}
+                                </span>
+                              ))}
+                            </>
+                          )}
+                          {cap.produces_dimensions.length > 0 && (
+                            <>
+                              <span className="text-[10px] text-gray-400 uppercase ml-1">{cap.requires_dimensions.length > 0 ? '→' : 'produces'}</span>
+                              {cap.produces_dimensions.map(d => (
+                                <span key={d} className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  {humanize(d)}
+                                </span>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-          )}
 
-          {/* Capability Prompt Preview */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-gray-900">Capability Prompt</h3>
+            {/* Composability */}
+            <div className="card p-6">
+              <p className="text-xs font-semibold text-primary-600 uppercase tracking-wider mb-4">Composability</p>
+              <div className="space-y-5">
+                {/* Consumes From */}
+                {Object.entries(capabilityDef.composability.consumes_from).length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-px bg-amber-400" />
+                      Receives from other engines
+                    </p>
+                    <div className="space-y-1.5">
+                      {Object.entries(capabilityDef.composability.consumes_from).map(([dim, desc]) => (
+                        <div key={dim} className="text-sm pl-4">
+                          <span className="font-medium text-gray-800">{humanize(dim)}</span>
+                          <span className="text-gray-400 mx-1">—</span>
+                          <span className="text-gray-500 text-xs">{desc}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Shares With */}
+                {Object.entries(capabilityDef.composability.shares_with).length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-px bg-emerald-400" />
+                      Shares with other engines
+                    </p>
+                    <div className="space-y-1.5">
+                      {Object.entries(capabilityDef.composability.shares_with).map(([eng, desc]) => (
+                        <div key={eng} className="text-sm pl-4">
+                          <span className="font-medium text-gray-800">{humanize(eng)}</span>
+                          <span className="text-gray-400 mx-1">—</span>
+                          <span className="text-gray-500 text-xs">{desc}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Synergy Engines */}
+                {capabilityDef.composability.synergy_engines.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-px bg-primary-400" />
+                      Best combined with
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 pl-4">
+                      {capabilityDef.composability.synergy_engines.map((e) => (
+                        <Link
+                          key={e}
+                          href={`/engines/${e}`}
+                          className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 transition-colors"
+                        >
+                          {humanize(e)}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Capability Prompt Preview — collapsible */}
+          <details className="card overflow-hidden">
+            <summary className="px-6 py-4 cursor-pointer flex items-center justify-between hover:bg-gray-50 transition-colors">
+              <div className="flex items-center gap-3">
+                <Eye className="h-4 w-4 text-gray-400" />
+                <span className="text-sm font-medium text-gray-700">Preview Composed Prompt</span>
+              </div>
               <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-700">Depth:</label>
+                <label className="text-xs text-gray-500">Depth:</label>
                 <select
                   value={capabilityDepth}
-                  onChange={(e) => setCapabilityDepth(e.target.value)}
-                  className="input py-1 text-sm"
+                  onChange={(e) => { e.stopPropagation(); setCapabilityDepth(e.target.value); }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="input py-0.5 px-2 text-xs"
                 >
                   <option value="surface">Surface</option>
                   <option value="standard">Standard</option>
                   <option value="deep">Deep</option>
                 </select>
               </div>
-            </div>
-            <div className="h-[400px] border rounded-lg overflow-hidden">
+            </summary>
+            <div className="h-[400px] border-t">
               <MonacoEditor
                 height="100%"
                 language="markdown"
@@ -648,7 +709,7 @@ export default function EngineDetailPage() {
                 theme="vs-light"
               />
             </div>
-          </div>
+          </details>
         </div>
       )}
 
