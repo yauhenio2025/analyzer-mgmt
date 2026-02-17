@@ -79,12 +79,50 @@ function humanize(s: string): string {
   return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-/** Split prose text into paragraphs, collapsing line-wrap newlines */
-function formatProse(text: string): string[] {
-  return text
-    .split(/\n\n+/)
-    .map(p => p.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim())
-    .filter(p => p.length > 0);
+/** Prose block: either a plain paragraph or a definition-list term */
+type ProseBlock =
+  | { type: 'text'; content: string }
+  | { type: 'term'; name: string; definition: string };
+
+/**
+ * Split prose into structured blocks.
+ * Detects ALL-CAPS TERM: definition patterns (like taxonomy lists)
+ * and formats them as separate definition entries.
+ */
+function formatProse(text: string): ProseBlock[] {
+  const result: ProseBlock[] = [];
+  const rawParagraphs = text.split(/\n\n+/);
+
+  for (const rawPara of rawParagraphs) {
+    const joined = rawPara.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!joined) continue;
+
+    // Detect definition-list paragraphs: 3+ ALL-CAPS TERM: patterns
+    const termRegex = /([A-Z]{2,}(?:\s+[A-Z]{2,})*):\s*/g;
+    const terms: { index: number; name: string; end: number }[] = [];
+    let m;
+    while ((m = termRegex.exec(joined)) !== null) {
+      if (m[1].length >= 8) {
+        terms.push({ index: m.index, name: m[1], end: m.index + m[0].length });
+      }
+    }
+
+    if (terms.length >= 3) {
+      // This paragraph contains a taxonomy/definition list
+      const before = joined.substring(0, terms[0].index).trim();
+      if (before) result.push({ type: 'text', content: before });
+
+      for (let i = 0; i < terms.length; i++) {
+        const defEnd = i + 1 < terms.length ? terms[i + 1].index : joined.length;
+        const definition = joined.substring(terms[i].end, defEnd).trim();
+        result.push({ type: 'term', name: terms[i].name, definition });
+      }
+    } else {
+      result.push({ type: 'text', content: joined });
+    }
+  }
+
+  return result;
 }
 
 const SERIF = "'Source Serif 4', Georgia, serif";
@@ -121,8 +159,8 @@ function DimensionCard({ dimension, index }: { dimension: CapabilityEngineDefini
         <div className="ml-12 pb-6 space-y-5">
           {/* Full description */}
           <div className="text-sm text-stone-600 leading-[1.8] max-w-2xl" style={{ fontFamily: SERIF }}>
-            {formatProse(dimension.description).map((p, i) => (
-              <p key={i} className={i > 0 ? 'mt-3' : ''}>{p}</p>
+            {formatProse(dimension.description).map((block, i) => (
+              <p key={i} className={i > 0 ? 'mt-3' : ''}>{block.type === 'term' ? `${block.name}: ${block.definition}` : block.content}</p>
             ))}
           </div>
 
@@ -519,17 +557,32 @@ export default function EngineDetailPage() {
                 </div>
 
                 <div style={{ fontFamily: SERIF }} className="space-y-5">
-                  {formatProse(capabilityDef.problematique).map((paragraph, i) => (
-                    <p
-                      key={i}
-                      className={clsx(
-                        'leading-[1.9] text-stone-700',
-                        i === 0 ? 'text-[17px]' : 'text-[15.5px]',
-                      )}
-                    >
-                      {paragraph}
-                    </p>
-                  ))}
+                  {formatProse(capabilityDef.problematique).map((block, i) => {
+                    if (block.type === 'term') {
+                      return (
+                        <div key={i} className="pl-5 border-l-2 border-amber-300/40 py-0.5">
+                          <p className="text-[12px] font-semibold text-amber-800/70 tracking-[0.06em] mb-1"
+                             style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+                            {block.name}
+                          </p>
+                          <p className="text-[14.5px] leading-[1.8] text-stone-600">
+                            {block.definition}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <p
+                        key={i}
+                        className={clsx(
+                          'leading-[1.9] text-stone-700',
+                          i === 0 ? 'text-[17px]' : 'text-[15.5px]',
+                        )}
+                      >
+                        {block.content}
+                      </p>
+                    );
+                  })}
                 </div>
 
                 {capabilityDef.researcher_question && (
