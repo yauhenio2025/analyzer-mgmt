@@ -6,12 +6,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
-- **Tab disaggregation for capability engines** — replaced single monolithic "Capability" tab with 5 focused sub-tabs for the 11 genealogy engines:
-  - **About**: Problematique (serif prose) + Intellectual Lineage (dark sidebar with thinkers, traditions, key concepts)
+- **Lineage tab** — extracted intellectual lineage from About tab into its own dedicated tab with spacious full-width layout:
+  - Dark hero section for primary thinker (serif 4xl font)
+  - Card grid (2-4 cols) for secondary thinkers
+  - Badge/pill layout for traditions
+  - Stone-50 panel with serif text for key concepts
+- **History tab for capability engines** — shows auto-detected YAML definition changes from analyzer-v2:
+  - Baseline entries with Baseline badge + timestamp
+  - Expandable change entries with field-level diffs grouped by section
+  - Color-coded actions: green=added, amber=modified, rose=removed
+  - Lazy-loaded query (only fetches when History tab active)
+  - Legacy engines retain their own Version History tab (guarded with `!capabilityDef`)
+  - `getCapabilityHistory` API client using direct `fetch(ANALYZER_V2_URL + ...)` pattern
+  - TypeScript types: `CapabilityFieldChange`, `CapabilityHistoryEntry`, `CapabilityHistoryResponse`
+- **Tab disaggregation for capability engines** — replaced single monolithic "Capability" tab with 7 focused sub-tabs:
+  - **About**: Full-width Problematique prose (lineage moved to Lineage tab)
+  - **Lineage**: Intellectual lineage with primary thinker hero, secondary cards, traditions, key concepts
   - **Depth**: Depth levels (surface/standard/deep) with pass structures and stance flows
   - **Dimensions**: Pipeline matrix + dimension cards with probing questions
   - **Capabilities**: Enriched capability cards with thinker badges, grounding, indicators, depth scaling
   - **Composability**: 3-column grid (shares_with, consumes_from, synergy engines)
+  - **History**: Capability definition change tracking from analyzer-v2
   - Legacy engines (185) retain original tabs: About (Engine Profile), Stage Context, Prompt Preview, Schema, Consumers, History
   - Tab selection driven by `capabilityDef` query result — no capability definition = legacy tabs
   - Removed deprecated composed prompt preview (replaced by multi-pass operationalization layer)
