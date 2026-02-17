@@ -1519,6 +1519,16 @@ class ApiClient {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     },
+
+    update: async (engineKey: string, data: import('@/types').EngineOperationalization) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/operationalizations/${engineKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').EngineOperationalization>;
+    },
   };
 }
 
