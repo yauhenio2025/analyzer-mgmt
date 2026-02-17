@@ -18,7 +18,7 @@ import {
   Settings2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { Engine, EngineUpdate, StageContext, AudienceType, EngineProfile, CapabilityEngineDefinition } from '@/types';
+import type { Engine, EngineUpdate, StageContext, AudienceType, EngineProfile, CapabilityEngineDefinition, ThinkerReference, TraditionEntry, KeyConceptEntry } from '@/types';
 import clsx from 'clsx';
 import { StageContextEditor } from '@/components/StageContextEditor';
 import { EngineProfileEditor } from '@/components/EngineProfileEditor';
@@ -1129,7 +1129,22 @@ export default function EngineDetailPage() {
       )}
 
       {/* ═══ Capability Engine: Lineage Tab ═══ */}
-      {activeTab === 'lineage' && capabilityDef && (
+      {activeTab === 'lineage' && capabilityDef && (() => {
+        const lin = capabilityDef.intellectual_lineage;
+        // Normalize to handle both flat strings and rich objects
+        const primaryName = typeof lin.primary === 'string' ? lin.primary : lin.primary.name;
+        const primaryDesc = typeof lin.primary === 'string' ? '' : lin.primary.description;
+        const secondaryItems = lin.secondary.map(s =>
+          typeof s === 'string' ? { name: s, description: '' } : s
+        ) as ThinkerReference[];
+        const traditionItems = lin.traditions.map(t =>
+          typeof t === 'string' ? { name: t, description: '' } : t
+        ) as TraditionEntry[];
+        const conceptItems = lin.key_concepts.map(c =>
+          typeof c === 'string' ? { name: c, definition: '' } : c
+        ) as KeyConceptEntry[];
+
+        return (
         <>
           <Head>
             <link
@@ -1138,9 +1153,9 @@ export default function EngineDetailPage() {
             />
           </Head>
 
-          <div className="-mt-2 space-y-8">
+          <div className="-mt-2 space-y-10">
             {/* Primary thinker — hero */}
-            <div className="bg-stone-800 rounded-xl p-10 text-center">
+            <div className="bg-stone-800 rounded-xl px-10 py-12 text-center">
               <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-500 mb-4">
                 Primary Intellectual Influence
               </p>
@@ -1148,67 +1163,95 @@ export default function EngineDetailPage() {
                 className="text-4xl font-light text-white tracking-wide"
                 style={{ fontFamily: SERIF }}
               >
-                {humanize(capabilityDef.intellectual_lineage.primary)}
+                {humanize(primaryName)}
               </p>
-              {capabilityDef.intellectual_lineage.secondary.length > 0 && (
-                <p className="text-sm text-stone-400 mt-3">
-                  with {capabilityDef.intellectual_lineage.secondary.map(s => humanize(s)).join(', ')}
+              {primaryDesc && (
+                <p
+                  className="text-stone-300 mt-5 max-w-2xl mx-auto text-[15px] leading-relaxed"
+                  style={{ fontFamily: SERIF }}
+                >
+                  {primaryDesc}
+                </p>
+              )}
+              {secondaryItems.length > 0 && (
+                <p className="text-xs text-stone-500 mt-5 tracking-wide">
+                  with {secondaryItems.map(s => humanize(s.name)).join(', ')}
                 </p>
               )}
             </div>
 
-            {/* Secondary thinkers — cards */}
-            {capabilityDef.intellectual_lineage.secondary.length > 0 && (
+            {/* Secondary thinkers — rich cards */}
+            {secondaryItems.length > 0 && (
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-5">
                   Secondary Influences
                 </p>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  {capabilityDef.intellectual_lineage.secondary.map(s => (
-                    <div key={s} className="bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-center">
-                      <span className="text-sm font-medium text-stone-700">{humanize(s)}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {secondaryItems.map(s => (
+                    <div key={s.name} className="bg-white border border-stone-200 rounded-lg px-5 py-4 border-l-[3px] border-l-stone-400">
+                      <p className="text-sm font-semibold text-stone-800 mb-1">{humanize(s.name)}</p>
+                      {s.description && (
+                        <p className="text-[13px] text-stone-500 leading-relaxed">{s.description}</p>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Traditions */}
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-4">
-                Traditions
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {capabilityDef.intellectual_lineage.traditions.map(t => (
-                  <span
-                    key={t}
-                    className="px-4 py-2 rounded-lg text-sm bg-stone-100 text-stone-700 border border-stone-200 font-medium"
-                  >
-                    {humanize(t)}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Key concepts */}
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-4">
-                Key Concepts
-              </p>
-              <div className="bg-stone-50 rounded-xl border border-stone-200 p-6">
-                <p
-                  className="text-[15px] text-stone-600 leading-relaxed"
-                  style={{ fontFamily: SERIF }}
-                >
-                  {capabilityDef.intellectual_lineage.key_concepts
-                    .map(c => c.replace(/_/g, ' '))
-                    .join('  \u00b7  ')}
+            {/* Traditions — description cards */}
+            {traditionItems.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-5">
+                  Traditions
                 </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {traditionItems.map(t => (
+                    <div key={t.name} className="bg-stone-50 border border-stone-200 rounded-lg px-5 py-4">
+                      <p className="text-xs font-bold uppercase tracking-[0.15em] text-stone-500 mb-2">
+                        {humanize(t.name)}
+                      </p>
+                      {t.description && (
+                        <p
+                          className="text-[13px] text-stone-600 leading-relaxed"
+                          style={{ fontFamily: SERIF }}
+                        >
+                          {t.description}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Key concepts — glossary */}
+            {conceptItems.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-5">
+                  Key Concepts
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {conceptItems.map(c => (
+                    <div key={c.name} className="bg-white border border-stone-200 rounded-lg px-5 py-4 border-l-[3px] border-l-amber-600/40">
+                      <p
+                        className="text-[15px] font-semibold text-stone-800 mb-1"
+                        style={{ fontFamily: SERIF }}
+                      >
+                        {humanize(c.name)}
+                      </p>
+                      {c.definition && (
+                        <p className="text-[13px] text-stone-500 leading-relaxed">{c.definition}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </>
-      )}
+        );
+      })()}
 
       {/* ═══ Capability Engine: Depth Tab ═══ */}
       {activeTab === 'depth' && capabilityDef && capabilityDef.depth_levels.length > 0 && (

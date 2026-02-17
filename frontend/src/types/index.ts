@@ -1187,11 +1187,26 @@ export interface DepthLevel {
   passes: PassDefinition[];
 }
 
+export interface ThinkerReference {
+  name: string;
+  description: string;
+}
+
+export interface TraditionEntry {
+  name: string;
+  description: string;
+}
+
+export interface KeyConceptEntry {
+  name: string;
+  definition: string;
+}
+
 export interface IntellectualLineage {
-  primary: string;
-  secondary: string[];
-  traditions: string[];
-  key_concepts: string[];
+  primary: ThinkerReference | string;
+  secondary: (ThinkerReference | string)[];
+  traditions: (TraditionEntry | string)[];
+  key_concepts: (KeyConceptEntry | string)[];
 }
 
 export interface CapabilityEngineDefinition {
