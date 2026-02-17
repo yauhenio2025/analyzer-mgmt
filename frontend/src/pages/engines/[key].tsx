@@ -705,7 +705,8 @@ export default function EngineDetailPage() {
                                       pass.stance === 'architecture' && 'bg-amber-100 text-amber-700',
                                       pass.stance === 'integration' && 'bg-emerald-100 text-emerald-700',
                                       pass.stance === 'reflection' && 'bg-slate-100 text-slate-600',
-                                      !['discovery','inference','confrontation','architecture','integration','reflection'].includes(pass.stance) && 'bg-stone-100 text-stone-600',
+                                      pass.stance === 'dialectical' && 'bg-teal-100 text-teal-700',
+                                      !['discovery','inference','confrontation','architecture','integration','reflection','dialectical'].includes(pass.stance) && 'bg-stone-100 text-stone-600',
                                     )}>
                                       {pass.stance}
                                     </span>

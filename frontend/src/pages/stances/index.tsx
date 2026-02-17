@@ -19,6 +19,7 @@ const stanceAccentColors: Record<string, string> = {
   architecture: 'border-l-amber-400',
   integration: 'border-l-emerald-400',
   reflection: 'border-l-slate-400',
+  dialectical: 'border-l-teal-400',
 };
 
 function StanceCard({ stance }: { stance: AnalyticalStanceType }) {

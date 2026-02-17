@@ -21,6 +21,7 @@ const stanceAccentColors: Record<string, string> = {
   architecture: 'border-amber-400',
   integration: 'border-emerald-400',
   reflection: 'border-slate-400',
+  dialectical: 'border-teal-400',
 };
 
 const stanceBgColors: Record<string, string> = {
@@ -30,6 +31,7 @@ const stanceBgColors: Record<string, string> = {
   architecture: 'bg-amber-50',
   integration: 'bg-emerald-50',
   reflection: 'bg-slate-50',
+  dialectical: 'bg-teal-50',
 };
 
 function CopyButton({ text, label }: { text: string; label: string }) {
