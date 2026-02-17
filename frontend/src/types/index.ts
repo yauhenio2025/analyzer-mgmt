@@ -1063,3 +1063,59 @@ export interface AudienceSummary {
   vocabulary_term_count: number;
   status: string;
 }
+
+// ============================================================================
+// Capability Engine Definition Types (v2 prose-mode engine definitions)
+// ============================================================================
+
+export interface AnalyticalDimension {
+  key: string;
+  description: string;
+  probing_questions: string[];
+  depth_guidance: Record<string, string>;  // surface/standard/deep → guidance text
+}
+
+export interface EngineCapabilityItem {
+  key: string;
+  description: string;
+  requires_dimensions: string[];
+  produces_dimensions: string[];
+}
+
+export interface ComposabilitySpec {
+  shares_with: Record<string, string>;
+  consumes_from: Record<string, string>;
+  synergy_engines: string[];
+}
+
+export interface DepthLevel {
+  key: string;
+  description: string;
+  typical_passes: number;
+  suitable_for: string;
+}
+
+export interface IntellectualLineage {
+  primary: string;
+  secondary: string[];
+  traditions: string[];
+  key_concepts: string[];
+}
+
+export interface CapabilityEngineDefinition {
+  engine_key: string;
+  engine_name: string;
+  version: number;
+  category: EngineCategory;
+  kind: EngineKind;
+  problematique: string;
+  researcher_question: string;
+  intellectual_lineage: IntellectualLineage;
+  analytical_dimensions: AnalyticalDimension[];
+  capabilities: EngineCapabilityItem[];
+  composability: ComposabilitySpec;
+  depth_levels: DepthLevel[];
+  legacy_engine_key: string | null;
+  apps: string[];
+  paradigm_keys: string[];
+}

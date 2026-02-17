@@ -6,6 +6,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Capability Definition tab** on engine detail page — view v2 prose-mode capability definitions
+  - Displays problematique, intellectual lineage, analytical dimensions, capabilities, composability, depth levels
+  - Collapsible dimension cards with probing questions and per-depth guidance
+  - Capability prompt preview with depth selector (surface/standard/deep)
+  - Synergy engine links navigate to other engine detail pages
+  - Tab only appears for engines that have a capability definition in analyzer-v2
+  - TypeScript types: `CapabilityEngineDefinition`, `AnalyticalDimension`, `EngineCapabilityItem`, `ComposabilitySpec`, `DepthLevel`, `IntellectualLineage`
+  - API client methods: `getCapabilityDefinition()`, `getCapabilityPrompt()` (fetches from analyzer-v2 directly)
+
+### Fixed
+- Paradigm branch generation stuck at 6% - "Start Generation" button was hidden because `guiding_thinkers` pre-populated during branch creation made `completed > 0`, failing the `completed === 0` check. Button now shows whenever generation isn't complete, with "Resume" label for partial progress.
+- Generation endpoint timeout on Render - converted from synchronous HTTP request (18 sequential LLM calls blocking) to `BackgroundTasks` with its own DB session. Returns immediately, frontend polls for progress.
+- Switched `call_llm` from sync `Anthropic` to `AsyncAnthropic` client to avoid blocking the event loop
+- Updated LLM model from `claude-sonnet-4-20250514` to `claude-sonnet-4-5-20250929`
+- Added resume support to generation - skips already-populated fields so retries don't regenerate completed work
+- Added structured logging throughout branch generation process (`[BranchGen]` prefix)
+
+### Added
 - **Functions Browsing UI** - Browse decider-v2 LLM function definitions
   - List page at `/functions` with card grid, search, category/tier/project filters
   - Detail page at `/functions/[key]` with 3 tabs: Overview, Prompts, Implementations

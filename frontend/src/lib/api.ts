@@ -9,6 +9,7 @@ import type {
   EngineVersion,
   EngineProfile,
   EngineProfileResponse,
+  CapabilityEngineDefinition,
   Paradigm,
   ParadigmSummary,
   Pipeline,
@@ -251,6 +252,27 @@ class ApiClient {
      */
     deleteProfile: (engineKey: string) =>
       this.delete<{ status: string; engine_key: string }>(`/engines/${engineKey}/profile`),
+
+    /**
+     * Get the capability definition for an engine from analyzer-v2.
+     * Returns null if the engine has no capability definition.
+     */
+    getCapabilityDefinition: async (engineKey: string): Promise<CapabilityEngineDefinition | null> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/engines/${engineKey}/capability-definition`);
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+
+    /**
+     * Get the capability-based prompt for an engine from analyzer-v2.
+     */
+    getCapabilityPrompt: async (engineKey: string, depth: string = 'standard'): Promise<{ engine_key: string; depth: string; prompt: string } | null> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/engines/${engineKey}/capability-prompt?depth=${depth}`);
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
   };
 
   // ============================================================================
