@@ -17,6 +17,7 @@ import {
   MessageSquareWarning,
   UserCircle,
   Zap,
+  Compass,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -38,6 +39,7 @@ const navigation: NavItem[] = [
   { name: 'Primitives', href: '/primitives', icon: Shapes },
   { name: 'Display', href: '/display', icon: Brush },
   { name: 'Functions', href: '/functions', icon: Zap },
+  { name: 'Stances', href: '/stances', icon: Compass },
   { name: 'Rhetoric', href: '/rhetoric', icon: MessageSquareWarning },
   { name: 'Consumers', href: '/consumers', icon: Users },
   { name: 'Changes', href: '/changes', icon: History },

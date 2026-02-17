@@ -1382,6 +1382,58 @@ class ApiClient {
       return this.post<import('@/types').Rhetoric>(`/rhetoric/${rhetricKey}/restore/${version}`, {});
     },
   };
+
+  // ============================================================================
+  // Stances Endpoints (from analyzer-v2)
+  // ============================================================================
+
+  stances = {
+    /**
+     * List all analytical stances (summaries).
+     * Calls analyzer-v2 directly.
+     */
+    list: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/operations/stances`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').StanceSummaryType[]>;
+    },
+
+    /**
+     * List all stances with full prose descriptions.
+     */
+    listFull: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/operations/stances/full`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').AnalyticalStanceType[]>;
+    },
+
+    /**
+     * Get a single stance by key.
+     */
+    get: async (key: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/operations/stances/${key}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').AnalyticalStanceType>;
+    },
+
+    /**
+     * Get just the stance prose text.
+     */
+    getText: async (key: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/operations/stances/${key}/text`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<string>;
+    },
+
+    /**
+     * Get stances by typical position (early/middle/late).
+     */
+    getByPosition: async (position: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/operations/stances/position/${position}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').StanceSummaryType[]>;
+    },
+  };
 }
 
 // Types for Display API

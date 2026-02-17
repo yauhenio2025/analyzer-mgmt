@@ -951,6 +951,26 @@ export interface FunctionSummary {
 }
 
 // ============================================================================
+// Analytical Stance Types (from analyzer-v2)
+// ============================================================================
+
+export interface AnalyticalStanceType {
+  key: string;
+  name: string;
+  stance: string;
+  cognitive_mode: string;
+  typical_position: string;
+  pairs_well_with: string[];
+}
+
+export interface StanceSummaryType {
+  key: string;
+  name: string;
+  cognitive_mode: string;
+  typical_position: string;
+}
+
+// ============================================================================
 // API Response Types
 // ============================================================================
 
