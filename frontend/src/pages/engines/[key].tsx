@@ -30,7 +30,7 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false 
 // Capability tabs for engines with capability definitions (the 11 genealogy engines)
 type TabId =
   | 'about' | 'context' | 'preview' | 'schema' | 'consumers' | 'history'  // legacy
-  | 'depth' | 'dimensions' | 'capabilities' | 'composability';             // capability
+  | 'lineage' | 'depth' | 'dimensions' | 'capabilities' | 'composability'; // capability
 
 interface TabProps {
   id: TabId;
@@ -654,6 +654,116 @@ function DimensionCard({ dimension, index, passMap }: {
   );
 }
 
+/** Section labels for capability history */
+const SECTION_LABELS: Record<string, string> = {
+  top_level: 'Definition',
+  intellectual_lineage: 'Intellectual Lineage',
+  analytical_dimensions: 'Analytical Dimensions',
+  capabilities: 'Capabilities',
+  composability: 'Composability',
+  depth_levels: 'Depth Levels',
+};
+
+/** Color coding for history change actions */
+const ACTION_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  added:    { bg: 'bg-emerald-50', text: 'text-emerald-600', label: 'Added' },
+  removed:  { bg: 'bg-rose-50',   text: 'text-rose-600',   label: 'Removed' },
+  modified: { bg: 'bg-amber-50',  text: 'text-amber-600',  label: 'Modified' },
+};
+
+function HistoryEntryCard({ entry, isLatest }: {
+  entry: import('@/types').CapabilityHistoryEntry;
+  isLatest: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const date = new Date(entry.timestamp);
+  const hasChanges = entry.changes.length > 0;
+
+  // Group changes by section
+  const bySection: Record<string, import('@/types').CapabilityFieldChange[]> = {};
+  for (const change of entry.changes) {
+    if (!bySection[change.section]) bySection[change.section] = [];
+    bySection[change.section].push(change);
+  }
+
+  return (
+    <div className={clsx(
+      'rounded-lg border overflow-hidden',
+      isLatest ? 'border-stone-300 shadow-sm' : 'border-stone-200',
+    )}>
+      <button
+        onClick={() => hasChanges && setExpanded(!expanded)}
+        className={clsx(
+          'w-full text-left px-5 py-3 flex items-center justify-between',
+          hasChanges ? 'cursor-pointer hover:bg-stone-50/50' : 'cursor-default',
+          entry.is_baseline ? 'bg-stone-50' : 'bg-white',
+        )}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span className={clsx(
+            'text-xs font-mono px-2 py-0.5 rounded flex-shrink-0',
+            isLatest ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-500',
+          )}>
+            v{entry.version}
+          </span>
+          <p className="text-sm text-stone-700 truncate">{entry.summary}</p>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+          {entry.is_baseline && (
+            <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-50 text-indigo-500 font-medium">
+              Baseline
+            </span>
+          )}
+          <span className="text-[11px] text-stone-400 whitespace-nowrap">
+            {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+          {hasChanges && (
+            <ChevronDown className={clsx(
+              'w-4 h-4 text-stone-300 transition-transform',
+              expanded && 'rotate-180',
+            )} />
+          )}
+        </div>
+      </button>
+
+      {expanded && hasChanges && (
+        <div className="px-5 py-4 border-t border-stone-100 space-y-4">
+          {Object.entries(bySection).map(([section, changes]) => (
+            <div key={section}>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-2">
+                {SECTION_LABELS[section] || humanize(section)}
+              </p>
+              <div className="space-y-1.5">
+                {changes.map((change, i) => {
+                  const style = ACTION_STYLES[change.action] || ACTION_STYLES.modified;
+                  return (
+                    <div key={i} className={clsx('flex items-start gap-2 px-3 py-2 rounded text-[12px]', style.bg)}>
+                      <span className={clsx('font-medium flex-shrink-0', style.text)}>
+                        {style.label}
+                      </span>
+                      <span className="text-stone-600 font-medium">{humanize(change.field)}</span>
+                      {change.old_value && change.action === 'modified' && (
+                        <span className="text-stone-400 truncate max-w-[200px]" title={change.old_value}>
+                          was: {change.old_value}
+                        </span>
+                      )}
+                      {change.new_value && change.action !== 'removed' && (
+                        <span className="text-stone-500 truncate max-w-[300px]" title={change.new_value}>
+                          {change.action === 'added' ? change.new_value : `now: ${change.new_value}`}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EngineDetailPage() {
   const router = useRouter();
   const { key } = router.query;
@@ -686,6 +796,13 @@ export default function EngineDetailPage() {
   });
 
   const [matrixDepth, setMatrixDepth] = useState<string>('deep');
+
+  // Query for capability definition history (lazy — only when History tab active)
+  const { data: capabilityHistory } = useQuery({
+    queryKey: ['engines', key, 'capability-history'],
+    queryFn: () => api.engines.getCapabilityHistory(key as string),
+    enabled: !!key && activeTab === 'history' && !!capabilityDef,
+  });
 
   // Initialize local state when engine data loads
   useEffect(() => {
@@ -874,10 +991,12 @@ export default function EngineDetailPage() {
             <>
               {/* ── Capability engine tabs ── */}
               <Tab id="about" label="About" active={activeTab === 'about'} onClick={() => setActiveTab('about')} />
+              <Tab id="lineage" label="Lineage" active={activeTab === 'lineage'} onClick={() => setActiveTab('lineage')} />
               <Tab id="depth" label="Depth" active={activeTab === 'depth'} onClick={() => setActiveTab('depth')} />
               <Tab id="dimensions" label="Dimensions" active={activeTab === 'dimensions'} onClick={() => setActiveTab('dimensions')} />
               <Tab id="capabilities" label="Capabilities" active={activeTab === 'capabilities'} onClick={() => setActiveTab('capabilities')} />
               <Tab id="composability" label="Composability" active={activeTab === 'composability'} onClick={() => setActiveTab('composability')} />
+              <Tab id="history" label="History" active={activeTab === 'history'} onClick={() => setActiveTab('history')} />
             </>
           ) : (
             <>
@@ -949,7 +1068,7 @@ export default function EngineDetailPage() {
         </div>
       )}
 
-      {/* ═══ Capability Engine: About Tab (Problematique + Lineage) ═══ */}
+      {/* ═══ Capability Engine: About Tab (Problematique only) ═══ */}
       {activeTab === 'about' && capabilityDef && (
         <>
           <Head>
@@ -959,93 +1078,132 @@ export default function EngineDetailPage() {
             />
           </Head>
 
-          <div className="-mt-2 space-y-10">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 rounded-xl overflow-hidden border border-stone-200 shadow-sm">
-              {/* Problematique — main column */}
-              <div className="lg:col-span-8 p-8 lg:p-10 bg-[#faf9f6]">
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="h-px flex-1 bg-gradient-to-r from-amber-400/50 to-transparent" />
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-amber-700/60">Problematique</span>
-                  <div className="h-px flex-1 bg-gradient-to-l from-amber-400/50 to-transparent" />
-                </div>
-
-                <div style={{ fontFamily: SERIF }} className="space-y-5">
-                  {formatProse(capabilityDef.problematique).map((block, i) => {
-                    if (block.type === 'term') {
-                      return (
-                        <div key={i} className="pl-5 border-l-2 border-amber-300/40 py-0.5">
-                          <p className="text-[12px] font-semibold text-amber-800/70 tracking-[0.06em] mb-1"
-                             style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-                            {block.name}
-                          </p>
-                          <p className="text-[14.5px] leading-[1.8] text-stone-600">
-                            {block.definition}
-                          </p>
-                        </div>
-                      );
-                    }
-                    return (
-                      <p
-                        key={i}
-                        className={clsx(
-                          'leading-[1.9] text-stone-700',
-                          i === 0 ? 'text-[17px]' : 'text-[15.5px]',
-                        )}
-                      >
-                        {block.content}
-                      </p>
-                    );
-                  })}
-                </div>
-
-                {capabilityDef.researcher_question && (
-                  <p
-                    className="mt-10 pt-5 border-t border-stone-200/80 text-[15px] italic text-stone-500"
-                    style={{ fontFamily: SERIF }}
-                  >
-                    {capabilityDef.researcher_question}
-                  </p>
-                )}
+          <div className="-mt-2">
+            <div className="rounded-xl overflow-hidden border border-stone-200 shadow-sm p-8 lg:p-10 bg-[#faf9f6]">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="h-px flex-1 bg-gradient-to-r from-amber-400/50 to-transparent" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-amber-700/60">Problematique</span>
+                <div className="h-px flex-1 bg-gradient-to-l from-amber-400/50 to-transparent" />
               </div>
 
-              {/* Intellectual Lineage — dark sidebar */}
-              <div className="lg:col-span-4 bg-stone-800 text-stone-300 p-8 lg:p-8 flex flex-col">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-500 mb-8">
-                  Intellectual Lineage
-                </p>
+              <div style={{ fontFamily: SERIF }} className="space-y-5 max-w-3xl mx-auto">
+                {formatProse(capabilityDef.problematique).map((block, i) => {
+                  if (block.type === 'term') {
+                    return (
+                      <div key={i} className="pl-5 border-l-2 border-amber-300/40 py-0.5">
+                        <p className="text-[12px] font-semibold text-amber-800/70 tracking-[0.06em] mb-1"
+                           style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+                          {block.name}
+                        </p>
+                        <p className="text-[14.5px] leading-[1.8] text-stone-600">
+                          {block.definition}
+                        </p>
+                      </div>
+                    );
+                  }
+                  return (
+                    <p
+                      key={i}
+                      className={clsx(
+                        'leading-[1.9] text-stone-700',
+                        i === 0 ? 'text-[17px]' : 'text-[15.5px]',
+                      )}
+                    >
+                      {block.content}
+                    </p>
+                  );
+                })}
+              </div>
 
+              {capabilityDef.researcher_question && (
                 <p
-                  className="text-[26px] font-light text-white tracking-wide leading-tight"
+                  className="mt-10 pt-5 border-t border-stone-200/80 text-[15px] italic text-stone-500 max-w-3xl mx-auto"
                   style={{ fontFamily: SERIF }}
                 >
-                  {humanize(capabilityDef.intellectual_lineage.primary)}
+                  {capabilityDef.researcher_question}
                 </p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
-                {capabilityDef.intellectual_lineage.secondary.length > 0 && (
-                  <p className="text-sm text-stone-400 mt-2">
-                    with {capabilityDef.intellectual_lineage.secondary.map(s => humanize(s)).join(', ')}
-                  </p>
-                )}
+      {/* ═══ Capability Engine: Lineage Tab ═══ */}
+      {activeTab === 'lineage' && capabilityDef && (
+        <>
+          <Head>
+            <link
+              href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,300;1,8..60,400&display=swap"
+              rel="stylesheet"
+            />
+          </Head>
 
-                <div className="mt-8">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-500 mb-3">Traditions</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {capabilityDef.intellectual_lineage.traditions.map(t => (
-                      <span key={t} className="px-2.5 py-1 rounded text-xs bg-stone-700/80 text-stone-300 border border-stone-600/50">
-                        {humanize(t)}
-                      </span>
-                    ))}
-                  </div>
+          <div className="-mt-2 space-y-8">
+            {/* Primary thinker — hero */}
+            <div className="bg-stone-800 rounded-xl p-10 text-center">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-500 mb-4">
+                Primary Intellectual Influence
+              </p>
+              <p
+                className="text-4xl font-light text-white tracking-wide"
+                style={{ fontFamily: SERIF }}
+              >
+                {humanize(capabilityDef.intellectual_lineage.primary)}
+              </p>
+              {capabilityDef.intellectual_lineage.secondary.length > 0 && (
+                <p className="text-sm text-stone-400 mt-3">
+                  with {capabilityDef.intellectual_lineage.secondary.map(s => humanize(s)).join(', ')}
+                </p>
+              )}
+            </div>
+
+            {/* Secondary thinkers — cards */}
+            {capabilityDef.intellectual_lineage.secondary.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-4">
+                  Secondary Influences
+                </p>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {capabilityDef.intellectual_lineage.secondary.map(s => (
+                    <div key={s} className="bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 text-center">
+                      <span className="text-sm font-medium text-stone-700">{humanize(s)}</span>
+                    </div>
+                  ))}
                 </div>
+              </div>
+            )}
 
-                <div className="mt-8 flex-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-500 mb-3">Key Concepts</p>
-                  <p className="text-[13px] text-stone-400 leading-relaxed">
-                    {capabilityDef.intellectual_lineage.key_concepts
-                      .map(c => c.replace(/_/g, ' '))
-                      .join('  ·  ')}
-                  </p>
-                </div>
+            {/* Traditions */}
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-4">
+                Traditions
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {capabilityDef.intellectual_lineage.traditions.map(t => (
+                  <span
+                    key={t}
+                    className="px-4 py-2 rounded-lg text-sm bg-stone-100 text-stone-700 border border-stone-200 font-medium"
+                  >
+                    {humanize(t)}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Key concepts */}
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-4">
+                Key Concepts
+              </p>
+              <div className="bg-stone-50 rounded-xl border border-stone-200 p-6">
+                <p
+                  className="text-[15px] text-stone-600 leading-relaxed"
+                  style={{ fontFamily: SERIF }}
+                >
+                  {capabilityDef.intellectual_lineage.key_concepts
+                    .map(c => c.replace(/_/g, ' '))
+                    .join('  \u00b7  ')}
+                </p>
               </div>
             </div>
           </div>
@@ -1234,6 +1392,28 @@ export default function EngineDetailPage() {
         </div>
       )}
 
+      {/* ═══ Capability Engine: History Tab ═══ */}
+      {activeTab === 'history' && capabilityDef && (
+        <div className="-mt-2">
+          {capabilityHistory && capabilityHistory.entries.length > 0 ? (
+            <div className="space-y-3">
+              <p className="text-[11px] font-medium text-stone-400 tracking-wide">
+                {capabilityHistory.entry_count} recorded {capabilityHistory.entry_count === 1 ? 'entry' : 'entries'}
+              </p>
+              {capabilityHistory.entries.map((entry, idx) => (
+                <HistoryEntryCard key={entry.version} entry={entry} isLatest={idx === 0} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <History className="w-8 h-8 text-stone-300 mx-auto mb-3" />
+              <p className="text-sm text-stone-400">No history recorded yet</p>
+              <p className="text-xs text-stone-300 mt-1">Changes will be detected automatically on next server restart</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Stage Context Editor (for engines with stage_context) */}
       {activeTab === 'context' && displayEngine.stage_context && (
         <div className="space-y-4">
@@ -1402,7 +1582,7 @@ export default function EngineDetailPage() {
         </div>
       )}
 
-      {activeTab === 'history' && (
+      {activeTab === 'history' && !capabilityDef && (
         <div className="card">
           <div className="px-4 py-3 border-b">
             <h3 className="font-medium text-gray-900">Version History</h3>

@@ -1211,3 +1211,32 @@ export interface CapabilityEngineDefinition {
   apps: string[];
   paradigm_keys: string[];
 }
+
+// ============================================================================
+// Capability History Types (from analyzer-v2)
+// ============================================================================
+
+export type HistoryChangeAction = 'added' | 'removed' | 'modified';
+
+export interface CapabilityFieldChange {
+  section: string;
+  field: string;
+  action: HistoryChangeAction;
+  old_value: string | null;
+  new_value: string | null;
+}
+
+export interface CapabilityHistoryEntry {
+  timestamp: string;
+  version: number;
+  definition_hash: string;
+  changes: CapabilityFieldChange[];
+  summary: string;
+  is_baseline: boolean;
+}
+
+export interface CapabilityHistoryResponse {
+  engine_key: string;
+  entry_count: number;
+  entries: CapabilityHistoryEntry[];
+}

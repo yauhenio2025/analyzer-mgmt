@@ -283,6 +283,13 @@ class ApiClient {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     },
+
+    getCapabilityHistory: async (engineKey: string): Promise<import('@/types').CapabilityHistoryResponse | null> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/engines/${engineKey}/capability-definition/history`);
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
   };
 
   // ============================================================================
