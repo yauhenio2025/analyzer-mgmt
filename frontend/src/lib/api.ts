@@ -1434,6 +1434,92 @@ class ApiClient {
       return response.json() as Promise<import('@/types').StanceSummaryType[]>;
     },
   };
+
+  // ============================================================================
+  // Operationalizations Endpoints (from analyzer-v2)
+  // ============================================================================
+
+  operationalizations = {
+    list: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/operationalizations/`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').OperationalizationSummary[]>;
+    },
+
+    get: async (engineKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/operationalizations/${engineKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').EngineOperationalization>;
+    },
+
+    getCoverage: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/operationalizations/coverage`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').CoverageMatrix>;
+    },
+
+    getStanceOp: async (engineKey: string, stanceKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/operationalizations/${engineKey}/stances/${stanceKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').StanceOperationalization>;
+    },
+
+    getDepthSequence: async (engineKey: string, depthKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/operationalizations/${engineKey}/depths/${depthKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').DepthSequence>;
+    },
+
+    updateStanceOp: async (engineKey: string, stanceKey: string, data: import('@/types').StanceOperationalization) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/operationalizations/${engineKey}/stances/${stanceKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').StanceOperationalization>;
+    },
+
+    updateDepthSequence: async (engineKey: string, depthKey: string, data: import('@/types').DepthSequence) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/operationalizations/${engineKey}/depths/${depthKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').DepthSequence>;
+    },
+
+    composePreview: async (engineKey: string, depthKey: string, passNumber: number) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/operationalizations/${engineKey}/compose-preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ depth_key: depthKey, pass_number: passNumber }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+
+    generate: async (engineKey: string, stanceKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/llm/operationalization-generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ engine_key: engineKey, stance_key: stanceKey }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+
+    generateAll: async (engineKey: string, stanceKeys?: string[]) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/llm/operationalization-generate-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ engine_key: engineKey, stance_keys: stanceKeys }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+  };
 }
 
 // Types for Display API

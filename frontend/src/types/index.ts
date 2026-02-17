@@ -971,6 +971,57 @@ export interface StanceSummaryType {
 }
 
 // ============================================================================
+// Operationalization Types (bridge between stances and engines)
+// ============================================================================
+
+export interface StanceOperationalization {
+  stance_key: string;
+  label: string;
+  description: string;
+  focus_dimensions: string[];
+  focus_capabilities: string[];
+}
+
+export interface DepthPassEntry {
+  pass_number: number;
+  stance_key: string;
+  consumes_from: number[];
+}
+
+export interface DepthSequence {
+  depth_key: string;
+  passes: DepthPassEntry[];
+}
+
+export interface EngineOperationalization {
+  engine_key: string;
+  engine_name: string;
+  stance_operationalizations: StanceOperationalization[];
+  depth_sequences: DepthSequence[];
+}
+
+export interface OperationalizationSummary {
+  engine_key: string;
+  engine_name: string;
+  stance_count: number;
+  depth_count: number;
+  stance_keys: string[];
+  depth_keys: string[];
+}
+
+export interface CoverageEntry {
+  engine_key: string;
+  engine_name: string;
+  has_operationalization: boolean;
+  stance_keys: string[];
+}
+
+export interface CoverageMatrix {
+  all_stance_keys: string[];
+  engines: CoverageEntry[];
+}
+
+// ============================================================================
 // API Response Types
 // ============================================================================
 
