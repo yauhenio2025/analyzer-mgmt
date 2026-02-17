@@ -6,11 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
-- **Lineage tab** — extracted intellectual lineage from About tab into its own dedicated tab with spacious full-width layout:
-  - Dark hero section for primary thinker (serif 4xl font)
-  - Card grid (2-4 cols) for secondary thinkers
-  - Badge/pill layout for traditions
-  - Stone-50 panel with serif text for key concepts
+- **Enriched Lineage tab** — redesigned with rich content (bios, descriptions, definitions) for all 11 engines:
+  - Dark hero section for primary thinker with serif name + 2-3 sentence bio paragraph
+  - 2-column card grid for secondary thinkers with descriptions and left border accent
+  - 2-column tradition cards with small-caps headers and serif description paragraphs
+  - 2-column key concept glossary cards with amber left border, serif concept names, and definitions
+  - TypeScript interfaces: `ThinkerReference`, `TraditionEntry`, `KeyConceptEntry`
+  - Union types on `IntellectualLineage` for backwards compatibility with flat strings
+  - Normalizer handles both string and rich object data at render time
 - **History tab for capability engines** — shows auto-detected YAML definition changes from analyzer-v2:
   - Baseline entries with Baseline badge + timestamp
   - Expandable change entries with field-level diffs grouped by section
