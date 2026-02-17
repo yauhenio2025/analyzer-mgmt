@@ -1088,11 +1088,22 @@ export interface ComposabilitySpec {
   synergy_engines: string[];
 }
 
+export interface PassDefinition {
+  pass_number: number;
+  label: string;
+  stance: string;
+  focus_dimensions: string[];
+  focus_capabilities: string[];
+  consumes_from: number[];
+  description: string;
+}
+
 export interface DepthLevel {
   key: string;
   description: string;
   typical_passes: number;
   suitable_for: string;
+  passes: PassDefinition[];
 }
 
 export interface IntellectualLineage {

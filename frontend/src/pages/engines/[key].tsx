@@ -640,28 +640,101 @@ export default function EngineDetailPage() {
               </div>
             </div>
 
-            {/* ── Depth Levels ──────────────────────────────────── */}
+            {/* ── Depth Levels with Pass Breakdown ────────────── */}
             {capabilityDef.depth_levels.length > 0 && (
               <div>
                 <div className="flex items-center gap-4 mb-5">
                   <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400">Analysis Depth</span>
                   <div className="h-px flex-1 bg-stone-200" />
                 </div>
-                <div className="grid grid-cols-3 gap-px bg-stone-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="space-y-4">
                   {capabilityDef.depth_levels.map((dl, i) => (
                     <div key={dl.key} className={clsx(
-                      'p-6',
-                      i === 0 && 'bg-amber-50/40',
-                      i === 1 && 'bg-amber-50/80',
-                      i === 2 && 'bg-amber-100/70',
+                      'rounded-xl overflow-hidden shadow-sm border',
+                      i === 0 && 'bg-amber-50/30 border-amber-200/60',
+                      i === 1 && 'bg-amber-50/60 border-amber-200/80',
+                      i === 2 && 'bg-amber-100/50 border-amber-300/70',
                     )}>
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-semibold text-stone-800 capitalize">{dl.key}</span>
+                      {/* Depth header */}
+                      <div className="px-6 py-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-semibold text-stone-800 capitalize">{dl.key}</span>
+                          {dl.suitable_for && (
+                            <span className="text-[11px] text-stone-400 italic">{dl.suitable_for}</span>
+                          )}
+                        </div>
                         <span className="text-[11px] text-stone-400 font-mono">
                           {dl.typical_passes} pass{dl.typical_passes !== 1 ? 'es' : ''}
                         </span>
                       </div>
-                      <p className="text-sm text-stone-600 leading-relaxed">{dl.description}</p>
+
+                      {/* Description */}
+                      <div className="px-6 pb-4">
+                        <p className="text-sm text-stone-600 leading-relaxed">{dl.description}</p>
+                      </div>
+
+                      {/* Pass breakdown */}
+                      {dl.passes && dl.passes.length > 0 && (
+                        <div className="px-6 pb-5">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="h-px flex-1 bg-stone-300/40" />
+                            <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-stone-400">Pass Structure</span>
+                            <div className="h-px flex-1 bg-stone-300/40" />
+                          </div>
+                          <div className="space-y-2">
+                            {dl.passes.map((pass, pi) => (
+                              <div key={pass.pass_number} className="relative">
+                                {/* Connector arrow between passes */}
+                                {pi > 0 && (
+                                  <div className="absolute -top-2 left-6 w-px h-2 bg-stone-300/60" />
+                                )}
+                                <div className="rounded-lg bg-white/70 border border-stone-200/80 px-4 py-3">
+                                  {/* Pass header row */}
+                                  <div className="flex items-start justify-between gap-3 mb-1.5">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="shrink-0 w-5 h-5 rounded-full bg-stone-800 text-white text-[10px] font-bold flex items-center justify-center">
+                                        {pass.pass_number}
+                                      </span>
+                                      <span className="text-[13px] font-semibold text-stone-800 truncate">{pass.label}</span>
+                                    </div>
+                                    <span className={clsx(
+                                      'shrink-0 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full',
+                                      pass.stance === 'discovery' && 'bg-sky-100 text-sky-700',
+                                      pass.stance === 'inference' && 'bg-violet-100 text-violet-700',
+                                      pass.stance === 'confrontation' && 'bg-rose-100 text-rose-700',
+                                      pass.stance === 'architecture' && 'bg-amber-100 text-amber-700',
+                                      pass.stance === 'integration' && 'bg-emerald-100 text-emerald-700',
+                                      pass.stance === 'reflection' && 'bg-slate-100 text-slate-600',
+                                      !['discovery','inference','confrontation','architecture','integration','reflection'].includes(pass.stance) && 'bg-stone-100 text-stone-600',
+                                    )}>
+                                      {pass.stance}
+                                    </span>
+                                  </div>
+
+                                  {/* Description */}
+                                  <p className="text-[12px] text-stone-500 leading-relaxed ml-7 mb-2">
+                                    {pass.description.trim().split('\n')[0]}
+                                  </p>
+
+                                  {/* Focus dimensions + consumes_from */}
+                                  <div className="ml-7 flex flex-wrap items-center gap-1.5">
+                                    {pass.focus_dimensions.map(dim => (
+                                      <span key={dim} className="text-[10px] px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 font-mono">
+                                        {dim}
+                                      </span>
+                                    ))}
+                                    {pass.consumes_from.length > 0 && (
+                                      <span className="text-[10px] text-stone-400 ml-1">
+                                        ← from pass{pass.consumes_from.length > 1 ? 'es' : ''} {pass.consumes_from.join(', ')}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
