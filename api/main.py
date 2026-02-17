@@ -21,18 +21,16 @@ async def lifespan(app: FastAPI):
     # Create tables on startup (in production, use Alembic)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # One-time migration: add 'about' column to grids if missing
-        await conn.execute(
-            __import__('sqlalchemy').text(
-                "ALTER TABLE grids ADD COLUMN IF NOT EXISTS about TEXT NOT NULL DEFAULT ''"
-            )
-        )
-        # One-time migration: add 'engine_profile' column to engines if missing
-        await conn.execute(
-            __import__('sqlalchemy').text(
-                "ALTER TABLE engines ADD COLUMN IF NOT EXISTS engine_profile JSONB"
-            )
-        )
+        # One-time migrations: add columns if missing (SQLite doesn't support IF NOT EXISTS)
+        import sqlalchemy
+        for stmt in [
+            "ALTER TABLE grids ADD COLUMN about TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE engines ADD COLUMN engine_profile JSONB",
+        ]:
+            try:
+                await conn.execute(sqlalchemy.text(stmt))
+            except Exception:
+                pass  # Column already exists
     yield
 
 

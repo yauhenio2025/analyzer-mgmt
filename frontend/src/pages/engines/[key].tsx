@@ -15,7 +15,6 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  Eye,
   Settings2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -27,7 +26,11 @@ import { EngineProfileEditor } from '@/components/EngineProfileEditor';
 // Dynamic import for Monaco Editor to avoid SSR issues
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
-type TabId = 'about' | 'capability' | 'context' | 'preview' | 'schema' | 'consumers' | 'history';
+// Legacy tabs for engines without capability definitions
+// Capability tabs for engines with capability definitions (the 11 genealogy engines)
+type TabId =
+  | 'about' | 'context' | 'preview' | 'schema' | 'consumers' | 'history'  // legacy
+  | 'depth' | 'dimensions' | 'capabilities' | 'composability';             // capability
 
 interface TabProps {
   id: TabId;
@@ -682,14 +685,7 @@ export default function EngineDetailPage() {
     enabled: !!key,
   });
 
-  // Query for capability prompt (only when viewing capability tab)
-  const [capabilityDepth, setCapabilityDepth] = useState<string>('standard');
   const [matrixDepth, setMatrixDepth] = useState<string>('deep');
-  const { data: capabilityPrompt } = useQuery({
-    queryKey: ['engines', key, 'capability-prompt', capabilityDepth],
-    queryFn: () => api.engines.getCapabilityPrompt(key as string, capabilityDepth),
-    enabled: !!key && activeTab === 'capability' && !!capabilityDef,
-  });
 
   // Initialize local state when engine data loads
   useEffect(() => {
@@ -874,64 +870,37 @@ export default function EngineDetailPage() {
       {/* Tabs */}
       <div className="border-b">
         <div className="flex gap-4">
-          {/* About tab - always shown first */}
-          <Tab
-            id="about"
-            label="About"
-            active={activeTab === 'about'}
-            onClick={() => setActiveTab('about')}
-          />
-          {/* Show Capability tab if engine has a capability definition */}
-          {capabilityDef && (
-            <Tab
-              id="capability"
-              label="Capability"
-              active={activeTab === 'capability'}
-              onClick={() => setActiveTab('capability')}
-            />
-          )}
-          {/* Show Stage Context tab if engine has stage_context */}
-          {displayEngine.stage_context && (
+          {capabilityDef ? (
             <>
-              <Tab
-                id="context"
-                label="Stage Context"
-                active={activeTab === 'context'}
-                onClick={() => setActiveTab('context')}
-              />
-              <Tab
-                id="preview"
-                label="Prompt Preview"
-                active={activeTab === 'preview'}
-                onClick={() => setActiveTab('preview')}
-              />
+              {/* ── Capability engine tabs ── */}
+              <Tab id="about" label="About" active={activeTab === 'about'} onClick={() => setActiveTab('about')} />
+              <Tab id="depth" label="Depth" active={activeTab === 'depth'} onClick={() => setActiveTab('depth')} />
+              <Tab id="dimensions" label="Dimensions" active={activeTab === 'dimensions'} onClick={() => setActiveTab('dimensions')} />
+              <Tab id="capabilities" label="Capabilities" active={activeTab === 'capabilities'} onClick={() => setActiveTab('capabilities')} />
+              <Tab id="composability" label="Composability" active={activeTab === 'composability'} onClick={() => setActiveTab('composability')} />
+            </>
+          ) : (
+            <>
+              {/* ── Legacy engine tabs ── */}
+              <Tab id="about" label="About" active={activeTab === 'about'} onClick={() => setActiveTab('about')} />
+              {displayEngine.stage_context && (
+                <>
+                  <Tab id="context" label="Stage Context" active={activeTab === 'context'} onClick={() => setActiveTab('context')} />
+                  <Tab id="preview" label="Prompt Preview" active={activeTab === 'preview'} onClick={() => setActiveTab('preview')} />
+                </>
+              )}
+              <Tab id="schema" label="Schema" active={activeTab === 'schema'} onClick={() => setActiveTab('schema')} />
+              <Tab id="consumers" label={`Consumers (${consumers?.total ?? 0})`} active={activeTab === 'consumers'} onClick={() => setActiveTab('consumers')} />
+              <Tab id="history" label="History" active={activeTab === 'history'} onClick={() => setActiveTab('history')} />
             </>
           )}
-          <Tab
-            id="schema"
-            label="Schema"
-            active={activeTab === 'schema'}
-            onClick={() => setActiveTab('schema')}
-          />
-          <Tab
-            id="consumers"
-            label={`Consumers (${consumers?.total ?? 0})`}
-            active={activeTab === 'consumers'}
-            onClick={() => setActiveTab('consumers')}
-          />
-          <Tab
-            id="history"
-            label="History"
-            active={activeTab === 'history'}
-            onClick={() => setActiveTab('history')}
-          />
         </div>
       </div>
 
       {/* Tab Content */}
 
-      {/* About Tab */}
-      {activeTab === 'about' && (
+      {/* About Tab (legacy engines only — capability engines use the block below) */}
+      {activeTab === 'about' && !capabilityDef && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -980,8 +949,8 @@ export default function EngineDetailPage() {
         </div>
       )}
 
-      {/* ═══ Capability Definition Tab — Editorial Layout ═══ */}
-      {activeTab === 'capability' && capabilityDef && (
+      {/* ═══ Capability Engine: About Tab (Problematique + Lineage) ═══ */}
+      {activeTab === 'about' && capabilityDef && (
         <>
           <Head>
             <link
@@ -991,8 +960,6 @@ export default function EngineDetailPage() {
           </Head>
 
           <div className="-mt-2 space-y-10">
-
-            {/* ── Hero: Problematique + Lineage ─────────────────── */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 rounded-xl overflow-hidden border border-stone-200 shadow-sm">
               {/* Problematique — main column */}
               <div className="lg:col-span-8 p-8 lg:p-10 bg-[#faf9f6]">
@@ -1047,7 +1014,6 @@ export default function EngineDetailPage() {
                   Intellectual Lineage
                 </p>
 
-                {/* Primary thinker */}
                 <p
                   className="text-[26px] font-light text-white tracking-wide leading-tight"
                   style={{ fontFamily: SERIF }}
@@ -1055,14 +1021,12 @@ export default function EngineDetailPage() {
                   {humanize(capabilityDef.intellectual_lineage.primary)}
                 </p>
 
-                {/* Secondary */}
                 {capabilityDef.intellectual_lineage.secondary.length > 0 && (
                   <p className="text-sm text-stone-400 mt-2">
                     with {capabilityDef.intellectual_lineage.secondary.map(s => humanize(s)).join(', ')}
                   </p>
                 )}
 
-                {/* Traditions */}
                 <div className="mt-8">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-500 mb-3">Traditions</p>
                   <div className="flex flex-wrap gap-1.5">
@@ -1074,7 +1038,6 @@ export default function EngineDetailPage() {
                   </div>
                 </div>
 
-                {/* Key Concepts — flowing text */}
                 <div className="mt-8 flex-1">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-500 mb-3">Key Concepts</p>
                   <p className="text-[13px] text-stone-400 leading-relaxed">
@@ -1085,241 +1048,190 @@ export default function EngineDetailPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </>
+      )}
 
-            {/* ── Depth Levels with Pass Breakdown ────────────── */}
-            {capabilityDef.depth_levels.length > 0 && (
-              <div>
-                <div className="flex items-center gap-4 mb-5">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400">Analysis Depth</span>
-                  <div className="h-px flex-1 bg-stone-200" />
+      {/* ═══ Capability Engine: Depth Tab ═══ */}
+      {activeTab === 'depth' && capabilityDef && capabilityDef.depth_levels.length > 0 && (
+        <div className="-mt-2">
+          <div className="space-y-4">
+            {capabilityDef.depth_levels.map((dl, i) => (
+              <div key={dl.key} className={clsx(
+                'rounded-xl overflow-hidden shadow-sm border',
+                i === 0 && 'bg-amber-50/30 border-amber-200/60',
+                i === 1 && 'bg-amber-50/60 border-amber-200/80',
+                i === 2 && 'bg-amber-100/50 border-amber-300/70',
+              )}>
+                <div className="px-6 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold text-stone-800 capitalize">{dl.key}</span>
+                    {dl.suitable_for && (
+                      <span className="text-[11px] text-stone-400 italic">{dl.suitable_for}</span>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-stone-400 font-mono">
+                    {dl.typical_passes} pass{dl.typical_passes !== 1 ? 'es' : ''}
+                  </span>
                 </div>
-                <div className="space-y-4">
-                  {capabilityDef.depth_levels.map((dl, i) => (
-                    <div key={dl.key} className={clsx(
-                      'rounded-xl overflow-hidden shadow-sm border',
-                      i === 0 && 'bg-amber-50/30 border-amber-200/60',
-                      i === 1 && 'bg-amber-50/60 border-amber-200/80',
-                      i === 2 && 'bg-amber-100/50 border-amber-300/70',
-                    )}>
-                      {/* Depth header */}
-                      <div className="px-6 py-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm font-semibold text-stone-800 capitalize">{dl.key}</span>
-                          {dl.suitable_for && (
-                            <span className="text-[11px] text-stone-400 italic">{dl.suitable_for}</span>
+
+                <div className="px-6 pb-4">
+                  <p className="text-sm text-stone-600 leading-relaxed">{dl.description}</p>
+                </div>
+
+                {dl.passes && dl.passes.length > 0 && (
+                  <div className="px-6 pb-4">
+                    <div className="flex items-center gap-2">
+                      {dl.passes.map((pass, pi) => (
+                        <div key={pass.pass_number} className="flex items-center gap-1.5">
+                          {(() => { const s = getStanceStyle(pass.stance); return (
+                          <span className={clsx('text-[10px] font-semibold px-2 py-0.5 rounded-full', s.bg, s.text)}>
+                            {pass.stance}
+                          </span>
+                          ); })()}
+                          {pi < dl.passes.length - 1 && (
+                            <span className="text-stone-300 text-[10px]">→</span>
                           )}
                         </div>
-                        <span className="text-[11px] text-stone-400 font-mono">
-                          {dl.typical_passes} pass{dl.typical_passes !== 1 ? 'es' : ''}
-                        </span>
-                      </div>
+                      ))}
+                      <Link
+                        href={`/operationalizations/${capabilityDef.engine_key}`}
+                        className="ml-auto text-[10px] text-stone-400 hover:text-stone-600 transition-colors underline decoration-dotted"
+                      >
+                        Edit in Operationalizations
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-                      {/* Description */}
-                      <div className="px-6 pb-4">
-                        <p className="text-sm text-stone-600 leading-relaxed">{dl.description}</p>
-                      </div>
+      {/* ═══ Capability Engine: Dimensions Tab ═══ */}
+      {activeTab === 'dimensions' && capabilityDef && (() => {
+        const passMap = buildDimensionPassMap(capabilityDef.depth_levels);
+        return (
+          <div className="-mt-2 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400">
+                  Analytical Dimensions
+                </span>
+                <div className="h-px w-16 bg-stone-200" />
+              </div>
+              <span className="text-[11px] text-stone-400">
+                {capabilityDef.analytical_dimensions.length} dimensions
+              </span>
+            </div>
 
-                      {/* Compact stance flow + link to operationalizations */}
-                      {dl.passes && dl.passes.length > 0 && (
-                        <div className="px-6 pb-4">
-                          <div className="flex items-center gap-2">
-                            {dl.passes.map((pass, pi) => (
-                              <div key={pass.pass_number} className="flex items-center gap-1.5">
-                                {(() => { const s = getStanceStyle(pass.stance); return (
-                                <span className={clsx('text-[10px] font-semibold px-2 py-0.5 rounded-full', s.bg, s.text)}>
-                                  {pass.stance}
-                                </span>
-                                ); })()}
-                                {pi < dl.passes.length - 1 && (
-                                  <span className="text-stone-300 text-[10px]">→</span>
-                                )}
-                              </div>
-                            ))}
-                            <Link
-                              href={`/operationalizations/${capabilityDef.engine_key}`}
-                              className="ml-auto text-[10px] text-stone-400 hover:text-stone-600 transition-colors underline decoration-dotted"
-                            >
-                              Edit in Operationalizations
-                            </Link>
-                          </div>
-                        </div>
-                      )}
+            {capabilityDef.depth_levels.some(d => d.passes && d.passes.length > 0) && (
+              <DimensionPassMatrix
+                depthLevels={capabilityDef.depth_levels}
+                dimensions={capabilityDef.analytical_dimensions}
+                selectedDepth={matrixDepth}
+                onDepthChange={setMatrixDepth}
+              />
+            )}
+
+            <div className="divide-y divide-stone-100">
+              {capabilityDef.analytical_dimensions.map((dim, i) => (
+                <DimensionCard key={dim.key} dimension={dim} index={i} passMap={passMap} />
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ═══ Capability Engine: Capabilities Tab ═══ */}
+      {activeTab === 'capabilities' && capabilityDef && (() => {
+        const capPassMap = buildCapabilityPassMap(capabilityDef.depth_levels);
+        return (
+          <div className="-mt-2">
+            <div className="flex items-center gap-4 mb-6">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400">
+                Capabilities
+              </span>
+              <div className="h-px flex-1 bg-stone-200" />
+              <span className="text-[11px] text-stone-400">{capabilityDef.capabilities.length}</span>
+            </div>
+            <div className="space-y-1">
+              {capabilityDef.capabilities.map((cap, i) => (
+                <CapabilityCard
+                  key={cap.key}
+                  cap={cap}
+                  passMap={capPassMap[cap.key] || {}}
+                  index={i}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ═══ Capability Engine: Composability Tab ═══ */}
+      {activeTab === 'composability' && capabilityDef && (
+        <div className="-mt-2">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Receives from */}
+            {Object.entries(capabilityDef.composability.consumes_from).length > 0 && (
+              <div>
+                <p className="text-[11px] font-medium text-stone-500 mb-3 flex items-center gap-2">
+                  <span className="w-5 h-px bg-amber-400" />
+                  Receives context from
+                </p>
+                <div className="space-y-3 ml-7">
+                  {Object.entries(capabilityDef.composability.consumes_from).map(([dim, desc]) => (
+                    <div key={dim}>
+                      <p className="text-sm font-medium text-stone-700">{humanize(dim)}</p>
+                      <p className="text-xs text-stone-400 mt-0.5 leading-relaxed">{desc as string}</p>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* ── Analytical Dimensions ─────────────────────────── */}
-            {(() => {
-              const passMap = buildDimensionPassMap(capabilityDef.depth_levels);
-              return (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400">
-                        Analytical Dimensions
-                      </span>
-                      <div className="h-px w-16 bg-stone-200" />
+            {/* Shares with */}
+            {Object.entries(capabilityDef.composability.shares_with).length > 0 && (
+              <div>
+                <p className="text-[11px] font-medium text-stone-500 mb-3 flex items-center gap-2">
+                  <span className="w-5 h-px bg-emerald-400" />
+                  Shares findings with
+                </p>
+                <div className="space-y-3 ml-7">
+                  {Object.entries(capabilityDef.composability.shares_with).map(([eng, desc]) => (
+                    <div key={eng}>
+                      <p className="text-sm font-medium text-stone-700">{humanize(eng)}</p>
+                      <p className="text-xs text-stone-400 mt-0.5 leading-relaxed">{desc as string}</p>
                     </div>
-                    <span className="text-[11px] text-stone-400">
-                      {capabilityDef.analytical_dimensions.length} dimensions
-                    </span>
-                  </div>
-
-                  {/* Pipeline matrix: dimension × pass coverage */}
-                  {capabilityDef.depth_levels.some(d => d.passes && d.passes.length > 0) && (
-                    <DimensionPassMatrix
-                      depthLevels={capabilityDef.depth_levels}
-                      dimensions={capabilityDef.analytical_dimensions}
-                      selectedDepth={matrixDepth}
-                      onDepthChange={setMatrixDepth}
-                    />
-                  )}
-
-                  <div className="divide-y divide-stone-100">
-                    {capabilityDef.analytical_dimensions.map((dim, i) => (
-                      <DimensionCard key={dim.key} dimension={dim} index={i} passMap={passMap} />
-                    ))}
-                  </div>
+                  ))}
                 </div>
-              );
-            })()}
-
-            {/* ── Capabilities ──────────────────────────────── */}
-            {(() => {
-              const capPassMap = buildCapabilityPassMap(capabilityDef.depth_levels);
-              return (
-                <div>
-                  <div className="flex items-center gap-4 mb-6">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400">
-                      Capabilities
-                    </span>
-                    <div className="h-px flex-1 bg-stone-200" />
-                    <span className="text-[11px] text-stone-400">{capabilityDef.capabilities.length}</span>
-                  </div>
-                  <div className="space-y-1">
-                    {capabilityDef.capabilities.map((cap, i) => (
-                      <CapabilityCard
-                        key={cap.key}
-                        cap={cap}
-                        passMap={capPassMap[cap.key] || {}}
-                        index={i}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* ── Composability ──────────────────────────────── */}
-            <div>
-              <div className="flex items-center gap-4 mb-6">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400">
-                  Composability
-                </span>
-                <div className="h-px flex-1 bg-stone-200" />
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Receives from */}
-                {Object.entries(capabilityDef.composability.consumes_from).length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-medium text-stone-500 mb-3 flex items-center gap-2">
-                      <span className="w-5 h-px bg-amber-400" />
-                      Receives context from
-                    </p>
-                    <div className="space-y-3 ml-7">
-                      {Object.entries(capabilityDef.composability.consumes_from).map(([dim, desc]) => (
-                        <div key={dim}>
-                          <p className="text-sm font-medium text-stone-700">{humanize(dim)}</p>
-                          <p className="text-xs text-stone-400 mt-0.5 leading-relaxed">{desc as string}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            )}
 
-                {/* Shares with */}
-                {Object.entries(capabilityDef.composability.shares_with).length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-medium text-stone-500 mb-3 flex items-center gap-2">
-                      <span className="w-5 h-px bg-emerald-400" />
-                      Shares findings with
-                    </p>
-                    <div className="space-y-3 ml-7">
-                      {Object.entries(capabilityDef.composability.shares_with).map(([eng, desc]) => (
-                        <div key={eng}>
-                          <p className="text-sm font-medium text-stone-700">{humanize(eng)}</p>
-                          <p className="text-xs text-stone-400 mt-0.5 leading-relaxed">{desc as string}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Synergy */}
-                {capabilityDef.composability.synergy_engines.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-medium text-stone-500 mb-3 flex items-center gap-2">
-                      <span className="w-5 h-px bg-stone-400" />
-                      Best combined with
-                    </p>
-                    <div className="flex flex-wrap gap-2 ml-7">
-                      {capabilityDef.composability.synergy_engines.map(e => (
-                        <Link
-                          key={e}
-                          href={`/engines/${e}`}
-                          className="text-[12px] px-3 py-1.5 rounded-full bg-stone-100 text-stone-600 hover:bg-stone-800 hover:text-white transition-all duration-200 border border-stone-200 hover:border-stone-800"
-                        >
-                          {humanize(e)}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ── Prompt Preview (collapsed) ────────────────────── */}
-            <details className="rounded-xl border border-stone-200 overflow-hidden">
-              <summary className="px-6 py-4 cursor-pointer flex items-center justify-between hover:bg-stone-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <Eye className="h-4 w-4 text-stone-400" />
-                  <span className="text-sm font-medium text-stone-600">Preview Composed Prompt</span>
+            {/* Synergy */}
+            {capabilityDef.composability.synergy_engines.length > 0 && (
+              <div>
+                <p className="text-[11px] font-medium text-stone-500 mb-3 flex items-center gap-2">
+                  <span className="w-5 h-px bg-stone-400" />
+                  Best combined with
+                </p>
+                <div className="flex flex-wrap gap-2 ml-7">
+                  {capabilityDef.composability.synergy_engines.map(e => (
+                    <Link
+                      key={e}
+                      href={`/engines/${e}`}
+                      className="text-[12px] px-3 py-1.5 rounded-full bg-stone-100 text-stone-600 hover:bg-stone-800 hover:text-white transition-all duration-200 border border-stone-200 hover:border-stone-800"
+                    >
+                      {humanize(e)}
+                    </Link>
+                  ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-stone-500">Depth:</label>
-                  <select
-                    value={capabilityDepth}
-                    onChange={(e) => { e.stopPropagation(); setCapabilityDepth(e.target.value); }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="input py-0.5 px-2 text-xs"
-                  >
-                    <option value="surface">Surface</option>
-                    <option value="standard">Standard</option>
-                    <option value="deep">Deep</option>
-                  </select>
-                </div>
-              </summary>
-              <div className="h-[400px] border-t border-stone-200">
-                <MonacoEditor
-                  height="100%"
-                  language="markdown"
-                  value={capabilityPrompt?.prompt || 'Loading prompt...'}
-                  options={{
-                    readOnly: true,
-                    minimap: { enabled: false },
-                    wordWrap: 'on',
-                    lineNumbers: 'on',
-                    fontSize: 13,
-                    fontFamily: 'JetBrains Mono, monospace',
-                  }}
-                  theme="vs-light"
-                />
               </div>
-            </details>
+            )}
           </div>
-        </>
+        </div>
       )}
 
       {/* Stage Context Editor (for engines with stage_context) */}

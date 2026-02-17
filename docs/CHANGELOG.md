@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Tab disaggregation for capability engines** — replaced single monolithic "Capability" tab with 5 focused sub-tabs for the 11 genealogy engines:
+  - **About**: Problematique (serif prose) + Intellectual Lineage (dark sidebar with thinkers, traditions, key concepts)
+  - **Depth**: Depth levels (surface/standard/deep) with pass structures and stance flows
+  - **Dimensions**: Pipeline matrix + dimension cards with probing questions
+  - **Capabilities**: Enriched capability cards with thinker badges, grounding, indicators, depth scaling
+  - **Composability**: 3-column grid (shares_with, consumes_from, synergy engines)
+  - Legacy engines (185) retain original tabs: About (Engine Profile), Stage Context, Prompt Preview, Schema, Consumers, History
+  - Tab selection driven by `capabilityDef` query result — no capability definition = legacy tabs
+  - Removed deprecated composed prompt preview (replaced by multi-pass operationalization layer)
+  - Cleaned up unused `capabilityDepth` state, `capabilityPrompt` query, and `Eye` import
 - **Dimension × Pass Pipeline Matrix** on engine detail Capability tab — visual grid showing which analytical dimensions each pass targets at each depth level
   - Rows = dimensions, columns = passes with colored dots per stance
   - Depth toggle buttons (surface/standard/deep) recalculate the matrix
@@ -39,6 +49,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   - Filter intersects with existing app/search filters
 
 ### Fixed
+- SQLite startup migration crash — `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` not supported in SQLite; replaced with try/except pattern ([api/main.py](api/main.py))
 - Paradigm branch generation stuck at 6% - "Start Generation" button was hidden because `guiding_thinkers` pre-populated during branch creation made `completed > 0`, failing the `completed === 0` check. Button now shows whenever generation isn't complete, with "Resume" label for partial progress.
 - Generation endpoint timeout on Render - converted from synchronous HTTP request (18 sequential LLM calls blocking) to `BackgroundTasks` with its own DB session. Returns immediately, frontend polls for progress.
 - Switched `call_llm` from sync `Anthropic` to `AsyncAnthropic` client to avoid blocking the event loop
