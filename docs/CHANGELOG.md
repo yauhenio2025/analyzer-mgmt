@@ -14,6 +14,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   - Tab only appears for engines that have a capability definition in analyzer-v2
   - TypeScript types: `CapabilityEngineDefinition`, `AnalyticalDimension`, `EngineCapabilityItem`, `ComposabilitySpec`, `DepthLevel`, `IntellectualLineage`
   - API client methods: `getCapabilityDefinition()`, `getCapabilityPrompt()` (fetches from analyzer-v2 directly)
+- **Capability-enabled filter** on engines list page — checkbox to show only engines with capability definitions
+  - Badge shows count of matching engines in current list
+  - `listCapabilityKeys()` API method fetches from analyzer-v2 directly
+  - Filter intersects with existing app/search filters
 
 ### Fixed
 - Paradigm branch generation stuck at 6% - "Start Generation" button was hidden because `guiding_thinkers` pre-populated during branch creation made `completed > 0`, failing the `completed === 0` check. Button now shows whenever generation isn't complete, with "Resume" label for partial progress.
