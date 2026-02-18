@@ -1428,3 +1428,72 @@ export interface ViewSummary {
   visibility: string;
   status: string;
 }
+
+// ============================================================================
+// Transformation Template Types (from analyzer-v2)
+// ============================================================================
+
+export type TransformationType = 'none' | 'schema_map' | 'llm_extract' | 'llm_summarize' | 'aggregate';
+
+export interface AggregateConfig {
+  group_by?: string | null;
+  count_field?: string | null;
+  sum_fields: string[];
+  sort_by?: string | null;
+  sort_order: string;
+  limit?: number | null;
+}
+
+export interface TransformationTemplate {
+  template_key: string;
+  template_name: string;
+  description: string;
+  version: number;
+  transformation_type: TransformationType;
+  field_mapping?: Record<string, string> | null;
+  llm_extraction_schema?: Record<string, unknown> | null;
+  llm_prompt_template?: string | null;
+  stance_key?: string | null;
+  aggregate_config?: AggregateConfig | null;
+  applicable_renderer_types: string[];
+  applicable_engines: string[];
+  tags: string[];
+  status: string;
+  model: string;
+  model_fallback: string;
+  max_tokens: number;
+  source?: string | null;
+}
+
+export interface TransformationTemplateSummary {
+  template_key: string;
+  template_name: string;
+  description: string;
+  transformation_type: TransformationType;
+  applicable_renderer_types: string[];
+  tags: string[];
+  status: string;
+}
+
+export interface TransformationExecuteRequest {
+  data: unknown;
+  template_key?: string;
+  transformation_type?: TransformationType;
+  field_mapping?: Record<string, string>;
+  llm_extraction_schema?: Record<string, unknown>;
+  llm_prompt_template?: string;
+  stance_key?: string;
+  aggregate_config?: AggregateConfig;
+  cache_key?: string;
+}
+
+export interface TransformationExecuteResponse {
+  success: boolean;
+  data: unknown;
+  error?: string | null;
+  transformation_type: string;
+  model_used?: string | null;
+  token_count?: number | null;
+  cached: boolean;
+  execution_time_ms: number;
+}

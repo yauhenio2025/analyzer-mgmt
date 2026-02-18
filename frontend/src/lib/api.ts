@@ -57,6 +57,10 @@ import type {
   WorkflowExtensionAnalysis,
   AddEngineResponse,
   EngineChainSpec,
+  TransformationTemplate,
+  TransformationTemplateSummary,
+  TransformationExecuteRequest,
+  TransformationExecuteResponse,
 } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
@@ -1534,6 +1538,92 @@ class ApiClient {
 
     reload: async () => {
       const response = await fetch(`${ANALYZER_V2_URL}/v1/views/reload`, {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{ reloaded: boolean; count: number }>;
+    },
+  };
+
+  // ============================================================================
+  // Transformations Endpoints (from analyzer-v2)
+  // ============================================================================
+
+  transformations = {
+    list: async (params?: { type?: string; tag?: string }) => {
+      const qp = new URLSearchParams();
+      if (params?.type) qp.set('type', params.type);
+      if (params?.tag) qp.set('tag', params.tag);
+      const q = qp.toString();
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/transformations${q ? `?${q}` : ''}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<TransformationTemplateSummary[]>;
+    },
+
+    get: async (templateKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/transformations/${templateKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<TransformationTemplate>;
+    },
+
+    create: async (data: TransformationTemplate) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/transformations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const e = await response.json().catch(() => ({}));
+        throw new Error(e.detail || `HTTP ${response.status}`);
+      }
+      return response.json() as Promise<TransformationTemplate>;
+    },
+
+    update: async (templateKey: string, data: TransformationTemplate) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/transformations/${templateKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const e = await response.json().catch(() => ({}));
+        throw new Error(e.detail || `HTTP ${response.status}`);
+      }
+      return response.json() as Promise<TransformationTemplate>;
+    },
+
+    delete: async (templateKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/transformations/${templateKey}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{ deleted: string }>;
+    },
+
+    forEngine: async (engineKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/transformations/for-engine/${engineKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<TransformationTemplateSummary[]>;
+    },
+
+    forRenderer: async (rendererType: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/transformations/for-renderer/${rendererType}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<TransformationTemplateSummary[]>;
+    },
+
+    execute: async (request: TransformationExecuteRequest) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/transformations/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<TransformationExecuteResponse>;
+    },
+
+    reload: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/transformations/reload`, {
         method: 'POST',
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);

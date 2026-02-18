@@ -12,7 +12,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { ViewDefinition, DataSourceRef, TransformationSpec } from '@/types';
+import type { ViewDefinition, DataSourceRef, TransformationSpec, TransformationTemplateSummary } from '@/types';
 import clsx from 'clsx';
 
 // ============================================================================
@@ -654,6 +654,40 @@ function TransformationTab({
   view: ViewDefinition;
   onChange: (view: ViewDefinition) => void;
 }) {
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
+  const [appliedTemplateName, setAppliedTemplateName] = useState<string | null>(null);
+
+  // Fetch transformation templates for the "Apply Template" dropdown
+  const { data: templates } = useQuery({
+    queryKey: ['transformations'],
+    queryFn: () => api.transformations.list(),
+  });
+
+  const handleApplyTemplate = async (templateKey: string) => {
+    if (!templateKey) return;
+    setApplyingTemplate(true);
+    try {
+      const template = await api.transformations.get(templateKey);
+      // One-time copy: transfer template spec fields into view's transformation
+      onChange({
+        ...view,
+        transformation: {
+          type: template.transformation_type,
+          field_mapping: template.field_mapping || null,
+          llm_extraction_schema: template.llm_extraction_schema || null,
+          llm_prompt_template: template.llm_prompt_template || null,
+          stance_key: template.stance_key || null,
+        },
+      });
+      setAppliedTemplateName(template.template_name);
+      setTimeout(() => setAppliedTemplateName(null), 3000);
+    } catch (e) {
+      console.error('Failed to apply template:', e);
+    } finally {
+      setApplyingTemplate(false);
+    }
+  };
+
   const updateTransform = (field: keyof TransformationSpec, value: unknown) => {
     onChange({
       ...view,
@@ -663,6 +697,40 @@ function TransformationTab({
 
   return (
     <div className="space-y-6">
+      {/* Apply Template Section */}
+      {templates && templates.length > 0 && (
+        <div className="card p-4 bg-teal-50 border-teal-200">
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-teal-800 mb-1">
+                Apply Transformation Template
+              </p>
+              <p className="text-xs text-teal-600">
+                One-time copy of a template's spec into this view. Fields can be edited after applying.
+              </p>
+            </div>
+            <select
+              onChange={(e) => handleApplyTemplate(e.target.value)}
+              value=""
+              disabled={applyingTemplate}
+              className="input w-auto min-w-[220px] text-sm"
+            >
+              <option value="">Select template...</option>
+              {templates.map((t: TransformationTemplateSummary) => (
+                <option key={t.template_key} value={t.template_key}>
+                  {t.template_name} ({t.transformation_type})
+                </option>
+              ))}
+            </select>
+          </div>
+          {appliedTemplateName && (
+            <p className="text-xs text-teal-700 mt-2 font-medium">
+              Applied "{appliedTemplateName}" — fields copied below. Remember to save.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="card p-6 space-y-4">
         <h3 className="text-lg font-medium text-gray-900">Transformation</h3>
         <SelectField
