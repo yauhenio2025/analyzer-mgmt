@@ -341,10 +341,10 @@ export type WorkflowCategory =
   | 'genealogy'
   | 'decision_support';
 
-export interface WorkflowPass {
-  pass_number: number;
-  pass_name: string;
-  pass_description: string;
+export interface WorkflowPhase {
+  phase_number: number;
+  phase_name: string;
+  phase_description: string;
   engine_key: string | null;
   function_key: string | null;
   chain_key: string | null;
@@ -352,9 +352,12 @@ export interface WorkflowPass {
   prompt_template: string | null;
   requires_external_docs: boolean;
   caches_result: boolean;
-  depends_on_passes: number[];
+  depends_on_phases: number[];
   output_schema: Record<string, unknown> | null;
 }
+
+/** @deprecated Use WorkflowPhase instead */
+export type WorkflowPass = WorkflowPhase;
 
 export interface Workflow {
   workflow_key: string;
@@ -362,12 +365,12 @@ export interface Workflow {
   description: string;
   category: WorkflowCategory;
   version: number;
-  passes: WorkflowPass[];
+  phases: WorkflowPhase[];
   required_inputs: string[];
   optional_inputs: string[];
   output_description: string;
   final_output_schema: Record<string, unknown> | null;
-  estimated_passes: number;
+  estimated_phases: number;
   source_project: string;
 }
 
@@ -377,9 +380,72 @@ export interface WorkflowSummary {
   description: string;
   category: WorkflowCategory;
   version: number;
-  pass_count: number;
+  phase_count: number;
   source_project: string;
   required_inputs: string[];
+}
+
+// ============================================================================
+// Extension Points Types (from analyzer-v2)
+// ============================================================================
+
+export interface DimensionCoverage {
+  dimension_key: string;
+  dimension_description: string;
+  covered_by: string[];
+  gap_engines: string[];
+  coverage_ratio: number;
+}
+
+export interface CapabilityGap {
+  capability_key: string;
+  capability_description: string;
+  available_in: string[];
+  relevance_score: number;
+}
+
+export interface CandidateEngine {
+  engine_key: string;
+  engine_name: string;
+  category: string;
+  kind: string;
+  synergy_score: number;
+  dimension_production_score: number;
+  dimension_novelty_score: number;
+  category_affinity_score: number;
+  capability_gap_score: number;
+  composite_score: number;
+  recommendation_tier: 'strong' | 'moderate' | 'exploratory';
+  rationale: string[];
+  synergy_with: string[];
+  dimensions_added: string[];
+  capabilities_added: string[];
+  potential_issues: string[];
+  has_full_composability: boolean;
+}
+
+export interface PhaseExtensionPoint {
+  phase_number: number;
+  phase_name: string;
+  current_engines: string[];
+  current_chain_key: string | null;
+  dimension_coverage: DimensionCoverage[];
+  capability_gaps: CapabilityGap[];
+  candidate_engines: CandidateEngine[];
+  extension_potential: 'high' | 'moderate' | 'low';
+  summary: string;
+}
+
+export interface WorkflowExtensionAnalysis {
+  workflow_key: string;
+  workflow_name: string;
+  depth: string;
+  analysis_timestamp: string;
+  phase_extensions: PhaseExtensionPoint[];
+  total_candidate_engines: number;
+  strong_recommendations: number;
+  underserved_dimensions: string[];
+  workflow_summary: string;
 }
 
 // ============================================================================

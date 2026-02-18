@@ -34,7 +34,7 @@ function WorkflowCard({ workflow }: { workflow: WorkflowSummary }) {
               {workflow.category?.replace('_', ' ')}
             </span>
             <span className="badge badge-gray text-xs">
-              {workflow.pass_count} passes
+              {workflow.phase_count} phases
             </span>
             {workflow.source_project && (
               <span className="badge badge-gray text-xs capitalize">
@@ -81,7 +81,7 @@ export default function WorkflowsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Workflows</h1>
           <p className="mt-1 text-gray-500">
-            Multi-pass analysis workflows from analyzer-v2
+            Multi-phase analysis workflows from analyzer-v2
           </p>
         </div>
       </div>

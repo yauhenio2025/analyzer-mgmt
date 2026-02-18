@@ -46,7 +46,7 @@ function ImplementationCard({ workflow }: { workflow: WorkflowWithChainInfo }) {
             </span>
             <span className="badge badge-gray text-xs flex items-center gap-1">
               <Layers className="h-3 w-3" />
-              {workflow.pass_count} passes
+              {workflow.phase_count} phases
             </span>
             {workflow.chain_count > 0 && (
               <span className="badge text-xs bg-violet-100 text-violet-800 flex items-center gap-1">
@@ -96,7 +96,7 @@ export default function ImplementationsPage() {
     }
   }
 
-  // Enrich workflows with chain/engine counts and real source_project/pass_count from full data
+  // Enrich workflows with chain/engine counts and real source_project/phase_count from full data
   const enriched: WorkflowWithChainInfo[] = (workflowData?.workflows ?? []).map((ws) => {
     const full = fullWorkflows?.find((w) => w.workflow_key === ws.workflow_key);
     if (!full) {
@@ -107,10 +107,10 @@ export default function ImplementationsPage() {
     const engineKeys = new Set<string>();
     let engineCountFromChains = 0;
 
-    for (const pass of full.passes) {
-      if (pass.chain_key) {
-        chainKeys.add(pass.chain_key);
-        const chain = chainMap.get(pass.chain_key);
+    for (const phase of (full.phases ?? [])) {
+      if (phase.chain_key) {
+        chainKeys.add(phase.chain_key);
+        const chain = chainMap.get(phase.chain_key);
         if (chain) {
           if ('engine_keys' in chain && Array.isArray(chain.engine_keys)) {
             for (const ek of chain.engine_keys) {
@@ -121,8 +121,8 @@ export default function ImplementationsPage() {
           }
         }
       }
-      if (pass.engine_key) {
-        engineKeys.add(pass.engine_key);
+      if (phase.engine_key) {
+        engineKeys.add(phase.engine_key);
       }
     }
 
@@ -130,7 +130,7 @@ export default function ImplementationsPage() {
       ...ws,
       // Use full workflow data for fields the list API doesn't return
       source_project: full.source_project || ws.source_project || '',
-      pass_count: full.passes?.length ?? ws.pass_count,
+      phase_count: full.phases?.length ?? ws.phase_count,
       chain_count: chainKeys.size,
       engine_count: engineKeys.size + engineCountFromChains,
     };

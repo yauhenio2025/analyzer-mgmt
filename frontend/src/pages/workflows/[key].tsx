@@ -14,7 +14,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { Workflow, WorkflowPass, AudienceType } from '@/types';
+import type { Workflow, WorkflowPhase, AudienceType } from '@/types';
 import clsx from 'clsx';
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -26,14 +26,14 @@ const CATEGORY_COLORS: Record<string, string> = {
   decision_support: 'bg-rose-100 text-rose-800',
 };
 
-function PassCard({
-  pass,
+function PhaseCard({
+  phase,
   workflowKey,
-  allPasses,
+  allPhases,
 }: {
-  pass: WorkflowPass;
+  phase: WorkflowPhase;
   workflowKey: string;
-  allPasses: WorkflowPass[];
+  allPhases: WorkflowPhase[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -43,14 +43,14 @@ function PassCard({
     data: promptData,
     isLoading: promptLoading,
   } = useQuery({
-    queryKey: ['workflow-pass-prompt', workflowKey, pass.pass_number, audience],
-    queryFn: () => api.workflows.getPassPrompt(workflowKey, pass.pass_number, audience),
+    queryKey: ['workflow-phase-prompt', workflowKey, phase.phase_number, audience],
+    queryFn: () => api.workflows.getPhasePrompt(workflowKey, phase.phase_number, audience),
     enabled: showPrompt,
   });
 
-  const dependencyNames = pass.depends_on_passes.map((pn) => {
-    const dep = allPasses.find((p) => p.pass_number === pn);
-    return dep ? `${pn}. ${dep.pass_name}` : `Pass ${pn}`;
+  const dependencyNames = phase.depends_on_phases.map((pn) => {
+    const dep = allPhases.find((p) => p.phase_number === pn);
+    return dep ? `${pn}. ${dep.phase_name}` : `Phase ${pn}`;
   });
 
   return (
@@ -60,24 +60,24 @@ function PassCard({
         className="w-full p-4 flex items-start gap-4 hover:bg-gray-50 text-left"
       >
         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-semibold text-sm">
-          {pass.pass_number}
+          {phase.phase_number}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="font-medium text-gray-900">{pass.pass_name}</h3>
-            {pass.requires_external_docs && (
+            <h3 className="font-medium text-gray-900">{phase.phase_name}</h3>
+            {phase.requires_external_docs && (
               <span className="badge text-xs bg-violet-100 text-violet-800">
                 external docs
               </span>
             )}
-            {pass.caches_result && (
+            {phase.caches_result && (
               <span className="badge text-xs bg-emerald-100 text-emerald-800">
                 cached
               </span>
             )}
           </div>
-          <p className="text-sm text-gray-500 mt-0.5">{pass.pass_description}</p>
-          {pass.depends_on_passes.length > 0 && (
+          <p className="text-sm text-gray-500 mt-0.5">{phase.phase_description}</p>
+          {phase.depends_on_phases.length > 0 && (
             <div className="mt-1 flex items-center gap-1 text-xs text-gray-400">
               <Link2 className="h-3 w-3" />
               <span>Depends on: {dependencyNames.join(', ')}</span>
@@ -98,25 +98,25 @@ function PassCard({
             <Zap className="h-4 w-4 text-gray-400" />
             <span className="text-gray-600">Engine:</span>
             <Link
-              href={`/engines/${pass.engine_key}`}
+              href={`/engines/${phase.engine_key}`}
               className="text-primary-600 hover:underline font-mono text-xs"
             >
-              {pass.engine_key}
+              {phase.engine_key}
             </Link>
           </div>
 
           {/* Dependencies */}
-          {pass.depends_on_passes.length > 0 && (
+          {phase.depends_on_phases.length > 0 && (
             <div className="flex items-start gap-2 text-sm">
               <Link2 className="h-4 w-4 text-gray-400 mt-0.5" />
               <div>
                 <span className="text-gray-600">Dependencies:</span>
                 <div className="mt-1 flex flex-wrap gap-1">
-                  {pass.depends_on_passes.map((pn) => {
-                    const dep = allPasses.find((p) => p.pass_number === pn);
+                  {phase.depends_on_phases.map((pn) => {
+                    const dep = allPhases.find((p) => p.phase_number === pn);
                     return (
                       <span key={pn} className="badge badge-gray text-xs">
-                        {pn}. {dep?.pass_name || `Pass ${pn}`}
+                        {pn}. {dep?.phase_name || `Phase ${pn}`}
                       </span>
                     );
                   })}
@@ -129,11 +129,11 @@ function PassCard({
           <div className="flex items-center gap-4 text-sm text-gray-600">
             <span className="flex items-center gap-1">
               <Database className="h-4 w-4 text-gray-400" />
-              Cache: {pass.caches_result ? 'Yes' : 'No'}
+              Cache: {phase.caches_result ? 'Yes' : 'No'}
             </span>
             <span className="flex items-center gap-1">
               <FileText className="h-4 w-4 text-gray-400" />
-              External docs: {pass.requires_external_docs ? 'Yes' : 'No'}
+              External docs: {phase.requires_external_docs ? 'Yes' : 'No'}
             </span>
           </div>
 
@@ -188,23 +188,23 @@ function PassCard({
 }
 
 /** Simple dependency graph visualization */
-function DependencyGraph({ passes }: { passes: WorkflowPass[] }) {
+function DependencyGraph({ phases }: { phases: WorkflowPhase[] }) {
   // Build a simple layer layout based on topological ordering
-  const layers: WorkflowPass[][] = [];
+  const layers: WorkflowPhase[][] = [];
   const placed = new Set<number>();
 
-  // Layer 0: passes with no dependencies
-  while (placed.size < passes.length) {
-    const layer: WorkflowPass[] = [];
-    for (const pass of passes) {
-      if (placed.has(pass.pass_number)) continue;
-      const allDepsMet = pass.depends_on_passes.every((d) => placed.has(d));
+  // Layer 0: phases with no dependencies
+  while (placed.size < phases.length) {
+    const layer: WorkflowPhase[] = [];
+    for (const phase of phases) {
+      if (placed.has(phase.phase_number)) continue;
+      const allDepsMet = phase.depends_on_phases.every((d) => placed.has(d));
       if (allDepsMet) {
-        layer.push(pass);
+        layer.push(phase);
       }
     }
     if (layer.length === 0) break; // avoid infinite loop
-    for (const p of layer) placed.add(p.pass_number);
+    for (const p of layer) placed.add(p.phase_number);
     layers.push(layer);
   }
 
@@ -216,16 +216,16 @@ function DependencyGraph({ passes }: { passes: WorkflowPass[] }) {
             Layer {layerIdx + 1}
           </span>
           <div className="flex flex-wrap gap-2">
-            {layer.map((pass) => (
+            {layer.map((phase) => (
               <div
-                key={pass.pass_number}
+                key={phase.phase_number}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs"
               >
-                <span className="font-bold text-amber-700">{pass.pass_number}</span>
-                <span className="text-amber-900">{pass.pass_name}</span>
-                {pass.depends_on_passes.length > 0 && (
+                <span className="font-bold text-amber-700">{phase.phase_number}</span>
+                <span className="text-amber-900">{phase.phase_name}</span>
+                {phase.depends_on_phases.length > 0 && (
                   <span className="text-amber-500 ml-1">
-                    ({pass.depends_on_passes.map((d) => `←${d}`).join(' ')})
+                    ({phase.depends_on_phases.map((d) => `←${d}`).join(' ')})
                   </span>
                 )}
               </div>
@@ -281,7 +281,7 @@ export default function WorkflowDetailPage() {
     );
   }
 
-  const passes = workflow.passes || [];
+  const phases = workflow.phases || [];
 
   return (
     <div className="space-y-6">
@@ -330,8 +330,8 @@ export default function WorkflowDetailPage() {
               <span className="text-gray-700 font-medium">{workflow.version}</span>
             </div>
             <div>
-              <label className="label">Passes</label>
-              <span className="text-gray-700 font-medium">{passes.length}</span>
+              <label className="label">Phases</label>
+              <span className="text-gray-700 font-medium">{phases.length}</span>
             </div>
             <div>
               <label className="label">Source Project</label>
@@ -377,31 +377,31 @@ export default function WorkflowDetailPage() {
       </div>
 
       {/* Dependency Graph */}
-      {passes.length > 0 && (
+      {phases.length > 0 && (
         <div className="card p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Pass Dependency Graph</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Phase Dependency Graph</h2>
           <p className="text-sm text-gray-500 mb-4">
-            Passes are arranged in execution layers. A pass can only execute after all its dependencies complete.
+            Phases are arranged in execution layers. A phase can only execute after all its dependencies complete.
           </p>
-          <DependencyGraph passes={passes} />
+          <DependencyGraph phases={phases} />
         </div>
       )}
 
-      {/* Passes */}
+      {/* Phases */}
       <div className="space-y-2">
         <h2 className="text-lg font-semibold text-gray-900">
-          Workflow Passes ({passes.length})
+          Workflow Phases ({phases.length})
         </h2>
         <p className="text-sm text-gray-500">
-          Click a pass to view details and composed prompts
+          Click a phase to view details and composed prompts
         </p>
         <div className="space-y-2 mt-3">
-          {passes.map((pass) => (
-            <PassCard
-              key={pass.pass_number}
-              pass={pass}
+          {phases.map((phase) => (
+            <PhaseCard
+              key={phase.phase_number}
+              phase={phase}
               workflowKey={workflow.workflow_key}
-              allPasses={passes}
+              allPhases={phases}
             />
           ))}
         </div>

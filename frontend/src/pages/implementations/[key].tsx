@@ -15,16 +15,27 @@ import {
   FileText,
   Link2,
   Layers,
+  Puzzle,
+  Star,
+  Diamond,
+  Circle,
+  BarChart3,
+  Zap,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import type {
   Workflow as WorkflowType,
-  WorkflowPass,
+  WorkflowPhase,
   EngineChainSpec,
   CapabilityEngineDefinition,
   EngineOperationalization,
   DepthLevel,
   PassDefinition,
+  WorkflowExtensionAnalysis,
+  PhaseExtensionPoint,
+  CandidateEngine,
+  DimensionCoverage,
+  CapabilityGap,
 } from '@/types';
 import clsx from 'clsx';
 
@@ -60,6 +71,18 @@ const CATEGORY_COLORS: Record<string, string> = {
   decision_support: 'bg-rose-100 text-rose-800',
 };
 
+const TIER_STYLES: Record<string, { icon: typeof Star; color: string; bg: string; border: string; label: string }> = {
+  strong: { icon: Star, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', label: 'Strong Recommendations' },
+  moderate: { icon: Diamond, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', label: 'Moderate Fit' },
+  exploratory: { icon: Circle, color: 'text-gray-500', bg: 'bg-gray-50', border: 'border-gray-200', label: 'Exploratory' },
+};
+
+const POTENTIAL_COLORS: Record<string, string> = {
+  high: 'bg-emerald-100 text-emerald-800',
+  moderate: 'bg-amber-100 text-amber-800',
+  low: 'bg-gray-100 text-gray-600',
+};
+
 // ============================================================================
 // Stance Badge
 // ============================================================================
@@ -75,7 +98,7 @@ function StanceBadge({ stance }: { stance: string }) {
 }
 
 // ============================================================================
-// Engine Mini Card (inside a pass)
+// Engine Mini Card (inside a phase)
 // ============================================================================
 
 function EngineCard({
@@ -235,36 +258,317 @@ function ArrowRight({ className }: { className?: string }) {
 }
 
 // ============================================================================
-// Pass Block (chain or standalone engine)
+// Candidate Engine Card (for extension points)
 // ============================================================================
 
-function PassBlock({
-  pass,
-  allPasses,
+function CandidateEngineCard({ candidate }: { candidate: CandidateEngine }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className={clsx(
+      'border rounded-lg p-3 space-y-2',
+      candidate.has_full_composability ? 'bg-white' : 'bg-gray-50 border-dashed'
+    )}>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full text-left"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <Link
+              href={`/engines/${candidate.engine_key}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-sm font-medium text-primary-600 hover:underline truncate"
+            >
+              {candidate.engine_name}
+            </Link>
+            {!candidate.has_full_composability && (
+              <span className="text-[10px] text-gray-400">(basic scoring)</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-xs font-mono font-bold text-gray-700">
+              {candidate.composite_score.toFixed(2)}
+            </span>
+            {expanded ? (
+              <ChevronDown className="h-3 w-3 text-gray-400" />
+            ) : (
+              <ChevronRight className="h-3 w-3 text-gray-400" />
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+          <span className="badge badge-gray text-[10px]">{candidate.category}</span>
+          <span className="badge badge-gray text-[10px]">{candidate.kind}</span>
+        </div>
+      </button>
+
+      {/* Rationale bullets (always visible for strong) */}
+      {(candidate.recommendation_tier === 'strong' || expanded) && candidate.rationale.length > 0 && (
+        <ul className="text-xs text-gray-600 space-y-0.5 pl-1">
+          {candidate.rationale.map((r, i) => (
+            <li key={i} className="flex items-start gap-1">
+              <span className="text-gray-400 mt-0.5 flex-shrink-0">&bull;</span>
+              <span>{r}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {expanded && (
+        <div className="pt-2 border-t space-y-2 text-xs">
+          {/* Score Breakdown */}
+          <div className="grid grid-cols-5 gap-1">
+            {[
+              { label: 'Synergy', value: candidate.synergy_score },
+              { label: 'Dim Prod', value: candidate.dimension_production_score },
+              { label: 'Novelty', value: candidate.dimension_novelty_score },
+              { label: 'Cap Gap', value: candidate.capability_gap_score },
+              { label: 'Category', value: candidate.category_affinity_score },
+            ].map((s) => (
+              <div key={s.label} className="text-center">
+                <div className="text-[10px] text-gray-400">{s.label}</div>
+                <div className="font-mono font-medium">{s.value.toFixed(2)}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Synergy with */}
+          {candidate.synergy_with.length > 0 && (
+            <div>
+              <span className="text-gray-500">Synergizes with:</span>
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {candidate.synergy_with.map((e) => (
+                  <span key={e} className="badge text-[10px] bg-emerald-50 text-emerald-700">{e}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* New dimensions */}
+          {candidate.dimensions_added.length > 0 && (
+            <div>
+              <span className="text-gray-500">Adds dimensions:</span>
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {candidate.dimensions_added.map((d) => (
+                  <span key={d} className="badge text-[10px] bg-indigo-50 text-indigo-700">{d}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Potential issues */}
+          {candidate.potential_issues.length > 0 && (
+            <div className="text-orange-600">
+              {candidate.potential_issues.map((issue, i) => (
+                <div key={i}>&triangledown; {issue}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Extension Panel (inside a PhaseBlock)
+// ============================================================================
+
+function ExtensionPanel({ extension }: { extension: PhaseExtensionPoint }) {
+  const [showModerate, setShowModerate] = useState(false);
+  const [showExploratory, setShowExploratory] = useState(false);
+  const [showDimensions, setShowDimensions] = useState(false);
+  const [showGaps, setShowGaps] = useState(false);
+
+  const strong = extension.candidate_engines.filter((c) => c.recommendation_tier === 'strong');
+  const moderate = extension.candidate_engines.filter((c) => c.recommendation_tier === 'moderate');
+  const exploratory = extension.candidate_engines.filter((c) => c.recommendation_tier === 'exploratory');
+
+  const coveredCount = extension.dimension_coverage.filter((d) => d.coverage_ratio > 0).length;
+  const totalDims = extension.dimension_coverage.length;
+  const coveragePercent = totalDims > 0 ? Math.round((coveredCount / totalDims) * 100) : 0;
+
+  if (extension.candidate_engines.length === 0) return null;
+
+  return (
+    <div className="mt-3 border border-dashed border-indigo-200 rounded-lg bg-indigo-50/30 p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <Puzzle className="h-4 w-4 text-indigo-500" />
+        <span className="text-sm font-semibold text-indigo-800">Extension Points</span>
+        <span className={clsx('badge text-[10px]', POTENTIAL_COLORS[extension.extension_potential])}>
+          {extension.extension_potential} potential
+        </span>
+      </div>
+
+      {/* Dimension Coverage */}
+      {totalDims > 0 && (
+        <div>
+          <button
+            onClick={() => setShowDimensions(!showDimensions)}
+            className="flex items-center gap-2 text-xs text-gray-600 hover:text-gray-800"
+          >
+            {showDimensions ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            <BarChart3 className="h-3 w-3" />
+            <span>Dimension Coverage</span>
+            <span className="font-medium">{coveredCount}/{totalDims} dimensions covered ({coveragePercent}%)</span>
+          </button>
+
+          {/* Coverage bar */}
+          <div className="mt-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-indigo-500 rounded-full transition-all"
+              style={{ width: `${coveragePercent}%` }}
+            />
+          </div>
+
+          {showDimensions && (
+            <div className="mt-2 grid grid-cols-2 gap-1">
+              {extension.dimension_coverage.map((dim) => (
+                <div key={dim.dimension_key} className="flex items-center gap-1.5 text-[11px]">
+                  <div className={clsx(
+                    'w-2 h-2 rounded-full flex-shrink-0',
+                    dim.coverage_ratio > 0.5 ? 'bg-emerald-500' : dim.coverage_ratio > 0 ? 'bg-amber-400' : 'bg-red-300'
+                  )} />
+                  <span className="text-gray-700 truncate">{dim.dimension_key}</span>
+                  {dim.covered_by.length > 0 && (
+                    <span className="text-gray-400">({dim.covered_by.length})</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Capability Gaps */}
+      {extension.capability_gaps.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowGaps(!showGaps)}
+            className="flex items-center gap-2 text-xs text-gray-600 hover:text-gray-800"
+          >
+            {showGaps ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            <Zap className="h-3 w-3" />
+            <span>Capability Gaps</span>
+            <span className="font-medium">{extension.capability_gaps.length} uncovered</span>
+          </button>
+
+          {showGaps && (
+            <div className="mt-2 space-y-1">
+              {extension.capability_gaps.map((gap) => (
+                <div key={gap.capability_key} className="text-[11px] flex items-start gap-1.5">
+                  <span className="text-orange-400 mt-0.5 flex-shrink-0">&bull;</span>
+                  <div>
+                    <span className="font-medium text-gray-700">{gap.capability_key}</span>
+                    <span className="text-gray-500 ml-1">— {gap.capability_description}</span>
+                    {gap.available_in.length > 0 && (
+                      <span className="text-gray-400 ml-1">
+                        (available in {gap.available_in.length} engine{gap.available_in.length !== 1 ? 's' : ''})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Candidate Engines by Tier */}
+      <div className="space-y-2">
+        <span className="text-xs font-medium text-gray-600">
+          Candidate Engines ({extension.candidate_engines.length})
+        </span>
+
+        {/* Strong tier — always visible */}
+        {strong.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+              <Star className="h-3.5 w-3.5" />
+              {TIER_STYLES.strong.label} ({strong.length})
+            </div>
+            <div className="space-y-1.5">
+              {strong.map((c) => <CandidateEngineCard key={c.engine_key} candidate={c} />)}
+            </div>
+          </div>
+        )}
+
+        {/* Moderate tier — collapsed */}
+        {moderate.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowModerate(!showModerate)}
+              className="flex items-center gap-1.5 text-xs font-medium text-blue-700 hover:text-blue-800"
+            >
+              {showModerate ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <Diamond className="h-3.5 w-3.5" />
+              {TIER_STYLES.moderate.label} ({moderate.length})
+            </button>
+            {showModerate && (
+              <div className="mt-1.5 space-y-1.5">
+                {moderate.map((c) => <CandidateEngineCard key={c.engine_key} candidate={c} />)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Exploratory tier — collapsed */}
+        {exploratory.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowExploratory(!showExploratory)}
+              className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-700"
+            >
+              {showExploratory ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <Circle className="h-3.5 w-3.5" />
+              {TIER_STYLES.exploratory.label} ({exploratory.length})
+            </button>
+            {showExploratory && (
+              <div className="mt-1.5 space-y-1.5">
+                {exploratory.map((c) => <CandidateEngineCard key={c.engine_key} candidate={c} />)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Phase Block (chain or standalone engine)
+// ============================================================================
+
+function PhaseBlock({
+  phase,
+  allPhases,
   chain,
   capDefs,
   opDefs,
   depth,
+  extension,
 }: {
-  pass: WorkflowPass;
-  allPasses: WorkflowPass[];
+  phase: WorkflowPhase;
+  allPhases: WorkflowPhase[];
   chain: EngineChainSpec | null;
   capDefs: Map<string, CapabilityEngineDefinition | null>;
   opDefs: Map<string, EngineOperationalization | null>;
   depth: string;
+  extension?: PhaseExtensionPoint;
 }) {
   const isChain = !!chain;
-  const engineKeys = isChain ? (chain.engine_keys ?? []) : (pass.engine_key ? [pass.engine_key] : []);
+  const engineKeys = isChain ? (chain.engine_keys ?? []) : (phase.engine_key ? [phase.engine_key] : []);
   const blendInfo = isChain ? BLEND_MODE_LABELS[chain.blend_mode] : null;
 
-  // Context parameters — show what data this pass consumes from upstream
-  const contextParams = pass.context_parameters;
+  // Context parameters — show what data this phase consumes from upstream
+  const contextParams = phase.context_parameters;
   const hasContext = contextParams && Object.keys(contextParams).length > 0;
 
   // Dependency info
-  const depNames = pass.depends_on_passes.map((pn) => {
-    const dep = allPasses.find((p) => p.pass_number === pn);
-    return dep ? `${pn}. ${dep.pass_name}` : `Pass ${pn}`;
+  const depNames = phase.depends_on_phases.map((pn) => {
+    const dep = allPhases.find((p) => p.phase_number === pn);
+    return dep ? `${pn}. ${dep.phase_name}` : `Phase ${pn}`;
   });
 
   return (
@@ -273,28 +577,28 @@ function PassBlock({
         'border-2 rounded-xl p-4 space-y-3',
         isChain ? 'border-violet-200 bg-violet-50/30' : 'border-gray-200 bg-white'
       )}>
-        {/* Pass Header */}
+        {/* Phase Header */}
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="flex items-center justify-center w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-sm font-bold">
-                {pass.pass_number}
+                {phase.phase_number}
               </span>
-              <h3 className="font-semibold text-gray-900">{pass.pass_name}</h3>
-              {pass.requires_external_docs && (
+              <h3 className="font-semibold text-gray-900">{phase.phase_name}</h3>
+              {phase.requires_external_docs && (
                 <span className="badge text-xs bg-violet-100 text-violet-800 flex items-center gap-1">
                   <FileText className="h-3 w-3" />
                   external docs
                 </span>
               )}
-              {pass.caches_result && (
+              {phase.caches_result && (
                 <span className="badge text-xs bg-emerald-100 text-emerald-800 flex items-center gap-1">
                   <Database className="h-3 w-3" />
                   cached
                 </span>
               )}
             </div>
-            <p className="mt-1 text-sm text-gray-600">{pass.pass_description}</p>
+            <p className="mt-1 text-sm text-gray-600">{phase.phase_description}</p>
           </div>
         </div>
 
@@ -303,7 +607,7 @@ function PassBlock({
           <div className="flex items-center gap-2 flex-wrap">
             <GitBranch className="h-4 w-4 text-violet-500" />
             <Link
-              href={`/workflows/${pass.chain_key}`}
+              href={`/workflows/${phase.chain_key}`}
               className="text-sm font-medium text-violet-700 hover:underline"
             >
               {chain.chain_name}
@@ -320,7 +624,7 @@ function PassBlock({
         )}
 
         {/* Dependencies */}
-        {pass.depends_on_passes.length > 0 && (
+        {phase.depends_on_phases.length > 0 && (
           <div className="flex items-center gap-1 text-xs text-gray-500 flex-wrap">
             <Link2 className="h-3 w-3" />
             <span>Depends on:</span>
@@ -360,7 +664,61 @@ function PassBlock({
             />
           ))}
         </div>
+
+        {/* Extension Points Panel */}
+        {extension && <ExtensionPanel extension={extension} />}
       </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Workflow Extension Summary (bottom of page)
+// ============================================================================
+
+function WorkflowExtensionSummary({ analysis }: { analysis: WorkflowExtensionAnalysis }) {
+  return (
+    <div className="card p-6 space-y-4 border-indigo-200 bg-indigo-50/20">
+      <div className="flex items-center gap-2">
+        <Puzzle className="h-5 w-5 text-indigo-500" />
+        <h2 className="text-lg font-semibold text-gray-900">Workflow Extension Summary</h2>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div>
+          <span className="text-xs text-gray-500 uppercase tracking-wide">Total Candidates</span>
+          <p className="text-2xl font-bold text-gray-900">{analysis.total_candidate_engines}</p>
+        </div>
+        <div>
+          <span className="text-xs text-gray-500 uppercase tracking-wide">Strong Recommendations</span>
+          <p className="text-2xl font-bold text-amber-600">{analysis.strong_recommendations}</p>
+        </div>
+        <div>
+          <span className="text-xs text-gray-500 uppercase tracking-wide">Phases Analyzed</span>
+          <p className="text-2xl font-bold text-gray-900">{analysis.phase_extensions.length}</p>
+        </div>
+        <div>
+          <span className="text-xs text-gray-500 uppercase tracking-wide">Underserved Dims</span>
+          <p className="text-2xl font-bold text-orange-600">{analysis.underserved_dimensions.length}</p>
+        </div>
+      </div>
+
+      {analysis.underserved_dimensions.length > 0 && (
+        <div>
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Underserved Dimensions Across Workflow</span>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {analysis.underserved_dimensions.map((dim) => (
+              <span key={dim} className="badge text-xs bg-orange-50 text-orange-700 border border-orange-200">
+                {dim}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {analysis.workflow_summary && (
+        <p className="text-sm text-gray-600">{analysis.workflow_summary}</p>
+      )}
     </div>
   );
 }
@@ -373,6 +731,7 @@ export default function ImplementationDetailPage() {
   const router = useRouter();
   const { key } = router.query;
   const [depth, setDepth] = useState<string>('standard');
+  const [showExtensions, setShowExtensions] = useState(false);
 
   // 1. Fetch workflow
   const { data: workflow, isLoading: workflowLoading, error: workflowError } = useQuery({
@@ -381,10 +740,10 @@ export default function ImplementationDetailPage() {
     enabled: !!key,
   });
 
-  // 2. Collect chain keys from workflow passes
+  // 2. Collect chain keys from workflow phases
   const chainKeys = useMemo(() => {
-    if (!workflow) return [];
-    return [...new Set(workflow.passes.filter((p) => p.chain_key).map((p) => p.chain_key!))];
+    if (!workflow?.phases) return [];
+    return [...new Set(workflow.phases.filter((p) => p.chain_key).map((p) => p.chain_key!))];
   }, [workflow]);
 
   // 3. Fetch all chains in parallel
@@ -403,12 +762,12 @@ export default function ImplementationDetailPage() {
 
   // 4. Collect all unique engine keys (from chains + standalone)
   const allEngineKeys = useMemo(() => {
-    if (!workflow) return [];
+    if (!workflow?.phases) return [];
     const keys = new Set<string>();
-    for (const pass of workflow.passes) {
-      if (pass.engine_key) keys.add(pass.engine_key);
-      if (pass.chain_key && chainsData) {
-        const chain = chainsData.get(pass.chain_key);
+    for (const phase of workflow.phases) {
+      if (phase.engine_key) keys.add(phase.engine_key);
+      if (phase.chain_key && chainsData) {
+        const chain = chainsData.get(phase.chain_key);
         if (chain) {
           for (const ek of chain.engine_keys) keys.add(ek);
         }
@@ -455,12 +814,29 @@ export default function ImplementationDetailPage() {
     enabled: allEngineKeys.length > 0,
   });
 
+  // 7. Fetch extension points (lazy-loaded, toggle-gated)
+  const { data: extensionAnalysis, isLoading: extensionsLoading } = useQuery({
+    queryKey: ['extension-points', key, depth],
+    queryFn: () => api.workflows.getExtensionPoints(key as string, depth),
+    enabled: !!key && showExtensions,
+  });
+
   const capDefs = capDefsData ?? new Map<string, CapabilityEngineDefinition | null>();
   const opDefs = opDefsData ?? new Map<string, EngineOperationalization | null>();
   const chainMap = chainsData ?? new Map<string, EngineChainSpec>();
 
+  // Build extension map by phase number
+  const extensionMap = useMemo(() => {
+    if (!extensionAnalysis) return new Map<number, PhaseExtensionPoint>();
+    const map = new Map<number, PhaseExtensionPoint>();
+    for (const ext of extensionAnalysis.phase_extensions) {
+      map.set(ext.phase_number, ext);
+    }
+    return map;
+  }, [extensionAnalysis]);
+
   // Compute summary stats
-  const passes = workflow?.passes ?? [];
+  const phases = workflow?.phases ?? [];
   const chainCount = chainKeys.length;
   const engineCount = allEngineKeys.length;
 
@@ -546,10 +922,10 @@ export default function ImplementationDetailPage() {
               <span className="badge badge-gray capitalize">{workflow.source_project}</span>
             </div>
             <div>
-              <label className="label">Passes</label>
+              <label className="label">Phases</label>
               <span className="text-gray-700 font-medium flex items-center gap-1">
                 <Layers className="h-4 w-4 text-gray-400" />
-                {passes.length}
+                {phases.length}
               </span>
             </div>
             <div>
@@ -596,9 +972,9 @@ export default function ImplementationDetailPage() {
         </div>
       </div>
 
-      {/* Depth Toggle */}
+      {/* Depth Toggle + Extension Points Toggle */}
       <div className="card p-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <label className="label mb-0">Depth Level</label>
           <div className="flex rounded-lg border border-gray-200 overflow-hidden">
             {['surface', 'standard', 'deep'].map((d) => (
@@ -619,6 +995,24 @@ export default function ImplementationDetailPage() {
           <span className="text-sm text-gray-500">
             Changes the stance sequences displayed for each engine
           </span>
+
+          <div className="ml-auto flex items-center gap-2">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showExtensions}
+                onChange={(e) => setShowExtensions(e.target.checked)}
+                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span className="text-sm text-gray-700 flex items-center gap-1">
+                <Puzzle className="h-4 w-4 text-indigo-400" />
+                Show Extension Points
+              </span>
+            </label>
+            {extensionsLoading && (
+              <span className="text-xs text-gray-400 animate-pulse">analyzing...</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -626,24 +1020,26 @@ export default function ImplementationDetailPage() {
       <div className="space-y-2">
         <h2 className="text-lg font-semibold text-gray-900">Pipeline Flow</h2>
         <p className="text-sm text-gray-500">
-          Pass-by-pass execution flow. Chains are expanded to show their constituent engines.
+          Phase-by-phase execution flow. Chains are expanded to show their constituent engines.
         </p>
 
         <div className="space-y-0 mt-4">
-          {passes.map((pass, idx) => {
-            const chain = pass.chain_key ? chainMap.get(pass.chain_key) ?? null : null;
+          {phases.map((phase, idx) => {
+            const chain = phase.chain_key ? chainMap.get(phase.chain_key) ?? null : null;
+            const extension = extensionMap.get(phase.phase_number);
             return (
-              <div key={pass.pass_number}>
-                <PassBlock
-                  pass={pass}
-                  allPasses={passes}
+              <div key={phase.phase_number}>
+                <PhaseBlock
+                  phase={phase}
+                  allPhases={phases}
                   chain={chain}
                   capDefs={capDefs}
                   opDefs={opDefs}
                   depth={depth}
+                  extension={showExtensions ? extension : undefined}
                 />
-                {/* Connector arrow between passes */}
-                {idx < passes.length - 1 && (
+                {/* Connector arrow between phases */}
+                {idx < phases.length - 1 && (
                   <div className="flex justify-center py-2">
                     <ArrowDown className="h-6 w-6 text-gray-300" />
                   </div>
@@ -655,7 +1051,12 @@ export default function ImplementationDetailPage() {
       </div>
 
       {/* Data Flow Summary */}
-      <DataFlowSummary passes={passes} />
+      <DataFlowSummary phases={phases} />
+
+      {/* Extension Summary */}
+      {showExtensions && extensionAnalysis && (
+        <WorkflowExtensionSummary analysis={extensionAnalysis} />
+      )}
 
       {/* Output */}
       {workflow.output_description && (
@@ -672,14 +1073,14 @@ export default function ImplementationDetailPage() {
 // Data Flow Summary (collapsible)
 // ============================================================================
 
-function DataFlowSummary({ passes }: { passes: WorkflowPass[] }) {
+function DataFlowSummary({ phases }: { phases: WorkflowPhase[] }) {
   const [expanded, setExpanded] = useState(false);
 
-  const passesWithContext = passes.filter(
+  const phasesWithContext = phases.filter(
     (p) => p.context_parameters && Object.keys(p.context_parameters).length > 0
   );
 
-  if (passesWithContext.length === 0) return null;
+  if (phasesWithContext.length === 0) return null;
 
   return (
     <div className="card overflow-hidden">
@@ -690,7 +1091,7 @@ function DataFlowSummary({ passes }: { passes: WorkflowPass[] }) {
         <div className="flex items-center gap-2">
           <Database className="h-5 w-5 text-gray-400" />
           <h2 className="text-lg font-semibold text-gray-900">Data Flow Summary</h2>
-          <span className="badge badge-gray text-xs">{passesWithContext.length} passes with context</span>
+          <span className="badge badge-gray text-xs">{phasesWithContext.length} phases with context</span>
         </div>
         {expanded ? (
           <ChevronDown className="h-5 w-5 text-gray-400" />
@@ -701,15 +1102,15 @@ function DataFlowSummary({ passes }: { passes: WorkflowPass[] }) {
 
       {expanded && (
         <div className="border-t p-4 space-y-3">
-          {passesWithContext.map((pass) => (
-            <div key={pass.pass_number} className="flex items-start gap-3">
+          {phasesWithContext.map((phase) => (
+            <div key={phase.phase_number} className="flex items-start gap-3">
               <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex-shrink-0">
-                {pass.pass_number}
+                {phase.phase_number}
               </span>
               <div>
-                <p className="text-sm font-medium text-gray-900">{pass.pass_name}</p>
+                <p className="text-sm font-medium text-gray-900">{phase.phase_name}</p>
                 <div className="mt-1 space-y-0.5">
-                  {Object.entries(pass.context_parameters!).map(([param, source]) => (
+                  {Object.entries(phase.context_parameters!).map(([param, source]) => (
                     <div key={param} className="text-xs text-gray-600">
                       <span className="font-mono text-indigo-600">{param}</span>
                       <span className="text-gray-400 mx-1">&larr;</span>

@@ -51,8 +51,10 @@ import type {
   PromptTemplate,
   FunctionImplementation,
   Workflow,
+  WorkflowCategory,
   WorkflowSummary,
-  WorkflowPass,
+  WorkflowPhase,
+  WorkflowExtensionAnalysis,
   EngineChainSpec,
 } from '@/types';
 
@@ -439,39 +441,68 @@ class ApiClient {
       const query = queryParams.toString();
       const response = await fetch(`${ANALYZER_V2_URL}/v1/workflows${query ? `?${query}` : ''}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const workflows = await response.json() as Workflow[];
-      const summaries: WorkflowSummary[] = workflows.map((w) => ({
-        workflow_key: w.workflow_key,
-        workflow_name: w.workflow_name,
-        description: w.description,
-        category: w.category,
-        version: w.version,
-        pass_count: w.passes?.length ?? w.estimated_passes ?? 0,
-        source_project: w.source_project,
-        required_inputs: w.required_inputs ?? [],
+      const rawWorkflows = await response.json() as Array<Record<string, unknown>>;
+      const summaries: WorkflowSummary[] = rawWorkflows.map((w) => ({
+        workflow_key: w.workflow_key as string,
+        workflow_name: w.workflow_name as string,
+        description: w.description as string,
+        category: w.category as WorkflowCategory,
+        version: w.version as number,
+        phase_count: (w.phase_count as number) ?? (w.pass_count as number) ?? (w.phases as unknown[] | undefined)?.length ?? (w.passes as unknown[] | undefined)?.length ?? 0,
+        source_project: (w.source_project as string) ?? '',
+        required_inputs: (w.required_inputs as string[]) ?? [],
       }));
       return { workflows: summaries, total: summaries.length };
     },
 
     /**
-     * Get a single workflow from analyzer-v2 with full pass details.
+     * Get a single workflow from analyzer-v2 with full phase details.
+     * Normalizes legacy 'passes' field to 'phases' for backward compatibility.
      */
     get: async (workflowKey: string): Promise<Workflow> => {
       const response = await fetch(`${ANALYZER_V2_URL}/v1/workflows/${workflowKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      // Normalize: accept both 'phases' and legacy 'passes' field names
+      if (!data.phases && data.passes) {
+        data.phases = data.passes.map((p: Record<string, unknown>) => ({
+          ...p,
+          phase_number: p.phase_number ?? p.pass_number,
+          phase_name: p.phase_name ?? p.pass_name,
+          phase_description: p.phase_description ?? p.pass_description,
+          depends_on_phases: p.depends_on_phases ?? p.depends_on_passes ?? [],
+        }));
+      }
+      if (data.estimated_passes !== undefined && data.estimated_phases === undefined) {
+        data.estimated_phases = data.estimated_passes;
+      }
+      return data as Workflow;
+    },
+
+    /**
+     * Get the composed prompt for a specific phase of a workflow.
+     */
+    getPhasePrompt: async (
+      workflowKey: string,
+      phaseNumber: number,
+      audience: AudienceType = 'analyst'
+    ): Promise<ComposedPromptResponse> => {
+      const response = await fetch(
+        `${ANALYZER_V2_URL}/v1/workflows/${workflowKey}/phase/${phaseNumber}/prompt?audience=${audience}`
+      );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     },
 
     /**
-     * Get the composed prompt for a specific pass of a workflow.
+     * Get extension points analysis for a workflow.
      */
-    getPassPrompt: async (
+    getExtensionPoints: async (
       workflowKey: string,
-      passNumber: number,
-      audience: AudienceType = 'analyst'
-    ): Promise<ComposedPromptResponse> => {
+      depth: string = 'standard'
+    ): Promise<WorkflowExtensionAnalysis> => {
       const response = await fetch(
-        `${ANALYZER_V2_URL}/v1/workflows/${workflowKey}/pass/${passNumber}/prompt?audience=${audience}`
+        `${ANALYZER_V2_URL}/v1/workflows/${workflowKey}/extension-points?depth=${depth}`
       );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
