@@ -1369,3 +1369,62 @@ export interface CapabilityHistoryResponse {
   entry_count: number;
   entries: CapabilityHistoryEntry[];
 }
+
+// ============================================================================
+// View Definition Types (from analyzer-v2)
+// ============================================================================
+
+export interface DataSourceRef {
+  workflow_key?: string | null;
+  phase_number?: number | null;
+  engine_key?: string | null;
+  chain_key?: string | null;
+  result_path: string;
+  scope: 'aggregated' | 'per_item';
+}
+
+export interface TransformationSpec {
+  type: 'none' | 'schema_map' | 'llm_extract' | 'llm_summarize' | 'aggregate';
+  field_mapping?: Record<string, string> | null;
+  llm_extraction_schema?: Record<string, unknown> | null;
+  llm_prompt_template?: string | null;
+  stance_key?: string | null;
+}
+
+export interface ViewDefinition {
+  view_key: string;
+  view_name: string;
+  description: string;
+  version: number;
+  target_app: string;
+  target_page: string;
+  target_section: string;
+  renderer_type: string;
+  renderer_config: Record<string, unknown>;
+  data_source: DataSourceRef;
+  secondary_sources: DataSourceRef[];
+  transformation: TransformationSpec;
+  presentation_stance: string | null;
+  position: number;
+  parent_view_key: string | null;
+  tab_count_field: string | null;
+  visibility: 'always' | 'if_data_exists' | 'on_demand';
+  audience_overrides: Record<string, Record<string, unknown>>;
+  status: string;
+  tags: string[];
+  source_project: string | null;
+}
+
+export interface ViewSummary {
+  view_key: string;
+  view_name: string;
+  description: string;
+  target_app: string;
+  target_page: string;
+  renderer_type: string;
+  presentation_stance: string | null;
+  position: number;
+  parent_view_key: string | null;
+  visibility: string;
+  status: string;
+}

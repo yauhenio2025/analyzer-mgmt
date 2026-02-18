@@ -20,6 +20,7 @@ import {
   Compass,
   Combine,
   Workflow,
+  Eye,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -43,6 +44,7 @@ const navigation: NavItem[] = [
   { name: 'Display', href: '/display', icon: Brush },
   { name: 'Functions', href: '/functions', icon: Zap },
   { name: 'Stances', href: '/stances', icon: Compass },
+  { name: 'Views', href: '/views', icon: Eye },
   { name: 'Operationalizations', href: '/operationalizations', icon: Combine },
   { name: 'Rhetoric', href: '/rhetoric', icon: MessageSquareWarning },
   { name: 'Consumers', href: '/consumers', icon: Users },

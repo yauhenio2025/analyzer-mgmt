@@ -255,3 +255,15 @@
   - `frontend/src/lib/api.ts:1-400` - ApiClient class with all methods
 - **Dependencies**: fetch API
 - **Added**: 2026-01-28
+
+### View Definitions CRUD
+- **Status**: Active
+- **Description**: Full management UI for view definitions (declarative UI rendering specs from analyzer-v2). List page with grouped cards, filter/search, detail/edit page with 6 tabs, create mode, delete with confirm.
+- **Entry Points**:
+  - `frontend/src/pages/views/index.tsx:1-280` - List page with grouped cards, filters, search
+  - `frontend/src/pages/views/[key].tsx:1-700` - Detail/edit page with 6 tabs (Identity, Target, Renderer, Data Source, Transformation, Preview), create mode, delete
+  - `frontend/src/lib/api.ts:876-940` - Views API client (list, get, create, update, delete, forWorkflow, reload) via direct fetch to ANALYZER_V2_URL
+  - `frontend/src/types/index.ts:1374-1428` - ViewDefinition, ViewSummary, DataSourceRef, TransformationSpec types
+  - `frontend/src/components/Layout.tsx:46` - Views nav item with Eye icon
+- **Dependencies**: React Query, analyzer-v2 Views API
+- **Added**: 2026-02-18

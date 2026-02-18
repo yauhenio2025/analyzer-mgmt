@@ -1472,6 +1472,76 @@ class ApiClient {
   };
 
   // ============================================================================
+  // Views Endpoints (from analyzer-v2)
+  // ============================================================================
+
+  views = {
+    list: async (params?: { app?: string; page?: string }) => {
+      const qp = new URLSearchParams();
+      if (params?.app) qp.set('app', params.app);
+      if (params?.page) qp.set('page', params.page);
+      const q = qp.toString();
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/views${q ? `?${q}` : ''}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').ViewSummary[]>;
+    },
+
+    get: async (viewKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/views/${viewKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').ViewDefinition>;
+    },
+
+    create: async (data: import('@/types').ViewDefinition) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/views`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const e = await response.json().catch(() => ({}));
+        throw new Error(e.detail || `HTTP ${response.status}`);
+      }
+      return response.json() as Promise<import('@/types').ViewDefinition>;
+    },
+
+    update: async (viewKey: string, data: import('@/types').ViewDefinition) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/views/${viewKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const e = await response.json().catch(() => ({}));
+        throw new Error(e.detail || `HTTP ${response.status}`);
+      }
+      return response.json() as Promise<import('@/types').ViewDefinition>;
+    },
+
+    delete: async (viewKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/views/${viewKey}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{ deleted: string }>;
+    },
+
+    forWorkflow: async (workflowKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/views/for-workflow/${workflowKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').ViewSummary[]>;
+    },
+
+    reload: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/views/reload`, {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{ reloaded: boolean; count: number }>;
+    },
+  };
+
+  // ============================================================================
   // Stances Endpoints (from analyzer-v2)
   // ============================================================================
 
