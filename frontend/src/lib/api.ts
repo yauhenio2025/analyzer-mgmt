@@ -53,6 +53,7 @@ import type {
   Workflow,
   WorkflowSummary,
   WorkflowPass,
+  EngineChainSpec,
 } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
@@ -472,6 +473,30 @@ class ApiClient {
       const response = await fetch(
         `${ANALYZER_V2_URL}/v1/workflows/${workflowKey}/pass/${passNumber}/prompt?audience=${audience}`
       );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+  };
+
+  // ============================================================================
+  // Chains Endpoints (from analyzer-v2)
+  // ============================================================================
+
+  chains = {
+    /**
+     * List all engine chains from analyzer-v2.
+     */
+    list: async (): Promise<EngineChainSpec[]> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/chains`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+
+    /**
+     * Get a single chain by key from analyzer-v2.
+     */
+    get: async (chainKey: string): Promise<EngineChainSpec> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/chains/${chainKey}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     },

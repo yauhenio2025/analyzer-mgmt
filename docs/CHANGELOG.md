@@ -6,6 +6,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Implementations page** — pipeline orchestration view showing how workflows wire engines and chains together:
+  - **List page** (`/implementations`) groups workflows by source project (Critic, Decider V2, etc.) with pass/chain/engine counts
+  - **Detail page** (`/implementations/{key}`) shows full pipeline flow with:
+    - Pass-by-pass vertical flow with chains expanded to show constituent engines
+    - Depth toggle (surface/standard/deep) changes stance sequences displayed per engine
+    - Engine cards with expandable detail: problematique, dimensions, capabilities, stance badges
+    - Data flow summary showing context parameter mappings between passes
+    - Cross-links to engine detail and operationalization pages
+  - **New types**: `EngineChainSpec`, `ChainSummary`, `ChainBlendMode`
+  - **Updated types**: `WorkflowPass` now includes `chain_key` and `context_parameters`
+  - **New API**: `api.chains.list()` and `api.chains.get()` via direct fetch to ANALYZER_V2_URL
+  - **Nav**: "Implementations" item added to sidebar after Workflows
 - **Enriched Lineage tab** — redesigned with rich content (bios, descriptions, definitions) for all 11 engines:
   - Dark hero section for primary thinker with serif name + 2-3 sentence bio paragraph
   - 2-column card grid for secondary thinkers with descriptions and left border accent

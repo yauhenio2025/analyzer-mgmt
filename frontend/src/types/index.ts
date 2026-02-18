@@ -345,8 +345,10 @@ export interface WorkflowPass {
   pass_number: number;
   pass_name: string;
   pass_description: string;
-  engine_key: string;
+  engine_key: string | null;
   function_key: string | null;
+  chain_key: string | null;
+  context_parameters: Record<string, string> | null;
   prompt_template: string | null;
   requires_external_docs: boolean;
   caches_result: boolean;
@@ -378,6 +380,37 @@ export interface WorkflowSummary {
   pass_count: number;
   source_project: string;
   required_inputs: string[];
+}
+
+// ============================================================================
+// Engine Chain Types (from analyzer-v2)
+// ============================================================================
+
+export type ChainBlendMode = 'sequential' | 'parallel' | 'merge' | 'llm_selection';
+
+export interface EngineChainSpec {
+  chain_key: string;
+  chain_name: string;
+  description: string;
+  version: number;
+  engine_keys: string[];
+  blend_mode: ChainBlendMode;
+  selection_criteria: string | null;
+  max_engines: number;
+  merge_strategy: string | null;
+  pass_context: boolean;
+  category: string | null;
+  context_parameter_schema: Record<string, unknown> | null;
+  recommended_for: string[];
+}
+
+export interface ChainSummary {
+  chain_key: string;
+  chain_name: string;
+  description: string;
+  blend_mode: ChainBlendMode;
+  engine_count: number;
+  category: string | null;
 }
 
 // ============================================================================

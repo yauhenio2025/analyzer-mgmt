@@ -19,6 +19,7 @@ import {
   Zap,
   Compass,
   Combine,
+  Workflow,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -35,6 +36,7 @@ const navigation: NavItem[] = [
   { name: 'Audiences', href: '/audiences', icon: UserCircle },
   { name: 'Pipelines', href: '/pipelines', icon: GitBranch },
   { name: 'Workflows', href: '/workflows', icon: GitMerge },
+  { name: 'Implementations', href: '/implementations', icon: Workflow },
   { name: 'Grids', href: '/grids', icon: LayoutGrid },
   { name: 'Styles', href: '/styles', icon: Palette },
   { name: 'Primitives', href: '/primitives', icon: Shapes },

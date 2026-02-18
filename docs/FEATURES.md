@@ -1,6 +1,6 @@
 # Feature Inventory
 
-> Auto-maintained by Claude Code. Last updated: 2026-02-12
+> Auto-maintained by Claude Code. Last updated: 2026-02-18
 
 ## Backend API
 
@@ -169,6 +169,18 @@
   - `frontend/src/pages/_app.tsx:1-30` - App wrapper with React Query
 - **Dependencies**: Next.js, Tailwind CSS
 - **Added**: 2026-01-28
+
+### Implementations (Pipeline Orchestration)
+- **Status**: Active
+- **Description**: Pipeline orchestration view showing how workflows wire engines and chains together, with depth-toggled stance sequences and data flow visualization
+- **Entry Points**:
+  - `frontend/src/pages/implementations/index.tsx:1-207` - List page grouped by source project
+  - `frontend/src/pages/implementations/[key].tsx:1-492` - Detail page with pipeline flow, depth toggle, engine cards, data flow summary
+  - `frontend/src/lib/api.ts:480-500` - Chain API methods (list, get)
+  - `frontend/src/types/index.ts:334-368` - EngineChainSpec, ChainSummary, ChainBlendMode types
+  - `frontend/src/components/Layout.tsx:38` - Nav item
+- **Dependencies**: React Query, Lucide icons, analyzer-v2 chains/workflows/capability-definitions/operationalizations APIs
+- **Added**: 2026-02-18
 
 ### Dashboard
 - **Status**: Active
