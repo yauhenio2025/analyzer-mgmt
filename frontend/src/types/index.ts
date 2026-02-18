@@ -456,6 +456,11 @@ export interface AddEngineResponse {
   chain_key: string;
   chain_engine_keys: string[];
   created_new_chain: boolean;
+  chain_description: string;
+  phase_description: string;
+  git_committed: boolean;
+  commit_sha: string | null;
+  cascaded_workflows: string[];
 }
 
 // ============================================================================

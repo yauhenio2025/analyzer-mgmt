@@ -297,6 +297,7 @@ function CandidateEngineCard({
   const isAdded = addMutation.isSuccess;
   const isAdding = addMutation.isPending;
   const addError = addMutation.error;
+  const addData = addMutation.data;
 
   return (
     <div className={clsx(
@@ -414,6 +415,11 @@ function CandidateEngineCard({
           <span className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
             <Check className="h-3.5 w-3.5" />
             Added to phase
+            {addData?.git_committed && (
+              <span className="text-emerald-500 font-normal ml-1">
+                &middot; committed to git
+              </span>
+            )}
           </span>
         ) : (
           <button
