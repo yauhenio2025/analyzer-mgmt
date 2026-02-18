@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -21,6 +21,9 @@ import {
   Circle,
   BarChart3,
   Zap,
+  Plus,
+  Check,
+  Loader2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import type {
@@ -261,12 +264,44 @@ function ArrowRight({ className }: { className?: string }) {
 // Candidate Engine Card (for extension points)
 // ============================================================================
 
-function CandidateEngineCard({ candidate }: { candidate: CandidateEngine }) {
+function CandidateEngineCard({
+  candidate,
+  workflowKey,
+  phaseNumber,
+}: {
+  candidate: CandidateEngine;
+  workflowKey: string;
+  phaseNumber: number;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const queryClient = useQueryClient();
+
+  const addMutation = useMutation({
+    mutationFn: () => api.workflows.addEngineToPhase(workflowKey, phaseNumber, candidate.engine_key),
+    onSuccess: () => {
+      // Invalidate pipeline/workflow data immediately so the pipeline flow updates
+      queryClient.invalidateQueries({ queryKey: ['workflow', workflowKey] });
+      queryClient.invalidateQueries({ queryKey: ['chains-batch'] });
+      queryClient.invalidateQueries({ queryKey: ['cap-defs-batch'] });
+      queryClient.invalidateQueries({ queryKey: ['op-defs-batch'] });
+      queryClient.invalidateQueries({ queryKey: ['workflows'] });
+      queryClient.invalidateQueries({ queryKey: ['workflows-full'] });
+      // Delay extension points refetch so user sees "Added to phase" confirmation
+      // before the card disappears (engine is no longer a candidate after being added)
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['extension-points', workflowKey] });
+      }, 2500);
+    },
+  });
+
+  const isAdded = addMutation.isSuccess;
+  const isAdding = addMutation.isPending;
+  const addError = addMutation.error;
 
   return (
     <div className={clsx(
       'border rounded-lg p-3 space-y-2',
+      isAdded ? 'bg-emerald-50 border-emerald-300' :
       candidate.has_full_composability ? 'bg-white' : 'bg-gray-50 border-dashed'
     )}>
       <button
@@ -367,6 +402,42 @@ function CandidateEngineCard({ candidate }: { candidate: CandidateEngine }) {
           )}
         </div>
       )}
+
+      {/* Add to Phase button */}
+      <div className="flex items-center justify-between pt-1">
+        {addError && (
+          <span className="text-xs text-red-600 truncate mr-2">
+            {addError.message}
+          </span>
+        )}
+        {isAdded ? (
+          <span className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+            <Check className="h-3.5 w-3.5" />
+            Added to phase
+          </span>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              addMutation.mutate();
+            }}
+            disabled={isAdding}
+            className={clsx(
+              'ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
+              isAdding
+                ? 'bg-gray-100 text-gray-400 cursor-wait'
+                : 'bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800'
+            )}
+          >
+            {isAdding ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Plus className="h-3 w-3" />
+            )}
+            {isAdding ? 'Adding...' : 'Add to Phase'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -375,7 +446,7 @@ function CandidateEngineCard({ candidate }: { candidate: CandidateEngine }) {
 // Extension Panel (inside a PhaseBlock)
 // ============================================================================
 
-function ExtensionPanel({ extension }: { extension: PhaseExtensionPoint }) {
+function ExtensionPanel({ extension, workflowKey }: { extension: PhaseExtensionPoint; workflowKey: string }) {
   const [showModerate, setShowModerate] = useState(false);
   const [showExploratory, setShowExploratory] = useState(false);
   const [showDimensions, setShowDimensions] = useState(false);
@@ -489,7 +560,7 @@ function ExtensionPanel({ extension }: { extension: PhaseExtensionPoint }) {
               {TIER_STYLES.strong.label} ({strong.length})
             </div>
             <div className="space-y-1.5">
-              {strong.map((c) => <CandidateEngineCard key={c.engine_key} candidate={c} />)}
+              {strong.map((c) => <CandidateEngineCard key={c.engine_key} candidate={c} workflowKey={workflowKey} phaseNumber={extension.phase_number} />)}
             </div>
           </div>
         )}
@@ -507,7 +578,7 @@ function ExtensionPanel({ extension }: { extension: PhaseExtensionPoint }) {
             </button>
             {showModerate && (
               <div className="mt-1.5 space-y-1.5">
-                {moderate.map((c) => <CandidateEngineCard key={c.engine_key} candidate={c} />)}
+                {moderate.map((c) => <CandidateEngineCard key={c.engine_key} candidate={c} workflowKey={workflowKey} phaseNumber={extension.phase_number} />)}
               </div>
             )}
           </div>
@@ -526,7 +597,7 @@ function ExtensionPanel({ extension }: { extension: PhaseExtensionPoint }) {
             </button>
             {showExploratory && (
               <div className="mt-1.5 space-y-1.5">
-                {exploratory.map((c) => <CandidateEngineCard key={c.engine_key} candidate={c} />)}
+                {exploratory.map((c) => <CandidateEngineCard key={c.engine_key} candidate={c} workflowKey={workflowKey} phaseNumber={extension.phase_number} />)}
               </div>
             )}
           </div>
@@ -548,6 +619,7 @@ function PhaseBlock({
   opDefs,
   depth,
   extension,
+  workflowKey,
 }: {
   phase: WorkflowPhase;
   allPhases: WorkflowPhase[];
@@ -556,6 +628,7 @@ function PhaseBlock({
   opDefs: Map<string, EngineOperationalization | null>;
   depth: string;
   extension?: PhaseExtensionPoint;
+  workflowKey: string;
 }) {
   const isChain = !!chain;
   const engineKeys = isChain ? (chain.engine_keys ?? []) : (phase.engine_key ? [phase.engine_key] : []);
@@ -666,7 +739,7 @@ function PhaseBlock({
         </div>
 
         {/* Extension Points Panel */}
-        {extension && <ExtensionPanel extension={extension} />}
+        {extension && <ExtensionPanel extension={extension} workflowKey={workflowKey} />}
       </div>
     </div>
   );
@@ -1037,6 +1110,7 @@ export default function ImplementationDetailPage() {
                   opDefs={opDefs}
                   depth={depth}
                   extension={showExtensions ? extension : undefined}
+                  workflowKey={key as string}
                 />
                 {/* Connector arrow between phases */}
                 {idx < phases.length - 1 && (

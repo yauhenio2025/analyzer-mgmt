@@ -55,6 +55,7 @@ import type {
   WorkflowSummary,
   WorkflowPhase,
   WorkflowExtensionAnalysis,
+  AddEngineResponse,
   EngineChainSpec,
 } from '@/types';
 
@@ -505,6 +506,30 @@ class ApiClient {
         `${ANALYZER_V2_URL}/v1/workflows/${workflowKey}/extension-points?depth=${depth}`
       );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+
+    /**
+     * Add an engine to a workflow phase.
+     */
+    addEngineToPhase: async (
+      workflowKey: string,
+      phaseNumber: number,
+      engineKey: string,
+      position?: number,
+    ): Promise<AddEngineResponse> => {
+      const response = await fetch(
+        `${ANALYZER_V2_URL}/v1/workflows/${workflowKey}/phases/${phaseNumber}/add-engine`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ engine_key: engineKey, position: position ?? null }),
+        }
+      );
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+        throw new Error(err.detail || `HTTP ${response.status}`);
+      }
       return response.json();
     },
   };

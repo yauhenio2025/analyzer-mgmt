@@ -448,6 +448,16 @@ export interface WorkflowExtensionAnalysis {
   workflow_summary: string;
 }
 
+export interface AddEngineResponse {
+  status: string;
+  workflow_key: string;
+  phase_number: number;
+  engine_key: string;
+  chain_key: string;
+  chain_engine_keys: string[];
+  created_new_chain: boolean;
+}
+
 // ============================================================================
 // Engine Chain Types (from analyzer-v2)
 // ============================================================================
