@@ -450,6 +450,44 @@ function RendererTab({
   view: ViewDefinition;
   onChange: (view: ViewDefinition) => void;
 }) {
+  // Fetch renderer catalog from analyzer-v2
+  const { data: renderers } = useQuery({
+    queryKey: ['renderers'],
+    queryFn: () => api.renderers.list(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Selected renderer details
+  const { data: selectedRenderer } = useQuery({
+    queryKey: ['renderer', view.renderer_type],
+    queryFn: () => api.renderers.get(view.renderer_type),
+    enabled: !!view.renderer_type,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Build options from catalog, with fallback to static list
+  const rendererOptions = useMemo(() => {
+    if (renderers && renderers.length > 0) {
+      return renderers.map((r) => ({
+        value: r.renderer_key,
+        label: `${r.renderer_name} (${r.category})`,
+      }));
+    }
+    // Fallback if API unavailable
+    return [
+      { value: 'tab', label: 'Tab' },
+      { value: 'card_grid', label: 'Card Grid' },
+      { value: 'timeline', label: 'Timeline' },
+      { value: 'prose', label: 'Prose' },
+      { value: 'matrix', label: 'Matrix' },
+      { value: 'accordion', label: 'Accordion' },
+      { value: 'card', label: 'Card' },
+      { value: 'stat_summary', label: 'Stat Summary' },
+      { value: 'table', label: 'Table' },
+      { value: 'raw_json', label: 'Raw JSON' },
+    ];
+  }, [renderers]);
+
   return (
     <div className="space-y-6">
       <div className="card p-6 space-y-4">
@@ -458,19 +496,67 @@ function RendererTab({
           label="Renderer Type"
           value={view.renderer_type}
           onChange={(v) => onChange({ ...view, renderer_type: v })}
-          options={[
-            { value: 'tab', label: 'Tab' },
-            { value: 'card_grid', label: 'Card Grid' },
-            { value: 'timeline', label: 'Timeline' },
-            { value: 'prose', label: 'Prose' },
-            { value: 'matrix', label: 'Matrix' },
-            { value: 'accordion', label: 'Accordion' },
-            { value: 'card', label: 'Card' },
-            { value: 'stat_summary', label: 'Stat Summary' },
-            { value: 'table', label: 'Table' },
-            { value: 'raw_json', label: 'Raw JSON' },
-          ]}
+          options={rendererOptions}
         />
+
+        {/* Renderer metadata (from catalog) */}
+        {selectedRenderer && (
+          <div className="rounded-lg bg-gray-50 border border-gray-200 p-4 space-y-3">
+            <div className="text-sm text-gray-700">{selectedRenderer.description}</div>
+
+            {/* Stance affinities */}
+            {Object.keys(selectedRenderer.stance_affinities).length > 0 && (
+              <div>
+                <span className="text-xs font-semibold text-gray-500 uppercase">Stance Affinities</span>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {Object.entries(selectedRenderer.stance_affinities)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([stance, score]) => (
+                      <span
+                        key={stance}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs"
+                        style={{
+                          backgroundColor: score > 0.7 ? '#dcfce7' : score > 0.4 ? '#fef9c3' : '#f1f5f9',
+                          color: score > 0.7 ? '#166534' : score > 0.4 ? '#854d0e' : '#475569',
+                        }}
+                      >
+                        {stance}: {score.toFixed(1)}
+                      </span>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ideal data shapes */}
+            {selectedRenderer.ideal_data_shapes.length > 0 && (
+              <div>
+                <span className="text-xs font-semibold text-gray-500 uppercase">Data Shapes</span>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {selectedRenderer.ideal_data_shapes.map((shape) => (
+                    <span key={shape} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">
+                      {shape}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Available section renderers */}
+            {selectedRenderer.available_section_renderers.length > 0 && (
+              <div>
+                <span className="text-xs font-semibold text-gray-500 uppercase">Section Renderers</span>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {selectedRenderer.available_section_renderers.map((sr) => (
+                    <span key={sr} className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs">
+                      {sr}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <JsonEditor
           label="Renderer Config"
           value={view.renderer_config}

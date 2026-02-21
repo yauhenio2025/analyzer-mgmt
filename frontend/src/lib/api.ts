@@ -1546,6 +1546,36 @@ class ApiClient {
   };
 
   // ============================================================================
+  // Renderers Endpoints (from analyzer-v2)
+  // ============================================================================
+
+  renderers = {
+    list: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/renderers`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').RendererSummary[]>;
+    },
+
+    get: async (rendererKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/renderers/${rendererKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').RendererDefinition>;
+    },
+
+    forStance: async (stanceKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/renderers/for-stance/${stanceKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').RendererSummary[]>;
+    },
+
+    forApp: async (app: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/renderers/for-app/${app}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').RendererSummary[]>;
+    },
+  };
+
+  // ============================================================================
   // Transformations Endpoints (from analyzer-v2)
   // ============================================================================
 

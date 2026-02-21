@@ -1430,6 +1430,34 @@ export interface ViewSummary {
 }
 
 // ============================================================================
+// Renderer Types (from analyzer-v2)
+// ============================================================================
+
+export interface RendererDefinition {
+  renderer_key: string;
+  renderer_name: string;
+  description: string;
+  category: string;
+  ideal_data_shapes: string[];
+  stance_affinities: Record<string, number>;
+  available_section_renderers: string[];
+  config_schema: Record<string, unknown>;
+  supported_apps: string[];
+  status: string;
+  tags: string[];
+}
+
+export interface RendererSummary {
+  renderer_key: string;
+  renderer_name: string;
+  description: string;
+  category: string;
+  stance_affinities: Record<string, number>;
+  supported_apps: string[];
+  status: string;
+}
+
+// ============================================================================
 // Transformation Template Types (from analyzer-v2)
 // ============================================================================
 
