@@ -482,7 +482,7 @@ const RENDERER_CONFIG_FIELDS: Record<string, { field: string; label: string; pla
   ],
 };
 
-const SUB_RENDERER_OPTIONS = [
+const FALLBACK_SUB_RENDERER_OPTIONS = [
   { value: 'mini_card_list', label: 'Mini Card List' },
   { value: 'chip_grid', label: 'Chip Grid' },
   { value: 'key_value_table', label: 'Key-Value Table' },
@@ -490,12 +490,22 @@ const SUB_RENDERER_OPTIONS = [
   { value: 'stat_row', label: 'Stat Row' },
   { value: 'comparison_panel', label: 'Comparison Panel' },
   { value: 'timeline_strip', label: 'Timeline Strip' },
+  { value: 'evidence_trail', label: 'Evidence Trail' },
 ];
 
-const SECTION_RENDERER_OPTIONS = [
-  { value: 'nested_sections', label: 'Nested Sections (contains sub-renderers)' },
-  ...SUB_RENDERER_OPTIONS,
-];
+/** Build section renderer options from the renderer definition's available_section_renderers list */
+function buildSectionRendererOptions(availableSubRenderers?: string[]) {
+  const subOptions = availableSubRenderers && availableSubRenderers.length > 0
+    ? availableSubRenderers.map(key => ({
+        value: key,
+        label: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      }))
+    : FALLBACK_SUB_RENDERER_OPTIONS;
+  return [
+    { value: 'nested_sections', label: 'Nested Sections (contains sub-renderers)' },
+    ...subOptions,
+  ];
+}
 
 // ── Sub-renderer config editor (field mapping inputs) ────────────
 function RendererConfigFields({
@@ -536,12 +546,14 @@ function SubRendererCard({
   onChangeKey,
   onChangeHint,
   onRemove,
+  availableSubRenderers,
 }: {
   sectionKey: string;
   hint: { renderer_type: string; config?: Record<string, unknown> };
   onChangeKey: (newKey: string) => void;
   onChangeHint: (hint: { renderer_type: string; config?: Record<string, unknown> }) => void;
   onRemove: () => void;
+  availableSubRenderers?: string[];
 }) {
   return (
     <div className="border border-indigo-200 bg-indigo-50/30 rounded-md p-3 space-y-2 relative">
@@ -570,7 +582,7 @@ function SubRendererCard({
             onChange={(e) => onChangeHint({ ...hint, renderer_type: e.target.value, config: hint.config || {} })}
             className="input text-sm"
           >
-            {SUB_RENDERER_OPTIONS.map((o) => (
+            {buildSectionRendererOptions(availableSubRenderers).map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
@@ -592,12 +604,14 @@ function SectionRendererCard({
   onChangeKey,
   onChange,
   onRemove,
+  availableSubRenderers,
 }: {
   sectionKey: string;
   entry: Record<string, unknown>;
   onChangeKey: (newKey: string) => void;
   onChange: (entry: Record<string, unknown>) => void;
   onRemove: () => void;
+  availableSubRenderers?: string[];
 }) {
   const rendererType = (entry.renderer_type as string) || 'mini_card_list';
   const isNested = rendererType === 'nested_sections';
@@ -672,7 +686,7 @@ function SectionRendererCard({
               }}
               className="input text-sm"
             >
-              {SECTION_RENDERER_OPTIONS.map((o) => (
+              {buildSectionRendererOptions(availableSubRenderers).map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
@@ -705,6 +719,7 @@ function SectionRendererCard({
                 onChangeKey={(newKey) => updateSubRenderer(key, newKey, hint)}
                 onChangeHint={(newHint) => updateSubRenderer(key, key, newHint)}
                 onRemove={() => removeSubRenderer(key)}
+                availableSubRenderers={availableSubRenderers}
               />
             ))}
             {Object.keys(subRenderers).length === 0 && (
@@ -780,9 +795,11 @@ function SectionsEditor({
 function SectionRenderersEditor({
   sectionRenderers,
   onChange,
+  availableSubRenderers,
 }: {
   sectionRenderers: Record<string, Record<string, unknown>>;
   onChange: (sr: Record<string, Record<string, unknown>>) => void;
+  availableSubRenderers?: string[];
 }) {
   const updateEntry = (oldKey: string, newKey: string, entry: Record<string, unknown>) => {
     const updated = { ...sectionRenderers };
@@ -828,6 +845,7 @@ function SectionRenderersEditor({
           onChangeKey={(newKey) => updateEntry(key, newKey, entry as Record<string, unknown>)}
           onChange={(newEntry) => updateEntry(key, key, newEntry)}
           onRemove={() => removeEntry(key)}
+          availableSubRenderers={availableSubRenderers}
         />
       ))}
       {Object.keys(sectionRenderers).length === 0 && (
@@ -1786,6 +1804,7 @@ function RendererTab({
         <SectionRenderersEditor
           sectionRenderers={sectionRenderers}
           onChange={(sr) => updateConfig({ section_renderers: sr })}
+          availableSubRenderers={rendererDefs?.find(d => d.renderer_key === view.renderer_type)?.available_section_renderers}
         />
       )}
 
