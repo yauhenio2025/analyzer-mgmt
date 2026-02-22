@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+- **Section renderer dropdown** — Dropdown for selecting sub-renderer type now reads from the renderer definition's `available_section_renderers` instead of a hardcoded list. New sub-renderers (e.g., evidence_trail) appear automatically when added to the accordion definition. Fallback to hardcoded list when definition not loaded.
+  ([frontend/src/pages/views/[key].tsx](frontend/src/pages/views/[key].tsx))
+
 ### Added
 - **Implementations page** — pipeline orchestration view showing how workflows wire engines and chains together:
   - **List page** (`/implementations`) groups workflows by source project (Critic, Decider V2, etc.) with pass/chain/engine counts
