@@ -1613,6 +1613,19 @@ class ApiClient {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json() as Promise<import('@/types').RendererSummary[]>;
     },
+
+    recommend: async (context: import('@/types').RendererRecommendRequest) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/renderers/recommend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(context),
+      });
+      if (!response.ok) {
+        const e = await response.json().catch(() => ({}));
+        throw new Error(e.detail || `HTTP ${response.status}`);
+      }
+      return response.json() as Promise<import('@/types').RendererRecommendResponse>;
+    },
   };
 
   // ============================================================================

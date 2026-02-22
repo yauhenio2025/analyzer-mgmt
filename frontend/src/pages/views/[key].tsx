@@ -10,9 +10,20 @@ import {
   Plus,
   X,
   Eye,
+  Sparkles,
+  Check,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { ViewDefinition, DataSourceRef, TransformationSpec, TransformationTemplateSummary } from '@/types';
+import type {
+  ViewDefinition,
+  DataSourceRef,
+  TransformationSpec,
+  TransformationTemplateSummary,
+  RendererDefinition,
+  RendererRecommendResponse,
+} from '@/types';
 import clsx from 'clsx';
 
 // ============================================================================
@@ -828,52 +839,369 @@ function SectionRenderersEditor({
   );
 }
 
+// ── Wiring Explainer ────────────────────────────────────────────
+
+const STANCE_EXPLANATIONS: Record<string, { mode: string; means: string; ui: string }> = {
+  summary: {
+    mode: 'distillation',
+    means: 'compress to headlines and key points',
+    ui: 'stat cards, bullet lists, executive briefs',
+  },
+  evidence: {
+    mode: 'evidentiary',
+    means: 'foreground sources, quotes, traceability',
+    ui: 'quote cards with attribution, citation trails',
+  },
+  comparison: {
+    mode: 'differential',
+    means: 'side-by-side highlighting of contrasts',
+    ui: 'split panels, diff views, parallel layouts',
+  },
+  narrative: {
+    mode: 'narrative',
+    means: 'flowing prose with structure markers',
+    ui: 'formatted long-form with section anchors',
+  },
+  interactive: {
+    mode: 'explorative',
+    means: 'drill-down affordances, user-driven navigation',
+    ui: 'expandable cards, nested tabs, filter controls',
+  },
+  diagnostic: {
+    mode: 'meta-analytical',
+    means: 'expose methodology, confidence levels, gaps',
+    ui: 'confidence meters, coverage matrices, debug panels',
+  },
+};
+
+const SHAPE_EXPLANATIONS: Record<string, { label: string; because: string; implies: string }> = {
+  object_array: {
+    label: 'Array of objects',
+    because: 'the result path contains [*] or references a collection (ideas, findings, entities)',
+    implies: 'each item can be a card, row, or list entry — renderers like card_grid and table excel here',
+  },
+  nested_sections: {
+    label: 'Nested sections',
+    because: 'the output has named subsections (default for multi-part analytical output)',
+    implies: 'each section is a collapsible region — accordion and tab containers handle this naturally',
+  },
+  prose_text: {
+    label: 'Prose / narrative text',
+    because: 'the result path references a summary, overview, or narrative block',
+    implies: 'long-form continuous text — the prose renderer is the clear fit',
+  },
+  timeline_data: {
+    label: 'Timeline / evolution data',
+    because: 'the result path references temporal evolution or timeline data',
+    implies: 'chronologically ordered entries — the timeline renderer is purpose-built for this',
+  },
+  comparison_pairs: {
+    label: 'Comparison pairs',
+    because: 'the result path references comparisons, contrasts, or versus structures',
+    implies: 'paired data needing side-by-side presentation — table or split-panel renderers fit',
+  },
+  key_value_pairs: {
+    label: 'Key-value pairs',
+    because: 'the result path references a table, matrix, or grid structure',
+    implies: 'labeled data pairs — table renderer with two-column layout works best',
+  },
+};
+
+function WiringExplainer({
+  view,
+  allViews,
+  inferredShape,
+  topRenderer,
+}: {
+  view: ViewDefinition;
+  allViews: { view_key: string; view_name: string }[];
+  inferredShape: string;
+  topRenderer?: ScoredRenderer;
+}) {
+  const ds = view.data_source;
+  const children = allViews.filter(
+    (v) => (v as unknown as ViewDefinition).parent_view_key === view.view_key
+  );
+  const hasChildren = children.length > 0;
+  const stance = view.presentation_stance;
+  const stanceInfo = stance ? STANCE_EXPLANATIONS[stance] : null;
+  const shapeInfo = SHAPE_EXPLANATIONS[inferredShape] || SHAPE_EXPLANATIONS['nested_sections'];
+
+  return (
+    <div className="card p-5 space-y-3 bg-indigo-50/40 border-indigo-200">
+      <h3 className="text-sm font-semibold text-indigo-900 uppercase tracking-wide">
+        How this view is wired
+      </h3>
+
+      <div className="space-y-2 text-sm text-gray-700 leading-relaxed">
+        {/* Data source */}
+        <p>
+          <span className="font-medium text-gray-900">Data source:</span>{' '}
+          {ds?.chain_key ? (
+            <>
+              chain <code className="text-xs bg-white px-1 py-0.5 rounded border border-gray-200">{ds.chain_key}</code>
+            </>
+          ) : ds?.engine_key ? (
+            <>
+              engine <code className="text-xs bg-white px-1 py-0.5 rounded border border-gray-200">{ds.engine_key}</code>
+            </>
+          ) : (
+            <span className="text-gray-500">not specified</span>
+          )}
+          {ds?.result_path ? (
+            <>
+              {' → '}path <code className="text-xs bg-white px-1 py-0.5 rounded border border-gray-200">{ds.result_path}</code>
+            </>
+          ) : null}
+          {ds?.scope ? (
+            <span className="text-gray-500"> ({ds.scope})</span>
+          ) : null}
+        </p>
+
+        {/* Data shape */}
+        <p>
+          <span className="font-medium text-gray-900">Data shape:</span>{' '}
+          <span className="font-medium text-indigo-700">{shapeInfo.label}</span>
+          {' — '}
+          {shapeInfo.because}.{' '}
+          <span className="text-gray-500">{shapeInfo.implies}</span>
+        </p>
+
+        {/* Stance */}
+        {stance && stanceInfo ? (
+          <p>
+            <span className="font-medium text-gray-900">Stance:</span>{' '}
+            <span className="font-medium text-indigo-700">{stance}</span>
+            {' = '}{stanceInfo.mode} mode — {stanceInfo.means}.{' '}
+            <span className="text-gray-500">Typical UI: {stanceInfo.ui}.</span>
+          </p>
+        ) : stance ? (
+          <p>
+            <span className="font-medium text-gray-900">Stance:</span>{' '}
+            <span className="font-medium text-indigo-700">{stance}</span>
+          </p>
+        ) : (
+          <p>
+            <span className="font-medium text-gray-900">Stance:</span>{' '}
+            <span className="text-gray-500">none set — scoring ignores stance affinity.</span>
+          </p>
+        )}
+
+        {/* Children / container need */}
+        <p>
+          <span className="font-medium text-gray-900">Structure:</span>{' '}
+          {hasChildren ? (
+            <>
+              This view has <span className="font-semibold text-indigo-700">{children.length} child view{children.length > 1 ? 's' : ''}</span>
+              {' '}({children.map(c => c.view_name || c.view_key).join(', ')}),
+              so it <span className="font-semibold">needs a container renderer</span> (accordion or tab).
+              Non-container renderers are penalized.
+            </>
+          ) : view.parent_view_key ? (
+            <>
+              This is a <span className="font-semibold text-indigo-700">child view</span> (inside{' '}
+              <code className="text-xs bg-white px-1 py-0.5 rounded border border-gray-200">{view.parent_view_key}</code>).
+              It renders its own slice of data — container renderers are unnecessary overhead.
+            </>
+          ) : (
+            <>
+              This is a <span className="font-semibold text-indigo-700">standalone leaf view</span> with no children.
+              Container renderers (accordion, tab) get a slight penalty since there is nothing to contain.
+            </>
+          )}
+        </p>
+
+        {/* Why top renderer wins */}
+        {topRenderer && (
+          <p className="pt-1 border-t border-indigo-200/50">
+            <span className="font-medium text-gray-900">→ Best fit:</span>{' '}
+            <span className="font-semibold text-indigo-700">{topRenderer.renderer_name}</span>{' '}
+            ({Math.round(topRenderer.compositeScore * 100)}%) because
+            {topRenderer.containerScore >= 0.8 && hasChildren && ' it is a container'}
+            {topRenderer.dataShapeScore >= 0.8 && ` it handles ${shapeInfo.label.toLowerCase()}`}
+            {topRenderer.stanceScore !== null && topRenderer.stanceScore >= 0.5 && stance &&
+              ` and has ${topRenderer.stanceScore >= 0.7 ? 'strong' : 'moderate'} ${stance} affinity (${topRenderer.stanceScore.toFixed(1)})`}
+            {topRenderer.appScore >= 0.8 && ` and is supported by ${view.target_app}`}
+            .
+            {topRenderer.renderer_key !== view.renderer_type && view.renderer_type && (
+              <span className="text-amber-700">
+                {' '}Your current renderer ({view.renderer_type}) is not the top pick.
+              </span>
+            )}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Deterministic Renderer Scoring ──────────────────────────────
+
+function inferDataShape(view: ViewDefinition): string {
+  const path = view.data_source?.result_path || '';
+  if (!path) return 'nested_sections';
+  if (path.includes('[*]')) return 'object_array';
+  const lp = path.toLowerCase();
+  if (/ideas|concepts|findings|items|entities/.test(lp)) return 'object_array';
+  if (/summary|overview|narrative|prose/.test(lp)) return 'prose_text';
+  if (/timeline|evolution|temporal/.test(lp)) return 'timeline_data';
+  if (/comparison|versus|contrast/.test(lp)) return 'comparison_pairs';
+  if (/table|matrix|grid/.test(lp)) return 'key_value_pairs';
+  return 'nested_sections';
+}
+
+interface ScoredRenderer {
+  renderer_key: string;
+  renderer_name: string;
+  category: string;
+  description: string;
+  compositeScore: number;
+  stanceScore: number | null;
+  dataShapeScore: number;
+  containerScore: number;
+  appScore: number;
+  isCurrent: boolean;
+}
+
+function scoreRenderers(
+  renderers: RendererDefinition[],
+  view: ViewDefinition,
+  allViews: { view_key: string; view_name: string }[],
+): ScoredRenderer[] {
+  const inferredShape = inferDataShape(view);
+  const hasChildren = allViews.some((v) => v.view_key !== view.view_key && false) ||
+    // Check by counting children directly from allViews
+    allViews.filter((v) => (v as unknown as ViewDefinition).parent_view_key === view.view_key).length > 0;
+  const childCount = allViews.filter(
+    (v) => (v as unknown as ViewDefinition).parent_view_key === view.view_key
+  ).length;
+
+  return renderers.map((r) => {
+    // Stance affinity (0.0-1.0)
+    let stanceScore: number | null = null;
+    if (view.presentation_stance && Object.keys(r.stance_affinities).length > 0) {
+      stanceScore = r.stance_affinities[view.presentation_stance] ?? 0;
+    }
+
+    // Data shape match (0.0-1.0)
+    let dataShapeScore = 0.3; // default partial
+    if (r.ideal_data_shapes.includes(inferredShape)) {
+      dataShapeScore = 1.0;
+    } else if (r.ideal_data_shapes.length === 0) {
+      dataShapeScore = 0.5; // unknown → neutral
+    }
+
+    // Container fit (0.0-1.0)
+    const isContainer = r.category === 'container';
+    let containerScore = 0.5;
+    if (hasChildren || childCount > 0) {
+      containerScore = isContainer ? 1.0 : 0.2;
+    } else {
+      containerScore = isContainer ? 0.4 : 0.7;
+    }
+
+    // App support (0.0-1.0)
+    const appScore = r.supported_apps.includes(view.target_app) ? 1.0 : 0.2;
+
+    // Weighted composite
+    const weights = {
+      stance: stanceScore !== null ? 0.35 : 0,
+      shape: 0.30,
+      container: 0.20,
+      app: 0.15,
+    };
+    const totalWeight = weights.stance + weights.shape + weights.container + weights.app;
+    const composite =
+      ((stanceScore ?? 0) * weights.stance +
+        dataShapeScore * weights.shape +
+        containerScore * weights.container +
+        appScore * weights.app) /
+      totalWeight;
+
+    return {
+      renderer_key: r.renderer_key,
+      renderer_name: r.renderer_name,
+      category: r.category,
+      description: r.description,
+      compositeScore: composite,
+      stanceScore,
+      dataShapeScore,
+      containerScore,
+      appScore,
+      isCurrent: r.renderer_key === view.renderer_type,
+    };
+  }).sort((a, b) => b.compositeScore - a.compositeScore);
+}
+
+function scoreColor(score: number): string {
+  if (score >= 0.7) return 'text-green-700 bg-green-50 border-green-200';
+  if (score >= 0.4) return 'text-yellow-700 bg-yellow-50 border-yellow-200';
+  return 'text-red-700 bg-red-50 border-red-200';
+}
+
+function scoreDot(score: number): string {
+  if (score >= 0.7) return 'bg-green-500';
+  if (score >= 0.4) return 'bg-yellow-500';
+  return 'bg-red-400';
+}
+
 // ── Main Renderer Tab ────────────────────────────────────────────
 function RendererTab({
   view,
   onChange,
+  allViews,
 }: {
   view: ViewDefinition;
   onChange: (view: ViewDefinition) => void;
+  allViews: { view_key: string; view_name: string }[];
 }) {
   const [showRawJson, setShowRawJson] = useState(false);
+  const [llmResult, setLlmResult] = useState<RendererRecommendResponse | null>(null);
+  const [showMigration, setShowMigration] = useState(false);
 
-  // Fetch renderer catalog from analyzer-v2
-  const { data: renderers } = useQuery({
-    queryKey: ['renderers'],
-    queryFn: () => api.renderers.list(),
+  // Fetch full renderer definitions (not just summaries) for scoring
+  const { data: rendererDefs } = useQuery({
+    queryKey: ['renderers-full'],
+    queryFn: async () => {
+      const summaries = await api.renderers.list();
+      const defs = await Promise.all(
+        summaries.map((s) => api.renderers.get(s.renderer_key))
+      );
+      return defs;
+    },
     staleTime: 5 * 60 * 1000,
   });
 
-  // Selected renderer details
-  const { data: selectedRenderer } = useQuery({
-    queryKey: ['renderer', view.renderer_type],
-    queryFn: () => api.renderers.get(view.renderer_type),
-    enabled: !!view.renderer_type,
-    staleTime: 5 * 60 * 1000,
-  });
+  // Deterministic scored list
+  const scoredList = useMemo(() => {
+    if (!rendererDefs || rendererDefs.length === 0) return [];
+    return scoreRenderers(rendererDefs, view, allViews);
+  }, [rendererDefs, view, allViews]);
 
-  // Build options from catalog, with fallback to static list
-  const rendererOptions = useMemo(() => {
-    if (renderers && renderers.length > 0) {
-      return renderers.map((r) => ({
-        value: r.renderer_key,
-        label: `${r.renderer_name} (${r.category})`,
-      }));
-    }
-    return [
-      { value: 'tab', label: 'Tab' },
-      { value: 'card_grid', label: 'Card Grid' },
-      { value: 'timeline', label: 'Timeline' },
-      { value: 'prose', label: 'Prose' },
-      { value: 'matrix', label: 'Matrix' },
-      { value: 'accordion', label: 'Accordion' },
-      { value: 'card', label: 'Card' },
-      { value: 'stat_summary', label: 'Stat Summary' },
-      { value: 'table', label: 'Table' },
-      { value: 'raw_json', label: 'Raw JSON' },
-    ];
-  }, [renderers]);
+  // LLM recommendation mutation
+  const recommendMutation = useMutation({
+    mutationFn: () =>
+      api.renderers.recommend({
+        view_key: view.view_key,
+        view_name: view.view_name,
+        description: view.description,
+        presentation_stance: view.presentation_stance,
+        renderer_type: view.renderer_type,
+        renderer_config: view.renderer_config,
+        data_source: view.data_source as unknown as Record<string, unknown>,
+        has_children: allViews.some(
+          (v) => (v as unknown as ViewDefinition).parent_view_key === view.view_key
+        ),
+        child_count: allViews.filter(
+          (v) => (v as unknown as ViewDefinition).parent_view_key === view.view_key
+        ).length,
+        parent_view_key: view.parent_view_key,
+        target_app: view.target_app,
+        include_config_migration: !!view.renderer_type,
+        migrate_from: view.renderer_type || undefined,
+      }),
+    onSuccess: (data) => setLlmResult(data),
+  });
 
   const config = view.renderer_config || {};
   const sections = (config.sections || []) as { key: string; title: string }[];
@@ -884,58 +1212,212 @@ function RendererTab({
     onChange({ ...view, renderer_config: { ...config, ...patch } });
   };
 
+  const applyRenderer = (rendererKey: string) => {
+    onChange({ ...view, renderer_type: rendererKey });
+  };
+
+  const inferredShape = inferDataShape(view);
+
   return (
     <div className="space-y-6">
-      {/* Renderer type + metadata */}
-      <div className="card p-6 space-y-4">
-        <h3 className="text-lg font-medium text-gray-900">Renderer</h3>
-        <SelectField
-          label="Renderer Type"
-          value={view.renderer_type}
-          onChange={(v) => onChange({ ...view, renderer_type: v })}
-          options={rendererOptions}
-        />
+      {/* Wiring Explainer */}
+      <WiringExplainer
+        view={view}
+        allViews={allViews}
+        inferredShape={inferredShape}
+        topRenderer={scoredList[0]}
+      />
 
-        {selectedRenderer && (
-          <div className="rounded-lg bg-gray-50 border border-gray-200 p-4 space-y-3">
-            <div className="text-sm text-gray-700">{selectedRenderer.description}</div>
-            {Object.keys(selectedRenderer.stance_affinities).length > 0 && (
-              <div>
-                <span className="text-xs font-semibold text-gray-500 uppercase">Stance Affinities</span>
-                <div className="flex flex-wrap gap-1.5 mt-1">
-                  {Object.entries(selectedRenderer.stance_affinities)
-                    .sort(([, a], [, b]) => b - a)
-                    .map(([stance, score]) => (
-                      <span
-                        key={stance}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs"
-                        style={{
-                          backgroundColor: score > 0.7 ? '#dcfce7' : score > 0.4 ? '#fef9c3' : '#f1f5f9',
-                          color: score > 0.7 ? '#166534' : score > 0.4 ? '#854d0e' : '#475569',
-                        }}
-                      >
-                        {stance}: {score.toFixed(1)}
-                      </span>
-                    ))}
-                </div>
-              </div>
-            )}
-            {selectedRenderer.ideal_data_shapes.length > 0 && (
-              <div>
-                <span className="text-xs font-semibold text-gray-500 uppercase">Data Shapes</span>
-                <div className="flex flex-wrap gap-1.5 mt-1">
-                  {selectedRenderer.ideal_data_shapes.map((shape) => (
-                    <span key={shape} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">
-                      {shape}
+      {/* Scored Renderer List */}
+      <div className="card p-6 space-y-3">
+        <h3 className="text-lg font-medium text-gray-900">Renderer Selection</h3>
+        <p className="text-sm text-gray-500">
+          Renderers scored by stance affinity, data shape, container fit, and app support.
+        </p>
+        <div className="space-y-2 max-h-[400px] overflow-y-auto">
+          {scoredList.map((sr) => (
+            <button
+              key={sr.renderer_key}
+              onClick={() => applyRenderer(sr.renderer_key)}
+              className={clsx(
+                'w-full text-left rounded-lg border p-3 transition-all hover:shadow-sm',
+                sr.isCurrent
+                  ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-300'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className={clsx('h-2.5 w-2.5 rounded-full', scoreDot(sr.compositeScore))} />
+                  <span className="font-medium text-sm text-gray-900">
+                    {Math.round(sr.compositeScore * 100)}%
+                  </span>
+                  <span className="text-sm text-gray-800">{sr.renderer_name}</span>
+                  <span className="text-xs text-gray-400">({sr.category})</span>
+                  {sr.isCurrent && (
+                    <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">
+                      current
                     </span>
-                  ))}
+                  )}
                 </div>
+                {sr.isCurrent && <Check className="h-4 w-4 text-blue-600" />}
+              </div>
+              <p className="text-xs text-gray-500 mt-1 line-clamp-1">{sr.description}</p>
+              <div className="flex flex-wrap gap-2 mt-1.5">
+                {sr.stanceScore !== null && (
+                  <span className={clsx('text-[10px] px-1.5 py-0.5 rounded border', scoreColor(sr.stanceScore))}>
+                    Stance: {sr.stanceScore.toFixed(1)}
+                  </span>
+                )}
+                <span className={clsx('text-[10px] px-1.5 py-0.5 rounded border', scoreColor(sr.dataShapeScore))}>
+                  Shape: {sr.dataShapeScore === 1 ? '✓' : sr.dataShapeScore >= 0.5 ? '~' : '✗'}
+                </span>
+                <span className={clsx('text-[10px] px-1.5 py-0.5 rounded border', scoreColor(sr.containerScore))}>
+                  Container: {sr.containerScore === 1 ? '✓' : sr.containerScore >= 0.5 ? '~' : '✗'}
+                </span>
+                <span className={clsx('text-[10px] px-1.5 py-0.5 rounded border', scoreColor(sr.appScore))}>
+                  App: {sr.appScore === 1 ? '✓' : '✗'}
+                </span>
+              </div>
+            </button>
+          ))}
+          {scoredList.length === 0 && (
+            <p className="text-sm text-gray-400 italic">Loading renderer catalog...</p>
+          )}
+        </div>
+      </div>
+
+      {/* AI Recommendation Panel */}
+      <div className="card p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-amber-500" />
+            AI Recommendation
+          </h3>
+          <button
+            onClick={() => recommendMutation.mutate()}
+            disabled={recommendMutation.isPending}
+            className={clsx(
+              'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+              recommendMutation.isPending
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+            )}
+          >
+            {recommendMutation.isPending ? 'Analyzing...' : 'Recommend Renderer'}
+          </button>
+        </div>
+
+        {recommendMutation.isError && (
+          <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+            <AlertCircle className="h-4 w-4 inline mr-1" />
+            {(recommendMutation.error as Error).message}
+          </div>
+        )}
+
+        {llmResult && (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 border border-gray-200">
+              {llmResult.analysis_summary}
+            </p>
+            <div className="space-y-2">
+              {llmResult.recommendations.slice(0, 5).map((rec) => (
+                <div
+                  key={rec.renderer_key}
+                  className="rounded-lg border border-gray-200 p-3 space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-semibold text-gray-900">
+                        #{rec.rank}
+                      </span>
+                      <span className="font-medium text-sm text-gray-800">
+                        {rec.renderer_name}
+                      </span>
+                      <span className={clsx(
+                        'text-xs px-1.5 py-0.5 rounded border font-medium',
+                        scoreColor(rec.score)
+                      )}>
+                        {rec.score.toFixed(2)}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => applyRenderer(rec.renderer_key)}
+                      className={clsx(
+                        'text-xs px-3 py-1 rounded-md font-medium transition-colors',
+                        rec.renderer_key === view.renderer_type
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                          : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                      )}
+                    >
+                      {rec.renderer_key === view.renderer_type ? 'Current' : 'Apply'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-600">{rec.reasoning}</p>
+                  <div className="flex gap-3 text-[10px] text-gray-500">
+                    <span>Stance: {rec.stance_fit}</span>
+                    <span>|</span>
+                    <span>Shape: {rec.data_shape_fit}</span>
+                  </div>
+                  {rec.warnings.length > 0 && (
+                    <div className="text-[10px] text-amber-600">
+                      {rec.warnings.map((w, i) => (
+                        <span key={i} className="block">⚠ {w}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Config Migration */}
+            {llmResult.config_migration && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                <button
+                  onClick={() => setShowMigration(!showMigration)}
+                  className="flex items-center gap-2 text-sm font-medium text-amber-800 w-full"
+                >
+                  {showMigration ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                  Config Migration: {llmResult.config_migration.from_renderer} → {llmResult.config_migration.to_renderer}
+                </button>
+                {showMigration && (
+                  <div className="text-xs text-amber-700 space-y-1 pl-6">
+                    <p>{llmResult.config_migration.explanation}</p>
+                    {llmResult.config_migration.fields_to_add.length > 0 && (
+                      <p>
+                        <span className="font-semibold">Add:</span>{' '}
+                        {llmResult.config_migration.fields_to_add.join(', ')}
+                      </p>
+                    )}
+                    {llmResult.config_migration.fields_to_remove.length > 0 && (
+                      <p>
+                        <span className="font-semibold">Remove:</span>{' '}
+                        {llmResult.config_migration.fields_to_remove.join(', ')}
+                      </p>
+                    )}
+                    {Object.keys(llmResult.config_migration.fields_to_transform).length > 0 && (
+                      <p>
+                        <span className="font-semibold">Transform:</span>{' '}
+                        {Object.entries(llmResult.config_migration.fields_to_transform)
+                          .map(([k, v]) => `${k} → ${v}`)
+                          .join(', ')}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
+      </div>
 
-        {/* Expand first toggle */}
+      {/* Expand first toggle */}
+      <div className="card p-6 space-y-4">
+        <h3 className="text-lg font-medium text-gray-900">Renderer Config</h3>
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input
             type="checkbox"
@@ -1701,7 +2183,7 @@ export default function ViewDetailPage() {
         />
       )}
       {activeTab === 'renderer' && (
-        <RendererTab view={displayView} onChange={handleChange} />
+        <RendererTab view={displayView} onChange={handleChange} allViews={allViews || []} />
       )}
       {activeTab === 'data_source' && (
         <DataSourceTab view={displayView} onChange={handleChange} />

@@ -1460,6 +1460,53 @@ export interface RendererSummary {
   status: string;
 }
 
+// -- Renderer Recommendation Types --
+
+export interface RendererRecommendRequest {
+  view_key?: string;
+  view_name?: string;
+  description?: string;
+  presentation_stance?: string | null;
+  renderer_type?: string;
+  renderer_config?: Record<string, unknown>;
+  data_source?: Record<string, unknown>;
+  has_children?: boolean;
+  child_count?: number;
+  parent_view_key?: string | null;
+  target_app?: string;
+  include_config_migration?: boolean;
+  migrate_from?: string;
+}
+
+export interface RendererRecommendation {
+  renderer_key: string;
+  renderer_name: string;
+  category: string;
+  score: number;
+  rank: number;
+  reasoning: string;
+  stance_fit: string;
+  data_shape_fit: string;
+  config_suggestions?: Record<string, unknown> | null;
+  warnings: string[];
+}
+
+export interface ConfigMigrationHint {
+  from_renderer: string;
+  to_renderer: string;
+  fields_to_add: string[];
+  fields_to_remove: string[];
+  fields_to_transform: Record<string, string>;
+  explanation: string;
+}
+
+export interface RendererRecommendResponse {
+  recommendations: RendererRecommendation[];
+  best_match: string;
+  config_migration?: ConfigMigrationHint | null;
+  analysis_summary: string;
+}
+
 // ============================================================================
 // Transformation Template Types (from analyzer-v2)
 // ============================================================================
