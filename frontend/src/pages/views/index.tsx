@@ -48,7 +48,7 @@ const visibilityBadge: Record<string, string> = {
   on_demand: 'bg-amber-50 text-amber-700 border-amber-200',
 };
 
-function ViewCard({ view, isChild, childCount }: { view: ViewSummary; isChild?: boolean; childCount?: number }) {
+function ViewCard({ view, isChild, childCount, hasChildren }: { view: ViewSummary; isChild?: boolean; childCount?: number; hasChildren?: boolean }) {
   // Child cards: compact row style, no heavy border, no description
   if (isChild) {
     return (
@@ -92,24 +92,32 @@ function ViewCard({ view, isChild, childCount }: { view: ViewSummary; isChild?: 
     );
   }
 
-  // Parent / standalone cards: full detail
+  // Parent / standalone cards: full detail — lighter style matching child aesthetic
   return (
     <Link
       href={`/views/${view.view_key}`}
       className={clsx(
-        'card hover:shadow-md transition-shadow group border-l-4 p-5',
-        rendererBorderOnly[view.renderer_type] || 'border-l-gray-300'
+        'block border border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm transition-all group px-4 py-3',
+        hasChildren ? 'rounded-t-lg border-b-0' : 'rounded-lg'
       )}
     >
-      <div className="flex items-start justify-between">
+      <div className="flex items-start gap-3">
+        {/* Renderer color pip — matches child row style */}
+        <span
+          className={clsx(
+            'flex-shrink-0 w-1.5 rounded-full mt-1',
+            (rendererBorderOnly[view.renderer_type] || 'border-l-gray-300').replace('border-l-', 'bg-')
+          )}
+          style={{ height: 28 }}
+        />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <h3 className="font-semibold text-gray-900 text-base">
+          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+            <h3 className="font-semibold text-gray-900 text-[15px] leading-snug">
               {view.view_name}
             </h3>
             <span
               className={clsx(
-                'px-2 py-0.5 text-xs font-medium rounded-full border',
+                'px-1.5 py-0.5 text-[10px] font-medium rounded-full border',
                 rendererColors[view.renderer_type] ||
                   'bg-gray-50 text-gray-600 border-gray-200'
               )}
@@ -117,35 +125,35 @@ function ViewCard({ view, isChild, childCount }: { view: ViewSummary; isChild?: 
               {view.renderer_type}
             </span>
             {view.presentation_stance && (
-              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+              <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-purple-50 text-purple-700 border border-purple-200">
                 {view.presentation_stance}
               </span>
             )}
             {childCount !== undefined && childCount > 0 && (
-              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+              <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-gray-100 text-gray-500 border border-gray-200">
                 {childCount} child{childCount !== 1 ? 'ren' : ''}
               </span>
             )}
           </div>
 
-          <p className="text-xs font-mono text-gray-400 mb-2">
+          <p className="text-[10px] font-mono text-gray-400 mb-1.5">
             {view.view_key}
           </p>
 
           {view.description && (
-            <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed mb-3">
+            <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed mb-2">
               {view.description}
             </p>
           )}
 
-          <div className="flex items-center gap-3 text-xs text-gray-500">
+          <div className="flex items-center gap-3 text-[11px] text-gray-400">
             <span className="font-medium">
               {view.target_app}:{view.target_page}
             </span>
             <span>pos: {view.position}</span>
             <span
               className={clsx(
-                'px-1.5 py-0.5 rounded border',
+                'px-1.5 py-0.5 rounded border text-[10px]',
                 visibilityBadge[view.visibility] || visibilityBadge.if_data_exists
               )}
             >
@@ -153,7 +161,7 @@ function ViewCard({ view, isChild, childCount }: { view: ViewSummary; isChild?: 
             </span>
           </div>
         </div>
-        <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-primary-500 transition-colors flex-shrink-0 mt-1" />
+        <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-primary-500 transition-colors flex-shrink-0 mt-1.5" />
       </div>
     </Link>
   );
@@ -275,16 +283,17 @@ function TreeChildRow({
 }
 
 function ViewTreeGroup({ tree, isChild }: { tree: ViewTreeNode; isChild?: boolean }) {
+  const hasChildren = tree.children.length > 0;
   return (
     <div>
       {/* Parent card */}
-      <ViewCard view={tree.view} isChild={isChild} childCount={tree.children.length} />
+      <ViewCard view={tree.view} isChild={isChild} childCount={tree.children.length} hasChildren={hasChildren} />
 
       {/* Children with tree lines */}
-      {tree.children.length > 0 && (
+      {hasChildren && (
         <div
-          className="relative rounded-b-lg"
-          style={{ marginLeft: 16, marginTop: 2, paddingBottom: 4, paddingRight: 4, backgroundColor: 'rgba(243,244,246,0.4)' }}
+          className="relative rounded-b-lg border border-t-0 border-gray-100 bg-gray-50/30"
+          style={{ marginLeft: 0, paddingLeft: 20, paddingBottom: 6, paddingRight: 8, paddingTop: 4 }}
         >
           {/* Vertical stub connecting parent card bottom to first child's trunk */}
           <div
