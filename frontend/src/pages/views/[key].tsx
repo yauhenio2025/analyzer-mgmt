@@ -443,6 +443,392 @@ function TargetTab({
   );
 }
 
+// ── Sub-renderer config field definitions ────────────────────────
+const RENDERER_CONFIG_FIELDS: Record<string, { field: string; label: string; placeholder: string }[]> = {
+  mini_card_list: [
+    { field: 'title_field', label: 'Title Field', placeholder: 'e.g. name, framework_name' },
+    { field: 'subtitle_field', label: 'Subtitle Field', placeholder: 'e.g. type, category' },
+    { field: 'badge_field', label: 'Badge Field', placeholder: 'e.g. count, score' },
+    { field: 'description_field', label: 'Description Field', placeholder: 'e.g. description, summary' },
+  ],
+  chip_grid: [
+    { field: 'label_field', label: 'Label Field', placeholder: 'e.g. term, name' },
+    { field: 'count_field', label: 'Count Field', placeholder: 'e.g. count, frequency' },
+  ],
+  key_value_table: [
+    { field: 'key_field', label: 'Key Field', placeholder: 'e.g. term, concept' },
+    { field: 'value_field', label: 'Value Field', placeholder: 'e.g. meaning, definition' },
+  ],
+  prose_block: [],
+  stat_row: [],
+  comparison_panel: [
+    { field: 'left_field', label: 'Left Column', placeholder: 'e.g. pole_a, option_a' },
+    { field: 'right_field', label: 'Right Column', placeholder: 'e.g. pole_b, option_b' },
+  ],
+  timeline_strip: [
+    { field: 'label_field', label: 'Label Field', placeholder: 'e.g. concept, stage_name' },
+    { field: 'stages_field', label: 'Stages Field', placeholder: 'e.g. stages, phases' },
+  ],
+};
+
+const SUB_RENDERER_OPTIONS = [
+  { value: 'mini_card_list', label: 'Mini Card List' },
+  { value: 'chip_grid', label: 'Chip Grid' },
+  { value: 'key_value_table', label: 'Key-Value Table' },
+  { value: 'prose_block', label: 'Prose Block' },
+  { value: 'stat_row', label: 'Stat Row' },
+  { value: 'comparison_panel', label: 'Comparison Panel' },
+  { value: 'timeline_strip', label: 'Timeline Strip' },
+];
+
+const SECTION_RENDERER_OPTIONS = [
+  { value: 'nested_sections', label: 'Nested Sections (contains sub-renderers)' },
+  ...SUB_RENDERER_OPTIONS,
+];
+
+// ── Sub-renderer config editor (field mapping inputs) ────────────
+function RendererConfigFields({
+  rendererType,
+  config,
+  onChange,
+}: {
+  rendererType: string;
+  config: Record<string, unknown>;
+  onChange: (config: Record<string, unknown>) => void;
+}) {
+  const fields = RENDERER_CONFIG_FIELDS[rendererType];
+  if (!fields || fields.length === 0) {
+    return <p className="text-xs text-gray-400 italic">No config fields for {rendererType}</p>;
+  }
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+      {fields.map((f) => (
+        <div key={f.field}>
+          <label className="text-xs font-medium text-gray-500">{f.label}</label>
+          <input
+            type="text"
+            value={(config[f.field] as string) || ''}
+            onChange={(e) => onChange({ ...config, [f.field]: e.target.value || undefined })}
+            className="input font-mono text-sm"
+            placeholder={f.placeholder}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Single sub-renderer card ─────────────────────────────────────
+function SubRendererCard({
+  sectionKey,
+  hint,
+  onChangeKey,
+  onChangeHint,
+  onRemove,
+}: {
+  sectionKey: string;
+  hint: { renderer_type: string; config?: Record<string, unknown> };
+  onChangeKey: (newKey: string) => void;
+  onChangeHint: (hint: { renderer_type: string; config?: Record<string, unknown> }) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="border border-indigo-200 bg-indigo-50/30 rounded-md p-3 space-y-2 relative">
+      <button
+        onClick={onRemove}
+        className="absolute top-2 right-2 text-gray-400 hover:text-red-500"
+        title="Remove"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs font-medium text-gray-500">Data Key</label>
+          <input
+            type="text"
+            value={sectionKey}
+            onChange={(e) => onChangeKey(e.target.value)}
+            className="input font-mono text-sm"
+            placeholder="e.g. summary, frameworks"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500">Renderer Type</label>
+          <select
+            value={hint.renderer_type}
+            onChange={(e) => onChangeHint({ ...hint, renderer_type: e.target.value, config: hint.config || {} })}
+            className="input text-sm"
+          >
+            {SUB_RENDERER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <RendererConfigFields
+        rendererType={hint.renderer_type}
+        config={hint.config || {}}
+        onChange={(c) => onChangeHint({ ...hint, config: c })}
+      />
+    </div>
+  );
+}
+
+// ── Section renderer card (top-level, may contain sub-renderers) ─
+function SectionRendererCard({
+  sectionKey,
+  entry,
+  onChangeKey,
+  onChange,
+  onRemove,
+}: {
+  sectionKey: string;
+  entry: Record<string, unknown>;
+  onChangeKey: (newKey: string) => void;
+  onChange: (entry: Record<string, unknown>) => void;
+  onRemove: () => void;
+}) {
+  const rendererType = (entry.renderer_type as string) || 'mini_card_list';
+  const isNested = rendererType === 'nested_sections';
+  const subRenderers = (entry.sub_renderers || {}) as Record<string, { renderer_type: string; config?: Record<string, unknown> }>;
+  const config = (entry.config || {}) as Record<string, unknown>;
+
+  const updateSubRenderer = (oldKey: string, newKey: string, hint: { renderer_type: string; config?: Record<string, unknown> }) => {
+    const updated = { ...subRenderers };
+    if (oldKey !== newKey) {
+      delete updated[oldKey];
+    }
+    updated[newKey] = hint;
+    onChange({ ...entry, sub_renderers: updated });
+  };
+
+  const removeSubRenderer = (key: string) => {
+    const updated = { ...subRenderers };
+    delete updated[key];
+    onChange({ ...entry, sub_renderers: updated });
+  };
+
+  const addSubRenderer = () => {
+    const newKey = `field_${Object.keys(subRenderers).length + 1}`;
+    onChange({
+      ...entry,
+      sub_renderers: { ...subRenderers, [newKey]: { renderer_type: 'prose_block', config: {} } },
+    });
+  };
+
+  // Color coding based on renderer type
+  const borderColor = isNested ? 'border-purple-300' : 'border-blue-300';
+  const headerBg = isNested ? 'bg-purple-50' : 'bg-blue-50';
+
+  return (
+    <div className={`border ${borderColor} rounded-lg overflow-hidden`}>
+      {/* Header */}
+      <div className={`${headerBg} px-4 py-2 flex items-center justify-between`}>
+        <div className="flex items-center gap-2">
+          <span className="font-mono font-semibold text-sm text-gray-800">{sectionKey}</span>
+          <span className={`text-xs px-1.5 py-0.5 rounded ${isNested ? 'bg-purple-200 text-purple-800' : 'bg-blue-200 text-blue-800'}`}>
+            {rendererType.replace(/_/g, ' ')}
+          </span>
+        </div>
+        <button onClick={onRemove} className="text-gray-400 hover:text-red-500" title="Remove section renderer">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="p-4 space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-medium text-gray-500">Section Key</label>
+            <input
+              type="text"
+              value={sectionKey}
+              onChange={(e) => onChangeKey(e.target.value)}
+              className="input font-mono text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-500">Renderer Type</label>
+            <select
+              value={rendererType}
+              onChange={(e) => {
+                const newType = e.target.value;
+                if (newType === 'nested_sections') {
+                  onChange({ renderer_type: newType, sub_renderers: entry.sub_renderers || {} });
+                } else {
+                  onChange({ renderer_type: newType, config: entry.config || {} });
+                }
+              }}
+              className="input text-sm"
+            >
+              {SECTION_RENDERER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Non-nested: show config fields directly */}
+        {!isNested && (
+          <RendererConfigFields
+            rendererType={rendererType}
+            config={config}
+            onChange={(c) => onChange({ ...entry, config: c })}
+          />
+        )}
+
+        {/* Nested: show sub-renderers */}
+        {isNested && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-500 uppercase">Sub-renderers ({Object.keys(subRenderers).length})</span>
+              <button onClick={addSubRenderer} className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5">
+                <Plus className="h-3 w-3" /> Add
+              </button>
+            </div>
+            {Object.entries(subRenderers).map(([key, hint]) => (
+              <SubRendererCard
+                key={key}
+                sectionKey={key}
+                hint={hint}
+                onChangeKey={(newKey) => updateSubRenderer(key, newKey, hint)}
+                onChangeHint={(newHint) => updateSubRenderer(key, key, newHint)}
+                onRemove={() => removeSubRenderer(key)}
+              />
+            ))}
+            {Object.keys(subRenderers).length === 0 && (
+              <p className="text-xs text-gray-400 italic pl-1">No sub-renderers. Click + Add to create one.</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Sections list editor ─────────────────────────────────────────
+function SectionsEditor({
+  sections,
+  onChange,
+}: {
+  sections: { key: string; title: string }[];
+  onChange: (sections: { key: string; title: string }[]) => void;
+}) {
+  return (
+    <div className="card p-6 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium text-gray-900">Accordion Sections ({sections.length})</h3>
+        <button
+          onClick={() => onChange([...sections, { key: `section_${sections.length + 1}`, title: 'New Section' }])}
+          className="btn-secondary text-sm"
+        >
+          <Plus className="h-4 w-4 mr-1" /> Add Section
+        </button>
+      </div>
+      {sections.map((sec, i) => (
+        <div key={i} className="flex items-center gap-2 border border-gray-200 rounded-md p-2">
+          <span className="text-xs text-gray-400 w-5 text-center">{i + 1}</span>
+          <input
+            type="text"
+            value={sec.key}
+            onChange={(e) => {
+              const updated = [...sections];
+              updated[i] = { ...sec, key: e.target.value };
+              onChange(updated);
+            }}
+            className="input font-mono text-sm flex-1"
+            placeholder="section_key"
+          />
+          <input
+            type="text"
+            value={sec.title}
+            onChange={(e) => {
+              const updated = [...sections];
+              updated[i] = { ...sec, title: e.target.value };
+              onChange(updated);
+            }}
+            className="input text-sm flex-1"
+            placeholder="Section Title"
+          />
+          <button
+            onClick={() => onChange(sections.filter((_, j) => j !== i))}
+            className="text-gray-400 hover:text-red-500"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ))}
+      {sections.length === 0 && (
+        <p className="text-sm text-gray-400 italic">No sections defined.</p>
+      )}
+    </div>
+  );
+}
+
+// ── Section renderers visual editor ──────────────────────────────
+function SectionRenderersEditor({
+  sectionRenderers,
+  onChange,
+}: {
+  sectionRenderers: Record<string, Record<string, unknown>>;
+  onChange: (sr: Record<string, Record<string, unknown>>) => void;
+}) {
+  const updateEntry = (oldKey: string, newKey: string, entry: Record<string, unknown>) => {
+    const updated = { ...sectionRenderers };
+    if (oldKey !== newKey) {
+      delete updated[oldKey];
+    }
+    updated[newKey] = entry;
+    onChange(updated);
+  };
+
+  const removeEntry = (key: string) => {
+    const updated = { ...sectionRenderers };
+    delete updated[key];
+    onChange(updated);
+  };
+
+  const addEntry = () => {
+    const newKey = `new_section_${Object.keys(sectionRenderers).length + 1}`;
+    onChange({
+      ...sectionRenderers,
+      [newKey]: { renderer_type: 'prose_block', config: {} },
+    });
+  };
+
+  return (
+    <div className="card p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium text-gray-900">
+          Section Renderers ({Object.keys(sectionRenderers).length})
+        </h3>
+        <button onClick={addEntry} className="btn-secondary text-sm">
+          <Plus className="h-4 w-4 mr-1" /> Add Renderer
+        </button>
+      </div>
+      <p className="text-sm text-gray-500">
+        Configure how each accordion section renders its data. Choose a renderer type and map data fields to display positions.
+      </p>
+      {Object.entries(sectionRenderers).map(([key, entry]) => (
+        <SectionRendererCard
+          key={key}
+          sectionKey={key}
+          entry={entry as Record<string, unknown>}
+          onChangeKey={(newKey) => updateEntry(key, newKey, entry as Record<string, unknown>)}
+          onChange={(newEntry) => updateEntry(key, key, newEntry)}
+          onRemove={() => removeEntry(key)}
+        />
+      ))}
+      {Object.keys(sectionRenderers).length === 0 && (
+        <p className="text-sm text-gray-400 italic">
+          No section renderers configured. Sections will use generic rendering.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Main Renderer Tab ────────────────────────────────────────────
 function RendererTab({
   view,
   onChange,
@@ -450,6 +836,8 @@ function RendererTab({
   view: ViewDefinition;
   onChange: (view: ViewDefinition) => void;
 }) {
+  const [showRawJson, setShowRawJson] = useState(false);
+
   // Fetch renderer catalog from analyzer-v2
   const { data: renderers } = useQuery({
     queryKey: ['renderers'],
@@ -473,7 +861,6 @@ function RendererTab({
         label: `${r.renderer_name} (${r.category})`,
       }));
     }
-    // Fallback if API unavailable
     return [
       { value: 'tab', label: 'Tab' },
       { value: 'card_grid', label: 'Card Grid' },
@@ -488,8 +875,18 @@ function RendererTab({
     ];
   }, [renderers]);
 
+  const config = view.renderer_config || {};
+  const sections = (config.sections || []) as { key: string; title: string }[];
+  const sectionRenderers = (config.section_renderers || {}) as Record<string, Record<string, unknown>>;
+  const expandFirst = config.expand_first as boolean | undefined;
+
+  const updateConfig = (patch: Record<string, unknown>) => {
+    onChange({ ...view, renderer_config: { ...config, ...patch } });
+  };
+
   return (
     <div className="space-y-6">
+      {/* Renderer type + metadata */}
       <div className="card p-6 space-y-4">
         <h3 className="text-lg font-medium text-gray-900">Renderer</h3>
         <SelectField
@@ -499,12 +896,9 @@ function RendererTab({
           options={rendererOptions}
         />
 
-        {/* Renderer metadata (from catalog) */}
         {selectedRenderer && (
           <div className="rounded-lg bg-gray-50 border border-gray-200 p-4 space-y-3">
             <div className="text-sm text-gray-700">{selectedRenderer.description}</div>
-
-            {/* Stance affinities */}
             {Object.keys(selectedRenderer.stance_affinities).length > 0 && (
               <div>
                 <span className="text-xs font-semibold text-gray-500 uppercase">Stance Affinities</span>
@@ -526,8 +920,6 @@ function RendererTab({
                 </div>
               </div>
             )}
-
-            {/* Ideal data shapes */}
             {selectedRenderer.ideal_data_shapes.length > 0 && (
               <div>
                 <span className="text-xs font-semibold text-gray-500 uppercase">Data Shapes</span>
@@ -540,28 +932,55 @@ function RendererTab({
                 </div>
               </div>
             )}
-
-            {/* Available section renderers */}
-            {selectedRenderer.available_section_renderers.length > 0 && (
-              <div>
-                <span className="text-xs font-semibold text-gray-500 uppercase">Section Renderers</span>
-                <div className="flex flex-wrap gap-1.5 mt-1">
-                  {selectedRenderer.available_section_renderers.map((sr) => (
-                    <span key={sr} className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs">
-                      {sr}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
-        <JsonEditor
-          label="Renderer Config"
-          value={view.renderer_config}
-          onChange={(v) => onChange({ ...view, renderer_config: v })}
+        {/* Expand first toggle */}
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={!!expandFirst}
+            onChange={(e) => updateConfig({ expand_first: e.target.checked })}
+            className="rounded border-gray-300"
+          />
+          Auto-expand first section
+        </label>
+      </div>
+
+      {/* Sections list (only for accordion/tab renderers) */}
+      {(view.renderer_type === 'accordion' || view.renderer_type === 'tab') && sections.length > 0 && (
+        <SectionsEditor
+          sections={sections}
+          onChange={(s) => updateConfig({ sections: s })}
         />
+      )}
+
+      {/* Section renderers (visual editor) */}
+      {(view.renderer_type === 'accordion' || view.renderer_type === 'tab') && (
+        <SectionRenderersEditor
+          sectionRenderers={sectionRenderers}
+          onChange={(sr) => updateConfig({ section_renderers: sr })}
+        />
+      )}
+
+      {/* Raw JSON fallback */}
+      <div className="card p-6">
+        <button
+          onClick={() => setShowRawJson(!showRawJson)}
+          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+        >
+          <Eye className="h-4 w-4" />
+          {showRawJson ? 'Hide' : 'Show'} Raw JSON
+        </button>
+        {showRawJson && (
+          <div className="mt-3">
+            <JsonEditor
+              label="Renderer Config (JSON)"
+              value={view.renderer_config}
+              onChange={(v) => onChange({ ...view, renderer_config: v })}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
