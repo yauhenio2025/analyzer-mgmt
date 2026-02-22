@@ -173,8 +173,9 @@ interface ViewTreeNode {
   children: ViewTreeNode[];
 }
 
-/** Build a recursive tree from flat views. Handles multi-level nesting (grandchildren, etc.) */
-function buildViewTree(views: ViewSummary[]): { trees: ViewTreeNode[]; standalone: ViewSummary[] } {
+/** Build a single sorted list of tree nodes from flat views. Every top-level view
+ *  becomes a node (with or without children), interleaved by position. */
+function buildViewTree(views: ViewSummary[]): ViewTreeNode[] {
   const byKey = new Map(views.map((v) => [v.view_key, v]));
   // Index: parent_key -> list of child views
   const childrenOf = new Map<string, ViewSummary[]>();
@@ -199,22 +200,8 @@ function buildViewTree(views: ViewSummary[]): { trees: ViewTreeNode[]; standalon
   // Top-level roots: views that have NO parent (or whose parent isn't in this group)
   const roots = views.filter((v) => !v.parent_view_key || !byKey.has(v.parent_view_key));
 
-  const trees: ViewTreeNode[] = [];
-  const standalone: ViewSummary[] = [];
-
-  for (const v of roots) {
-    const node = buildNode(v);
-    if (node.children.length > 0) {
-      trees.push(node);
-    } else {
-      standalone.push(v);
-    }
-  }
-
-  trees.sort((a, b) => a.view.position - b.view.position);
-  standalone.sort((a, b) => a.position - b.position);
-
-  return { trees, standalone };
+  // All roots become tree nodes, sorted by position — no separate "standalone" bucket
+  return roots.map((v) => buildNode(v)).sort((a, b) => a.view.position - b.view.position);
 }
 
 /* ---- Tree-line visual constants ---- */
@@ -564,17 +551,16 @@ export default function ViewsListPage() {
                   )}
                 </button>
                 {!isCollapsed && (() => {
-                  const { trees, standalone } = buildViewTree(groupViews);
+                  const nodes = buildViewTree(groupViews);
                   return (
                     <div className="p-4 space-y-3">
-                      {/* Tree views — parent + indented children */}
-                      {trees.map((tree) => (
-                        <ViewTreeGroup key={tree.view.view_key} tree={tree} />
-                      ))}
-                      {/* Standalone views — same linear style, no children */}
-                      {standalone.map((view) => (
-                        <ViewCard key={view.view_key} view={view} />
-                      ))}
+                      {nodes.map((node) =>
+                        node.children.length > 0 ? (
+                          <ViewTreeGroup key={node.view.view_key} tree={node} />
+                        ) : (
+                          <ViewCard key={node.view.view_key} view={node.view} />
+                        )
+                      )}
                     </div>
                   );
                 })()}
