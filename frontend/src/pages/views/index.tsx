@@ -49,22 +49,62 @@ const visibilityBadge: Record<string, string> = {
 };
 
 function ViewCard({ view, isChild, childCount }: { view: ViewSummary; isChild?: boolean; childCount?: number }) {
+  // Child cards: compact row style, no heavy border, no description
+  if (isChild) {
+    return (
+      <Link
+        href={`/views/${view.view_key}`}
+        className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50/80 transition-all group"
+      >
+        {/* Small renderer color pip */}
+        <span
+          className={clsx(
+            'flex-shrink-0 w-1.5 h-6 rounded-full',
+            (rendererBorderOnly[view.renderer_type] || 'border-l-gray-300').replace('border-l-', 'bg-')
+          )}
+        />
+        <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
+          <h3 className="text-sm font-medium text-gray-800 truncate flex-shrink-0" style={{ maxWidth: '50%' }}>
+            {view.view_name}
+          </h3>
+          <span className="text-[10px] font-mono text-gray-400 truncate hidden sm:inline">
+            {view.view_key}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <span
+            className={clsx(
+              'px-1.5 py-0.5 text-[10px] font-medium rounded-full border whitespace-nowrap',
+              rendererColors[view.renderer_type] ||
+                'bg-gray-50 text-gray-600 border-gray-200'
+            )}
+          >
+            {view.renderer_type}
+          </span>
+          {view.presentation_stance && (
+            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap">
+              {view.presentation_stance}
+            </span>
+          )}
+        </div>
+        <ChevronRight className="h-3.5 w-3.5 text-gray-300 group-hover:text-primary-500 transition-colors flex-shrink-0" />
+      </Link>
+    );
+  }
+
+  // Parent / standalone cards: full detail
   return (
     <Link
       href={`/views/${view.view_key}`}
       className={clsx(
-        'card hover:shadow-md transition-shadow group border-l-4',
-        isChild ? 'p-4' : 'p-5',
+        'card hover:shadow-md transition-shadow group border-l-4 p-5',
         rendererBorderOnly[view.renderer_type] || 'border-l-gray-300'
       )}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <h3 className={clsx(
-              'font-semibold text-gray-900',
-              isChild ? 'text-sm' : 'text-base'
-            )}>
+            <h3 className="font-semibold text-gray-900 text-base">
               {view.view_name}
             </h3>
             <span
@@ -93,10 +133,7 @@ function ViewCard({ view, isChild, childCount }: { view: ViewSummary; isChild?: 
           </p>
 
           {view.description && (
-            <p className={clsx(
-              'text-gray-600 line-clamp-2 leading-relaxed mb-3',
-              isChild ? 'text-xs' : 'text-sm'
-            )}>
+            <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed mb-3">
               {view.description}
             </p>
           )}
@@ -173,10 +210,11 @@ function buildViewTree(views: ViewSummary[]): { trees: ViewTreeNode[]; standalon
 }
 
 /* ---- Tree-line visual constants ---- */
-const TREE_INDENT = 24;            // horizontal indent per nesting level (px)
-const TREE_BRANCH_Y = 20;          // vertical position of the horizontal branch line
-const TREE_LINE_COLOR = '#d4d4d8';  // zinc-300: subtle but legible
-const TREE_DOT_COLOR = '#a1a1aa';   // zinc-400: slightly darker dot
+const TREE_INDENT = 28;            // horizontal indent per nesting level (px)
+const TREE_BRANCH_Y = 18;          // vertical position of the horizontal branch line
+const TREE_LINE_COLOR = '#a1a1aa';  // zinc-400: clearly visible trunk
+const TREE_DOT_COLOR = '#71717a';   // zinc-500: prominent dot
+const TREE_LINE_WIDTH = 2;          // 2px trunk and branches
 
 /**
  * A single child row in a clean file-tree layout.
@@ -199,11 +237,13 @@ function TreeChildRow({
           - non-last child: full height so it continues to next sibling
           - last child: only down to the branch point */}
       <div
-        className="absolute left-0 top-0"
+        className="absolute top-0"
         style={{
-          width: 1,
+          left: 0,
+          width: TREE_LINE_WIDTH,
           height: isLast ? TREE_BRANCH_Y : '100%',
           backgroundColor: TREE_LINE_COLOR,
+          borderRadius: isLast ? '0 0 1px 1px' : 0,
         }}
       />
       {/* Horizontal branch from trunk to the card */}
@@ -212,24 +252,24 @@ function TreeChildRow({
         style={{
           left: 0,
           top: TREE_BRANCH_Y,
-          width: TREE_INDENT - 6,
-          height: 1,
+          width: TREE_INDENT - 8,
+          height: TREE_LINE_WIDTH,
           backgroundColor: TREE_LINE_COLOR,
         }}
       />
-      {/* Small endpoint circle */}
+      {/* Endpoint dot */}
       <div
         className="absolute rounded-full"
         style={{
-          left: TREE_INDENT - 8,
+          left: TREE_INDENT - 10,
           top: TREE_BRANCH_Y - 2,
-          width: 5,
-          height: 5,
+          width: 6,
+          height: 6,
           backgroundColor: TREE_DOT_COLOR,
         }}
       />
-      {/* Child content */}
-      <div style={{ paddingTop: 4 }}>{children}</div>
+      {/* Child content -- tight spacing */}
+      <div style={{ paddingTop: 2 }}>{children}</div>
     </div>
   );
 }
@@ -242,30 +282,35 @@ function ViewTreeGroup({ tree, isChild }: { tree: ViewTreeNode; isChild?: boolea
 
       {/* Children with tree lines */}
       {tree.children.length > 0 && (
-        <div className="relative" style={{ marginLeft: 16, marginTop: 2 }}>
+        <div
+          className="relative rounded-b-lg"
+          style={{ marginLeft: 16, marginTop: 2, paddingBottom: 4, paddingRight: 4, backgroundColor: 'rgba(243,244,246,0.4)' }}
+        >
           {/* Vertical stub connecting parent card bottom to first child's trunk */}
           <div
             className="absolute"
             style={{
               left: 0,
               top: 0,
-              width: 1,
+              width: TREE_LINE_WIDTH,
               height: TREE_BRANCH_Y,
               backgroundColor: TREE_LINE_COLOR,
             }}
           />
-          {tree.children.map((child, idx) => (
-            <TreeChildRow
-              key={child.view.view_key}
-              isLast={idx === tree.children.length - 1}
-            >
-              {child.children.length > 0 ? (
-                <ViewTreeGroup tree={child} isChild />
-              ) : (
-                <ViewCard view={child.view} isChild />
-              )}
-            </TreeChildRow>
-          ))}
+          <div className="flex flex-col gap-1">
+            {tree.children.map((child, idx) => (
+              <TreeChildRow
+                key={child.view.view_key}
+                isLast={idx === tree.children.length - 1}
+              >
+                {child.children.length > 0 ? (
+                  <ViewTreeGroup tree={child} isChild />
+                ) : (
+                  <ViewCard view={child.view} isChild />
+                )}
+              </TreeChildRow>
+            ))}
+          </div>
         </div>
       )}
     </div>
