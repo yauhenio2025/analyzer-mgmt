@@ -566,19 +566,15 @@ export default function ViewsListPage() {
                 {!isCollapsed && (() => {
                   const { trees, standalone } = buildViewTree(groupViews);
                   return (
-                    <div className="p-4 space-y-4">
+                    <div className="p-4 space-y-3">
                       {/* Tree views — parent + indented children */}
                       {trees.map((tree) => (
                         <ViewTreeGroup key={tree.view.view_key} tree={tree} />
                       ))}
-                      {/* Standalone views — no parent, no children */}
-                      {standalone.length > 0 && (
-                        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-                          {standalone.map((view) => (
-                            <ViewCard key={view.view_key} view={view} />
-                          ))}
-                        </div>
-                      )}
+                      {/* Standalone views — same linear style, no children */}
+                      {standalone.map((view) => (
+                        <ViewCard key={view.view_key} view={view} />
+                      ))}
                     </div>
                   );
                 })()}
