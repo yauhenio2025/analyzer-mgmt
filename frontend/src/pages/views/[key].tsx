@@ -1147,6 +1147,355 @@ function scoreDot(score: number): string {
   return 'bg-red-400';
 }
 
+// ── Renderer-type structured config editors ──────────────────────
+
+function RendererTypeConfig({
+  rendererType,
+  config,
+  onChange,
+}: {
+  rendererType: string;
+  config: Record<string, unknown>;
+  onChange: (patch: Record<string, unknown>) => void;
+}) {
+  switch (rendererType) {
+    case 'card_grid':
+      return <CardGridConfig config={config} onChange={onChange} />;
+    case 'accordion':
+    case 'tab':
+      return <AccordionTabConfig config={config} onChange={onChange} rendererType={rendererType} />;
+    case 'prose':
+      return <ProseConfig config={config} onChange={onChange} />;
+    case 'timeline':
+      return <TimelineConfig config={config} onChange={onChange} />;
+    case 'table':
+      return <TableConfig config={config} onChange={onChange} />;
+    default:
+      return (
+        <div className="card p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Renderer Config</h3>
+          <p className="text-sm text-gray-400 italic">
+            No structured editor for <code className="text-xs bg-gray-100 px-1 rounded">{rendererType}</code>.
+            Use Raw JSON below.
+          </p>
+        </div>
+      );
+  }
+}
+
+function CardGridConfig({
+  config,
+  onChange,
+}: {
+  config: Record<string, unknown>;
+  onChange: (patch: Record<string, unknown>) => void;
+}) {
+  return (
+    <div className="card p-6 space-y-4">
+      <h3 className="text-lg font-medium text-gray-900">Card Grid Config</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="label">Cell Renderer</label>
+          <input
+            type="text"
+            value={(config.cell_renderer as string) || ''}
+            onChange={(e) => onChange({ cell_renderer: e.target.value || undefined })}
+            className="input font-mono text-sm"
+            placeholder="e.g. tactic_card, relationship_card"
+          />
+          <p className="text-xs text-gray-400 mt-1">Custom cell component key from the cell registry</p>
+        </div>
+        <div>
+          <label className="label">Columns</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={1}
+              max={4}
+              value={(config.columns as number) || 2}
+              onChange={(e) => onChange({ columns: parseInt(e.target.value) })}
+              className="flex-1"
+            />
+            <span className="text-sm font-mono font-medium text-gray-700 w-6 text-center">
+              {(config.columns as number) || 2}
+            </span>
+          </div>
+        </div>
+        <div>
+          <label className="label">Group By</label>
+          <input
+            type="text"
+            value={(config.group_by as string) || ''}
+            onChange={(e) => onChange({ group_by: e.target.value || undefined })}
+            className="input font-mono text-sm"
+            placeholder="e.g. tactic_type, category"
+          />
+          <p className="text-xs text-gray-400 mt-1">Field to group items into sections</p>
+        </div>
+        <div>
+          <label className="label">Group Style Map</label>
+          <input
+            type="text"
+            value={(config.group_style_map as string) || ''}
+            onChange={(e) => onChange({ group_style_map: e.target.value || undefined })}
+            className="input font-mono text-sm"
+            placeholder="e.g. tactic_styles, relationship_styles"
+          />
+          <p className="text-xs text-gray-400 mt-1">Named color palette for group headers</p>
+        </div>
+        <div>
+          <label className="label">Items Path</label>
+          <input
+            type="text"
+            value={(config.items_path as string) || ''}
+            onChange={(e) => onChange({ items_path: e.target.value || undefined })}
+            className="input font-mono text-sm"
+            placeholder="e.g. tactics_detected, ideas"
+          />
+          <p className="text-xs text-gray-400 mt-1">Dotted path to extract items array from data</p>
+        </div>
+        <div>
+          <label className="label">Prose Endpoint</label>
+          <input
+            type="text"
+            value={(config.prose_endpoint as string) || ''}
+            onChange={(e) => onChange({ prose_endpoint: e.target.value || undefined })}
+            className="input font-mono text-sm"
+            placeholder="e.g. tactics, conditions"
+          />
+          <p className="text-xs text-gray-400 mt-1">Endpoint key for prose extraction mode</p>
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-sm text-gray-700 pt-2">
+        <input
+          type="checkbox"
+          checked={!!config.expandable}
+          onChange={(e) => onChange({ expandable: e.target.checked })}
+          className="rounded border-gray-300"
+        />
+        Expandable cards (click to expand/collapse)
+      </label>
+    </div>
+  );
+}
+
+function AccordionTabConfig({
+  config,
+  onChange,
+  rendererType,
+}: {
+  config: Record<string, unknown>;
+  onChange: (patch: Record<string, unknown>) => void;
+  rendererType: string;
+}) {
+  return (
+    <div className="card p-6 space-y-4">
+      <h3 className="text-lg font-medium text-gray-900">
+        {rendererType === 'tab' ? 'Tab' : 'Accordion'} Config
+      </h3>
+      <label className="flex items-center gap-2 text-sm text-gray-700">
+        <input
+          type="checkbox"
+          checked={!!config.expand_first}
+          onChange={(e) => onChange({ expand_first: e.target.checked })}
+          className="rounded border-gray-300"
+        />
+        Auto-expand first section
+      </label>
+      {rendererType === 'tab' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SelectField
+            label="Tab Style"
+            value={(config.tab_style as string) || 'pills'}
+            onChange={(v) => onChange({ tab_style: v })}
+            options={[
+              { value: 'pills', label: 'Pills' },
+              { value: 'underline', label: 'Underline' },
+              { value: 'boxed', label: 'Boxed' },
+            ]}
+          />
+          <NumberField
+            label="Default Tab Index"
+            value={(config.default_tab as number) || 0}
+            onChange={(v) => onChange({ default_tab: v })}
+            min={0}
+          />
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={config.show_count_badges !== false}
+              onChange={(e) => onChange({ show_count_badges: e.target.checked })}
+              className="rounded border-gray-300"
+            />
+            Show count badges on tabs
+          </label>
+        </div>
+      )}
+      <div>
+        <label className="label">Prose Endpoint</label>
+        <input
+          type="text"
+          value={(config.prose_endpoint as string) || ''}
+          onChange={(e) => onChange({ prose_endpoint: e.target.value || undefined })}
+          className="input font-mono text-sm"
+          placeholder="e.g. conditions, profile"
+        />
+        <p className="text-xs text-gray-400 mt-1">Endpoint for prose extraction mode</p>
+      </div>
+    </div>
+  );
+}
+
+function ProseConfig({
+  config,
+  onChange,
+}: {
+  config: Record<string, unknown>;
+  onChange: (patch: Record<string, unknown>) => void;
+}) {
+  return (
+    <div className="card p-6 space-y-4">
+      <h3 className="text-lg font-medium text-gray-900">Prose Config</h3>
+      <div className="space-y-3">
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={config.show_reading_time !== false}
+            onChange={(e) => onChange({ show_reading_time: e.target.checked })}
+            className="rounded border-gray-300"
+          />
+          Show estimated reading time
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={config.show_section_nav !== false}
+            onChange={(e) => onChange({ show_section_nav: e.target.checked })}
+            className="rounded border-gray-300"
+          />
+          Show section navigation anchors
+        </label>
+        <NumberField
+          label="Max Preview Lines"
+          value={(config.max_preview_lines as number) || 20}
+          onChange={(v) => onChange({ max_preview_lines: v })}
+          min={5}
+        />
+      </div>
+    </div>
+  );
+}
+
+function TimelineConfig({
+  config,
+  onChange,
+}: {
+  config: Record<string, unknown>;
+  onChange: (patch: Record<string, unknown>) => void;
+}) {
+  return (
+    <div className="card p-6 space-y-4">
+      <h3 className="text-lg font-medium text-gray-900">Timeline Config</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SelectField
+          label="Orientation"
+          value={(config.orientation as string) || 'horizontal'}
+          onChange={(v) => onChange({ orientation: v })}
+          options={[
+            { value: 'horizontal', label: 'Horizontal' },
+            { value: 'vertical', label: 'Vertical' },
+          ]}
+        />
+        <SelectField
+          label="Variant"
+          value={(config.variant as string) || ''}
+          onChange={(v) => onChange({ variant: v || undefined })}
+          options={[
+            { value: '', label: 'Default' },
+            { value: 'vertical_evolution', label: 'Vertical Evolution' },
+            { value: 'horizontal_bifurcation', label: 'Horizontal Bifurcation' },
+            { value: 'concept_drift', label: 'Concept Drift' },
+          ]}
+        />
+        <div>
+          <label className="label">Label Field</label>
+          <input
+            type="text"
+            value={(config.label_field as string) || ''}
+            onChange={(e) => onChange({ label_field: e.target.value || undefined })}
+            className="input font-mono text-sm"
+            placeholder="e.g. label, idea_name"
+          />
+        </div>
+        <div>
+          <label className="label">Date Field</label>
+          <input
+            type="text"
+            value={(config.date_field as string) || ''}
+            onChange={(e) => onChange({ date_field: e.target.value || undefined })}
+            className="input font-mono text-sm"
+            placeholder="e.g. date, year"
+          />
+        </div>
+        <div>
+          <label className="label">Description Field</label>
+          <input
+            type="text"
+            value={(config.description_field as string) || ''}
+            onChange={(e) => onChange({ description_field: e.target.value || undefined })}
+            className="input font-mono text-sm"
+            placeholder="e.g. description, summary"
+          />
+        </div>
+        <div>
+          <label className="label">Group By</label>
+          <input
+            type="text"
+            value={(config.group_by as string) || ''}
+            onChange={(e) => onChange({ group_by: e.target.value || undefined })}
+            className="input font-mono text-sm"
+            placeholder="e.g. category, idea_type"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TableConfig({
+  config,
+  onChange,
+}: {
+  config: Record<string, unknown>;
+  onChange: (patch: Record<string, unknown>) => void;
+}) {
+  return (
+    <div className="card p-6 space-y-4">
+      <h3 className="text-lg font-medium text-gray-900">Table Config</h3>
+      <div className="space-y-3">
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={!!config.sortable}
+            onChange={(e) => onChange({ sortable: e.target.checked })}
+            className="rounded border-gray-300"
+          />
+          Sortable columns
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={!!config.filterable}
+            onChange={(e) => onChange({ filterable: e.target.checked })}
+            className="rounded border-gray-300"
+          />
+          Filterable columns
+        </label>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Renderer Tab ────────────────────────────────────────────
 function RendererTab({
   view,
@@ -1417,19 +1766,12 @@ function RendererTab({
         )}
       </div>
 
-      {/* Expand first toggle */}
-      <div className="card p-6 space-y-4">
-        <h3 className="text-lg font-medium text-gray-900">Renderer Config</h3>
-        <label className="flex items-center gap-2 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            checked={!!expandFirst}
-            onChange={(e) => updateConfig({ expand_first: e.target.checked })}
-            className="rounded border-gray-300"
-          />
-          Auto-expand first section
-        </label>
-      </div>
+      {/* ── Renderer-specific structured config ── */}
+      <RendererTypeConfig
+        rendererType={view.renderer_type}
+        config={config}
+        onChange={updateConfig}
+      />
 
       {/* Sections list (only for accordion/tab renderers) */}
       {(view.renderer_type === 'accordion' || view.renderer_type === 'tab') && sections.length > 0 && (
