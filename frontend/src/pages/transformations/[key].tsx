@@ -386,6 +386,8 @@ function makeDefaultTemplate(): TransformationTemplate {
     aggregate_config: null,
     applicable_renderer_types: [],
     applicable_engines: [],
+    primitive_affinities: [],
+    renderer_config_presets: null,
     tags: [],
     status: 'active',
     model: 'claude-haiku-4-5-20251001',
@@ -729,7 +731,7 @@ export default function TransformationDetailPage() {
         )}
 
         {activeTab === 'applicability' && (
-          <div className="space-y-4 max-w-2xl">
+          <div className="space-y-6 max-w-3xl">
             <TagEditor
               label="Applicable Renderer Types"
               tags={form.applicable_renderer_types}
@@ -740,6 +742,50 @@ export default function TransformationDetailPage() {
               tags={form.applicable_engines}
               onChange={(v) => update('applicable_engines', v)}
             />
+
+            {/* Primitive Affinities */}
+            <div className="border-t pt-6">
+              <h3 className="text-sm font-semibold text-gray-700 mb-1">Primitive Cross-References</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Links this transformation to analytical primitives. Enables planner discovery:
+                primitive &rarr; renderer &rarr; transformation.
+              </p>
+              <TagEditor
+                label="Primitive Affinities"
+                tags={form.primitive_affinities || []}
+                onChange={(v) => update('primitive_affinities', v)}
+              />
+            </div>
+
+            {/* Renderer Config Presets */}
+            <div className="border-t pt-6">
+              <h3 className="text-sm font-semibold text-gray-700 mb-1">Renderer Config Presets</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Per-renderer default configuration. When this transformation is paired with a renderer,
+                the planner uses these presets to auto-configure it.
+              </p>
+              <JsonEditor
+                label="Presets (keyed by renderer_key)"
+                value={form.renderer_config_presets || {}}
+                onChange={(v) => update('renderer_config_presets', v as Record<string, Record<string, unknown>> | null)}
+                rows={8}
+              />
+              {form.renderer_config_presets && Object.keys(form.renderer_config_presets).length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {Object.entries(form.renderer_config_presets).map(([rKey, config]) => (
+                    <div
+                      key={rKey}
+                      className="px-3 py-2 bg-violet-50 border border-violet-200 rounded-md text-sm"
+                    >
+                      <span className="font-mono font-medium text-violet-700">{rKey}</span>
+                      <span className="text-gray-500 ml-2">
+                        {Object.keys(config).length} config keys
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

@@ -1562,6 +1562,40 @@ class ApiClient {
       return response.json() as Promise<import('@/types').RendererDefinition>;
     },
 
+    create: async (data: import('@/types').RendererDefinition) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/renderers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const e = await response.json().catch(() => ({}));
+        throw new Error(e.detail || `HTTP ${response.status}`);
+      }
+      return response.json() as Promise<import('@/types').RendererDefinition>;
+    },
+
+    update: async (rendererKey: string, data: import('@/types').RendererDefinition) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/renderers/${rendererKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const e = await response.json().catch(() => ({}));
+        throw new Error(e.detail || `HTTP ${response.status}`);
+      }
+      return response.json() as Promise<import('@/types').RendererDefinition>;
+    },
+
+    delete: async (rendererKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/renderers/${rendererKey}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{ deleted: string }>;
+    },
+
     forStance: async (stanceKey: string) => {
       const response = await fetch(`${ANALYZER_V2_URL}/v1/renderers/for-stance/${stanceKey}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -1570,6 +1604,12 @@ class ApiClient {
 
     forApp: async (app: string) => {
       const response = await fetch(`${ANALYZER_V2_URL}/v1/renderers/for-app/${app}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').RendererSummary[]>;
+    },
+
+    forPrimitive: async (primitiveKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/renderers/for-primitive/${primitiveKey}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json() as Promise<import('@/types').RendererSummary[]>;
     },
@@ -1638,6 +1678,12 @@ class ApiClient {
 
     forRenderer: async (rendererType: string) => {
       const response = await fetch(`${ANALYZER_V2_URL}/v1/transformations/for-renderer/${rendererType}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<TransformationTemplateSummary[]>;
+    },
+
+    forPrimitive: async (primitiveKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/transformations/for-primitive/${primitiveKey}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json() as Promise<TransformationTemplateSummary[]>;
     },

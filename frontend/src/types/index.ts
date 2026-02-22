@@ -1439,6 +1439,9 @@ export interface RendererDefinition {
   description: string;
   category: string;
   ideal_data_shapes: string[];
+  input_data_schema?: Record<string, unknown> | null;
+  primitive_affinities: string[];
+  variants: Record<string, Record<string, unknown>>;
   stance_affinities: Record<string, number>;
   available_section_renderers: string[];
   config_schema: Record<string, unknown>;
@@ -1485,6 +1488,8 @@ export interface TransformationTemplate {
   aggregate_config?: AggregateConfig | null;
   applicable_renderer_types: string[];
   applicable_engines: string[];
+  primitive_affinities: string[];
+  renderer_config_presets?: Record<string, Record<string, unknown>> | null;
   tags: string[];
   status: string;
   model: string;
