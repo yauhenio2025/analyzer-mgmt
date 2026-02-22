@@ -48,19 +48,23 @@ const visibilityBadge: Record<string, string> = {
   on_demand: 'bg-amber-50 text-amber-700 border-amber-200',
 };
 
-function ViewCard({ view }: { view: ViewSummary }) {
+function ViewCard({ view, isChild, childCount }: { view: ViewSummary; isChild?: boolean; childCount?: number }) {
   return (
     <Link
       href={`/views/${view.view_key}`}
       className={clsx(
-        'card p-5 hover:shadow-md transition-shadow group border-l-4',
+        'card hover:shadow-md transition-shadow group border-l-4',
+        isChild ? 'p-4' : 'p-5',
         rendererBorderOnly[view.renderer_type] || 'border-l-gray-300'
       )}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <h3 className="text-base font-semibold text-gray-900">
+            <h3 className={clsx(
+              'font-semibold text-gray-900',
+              isChild ? 'text-sm' : 'text-base'
+            )}>
               {view.view_name}
             </h3>
             <span
@@ -77,6 +81,11 @@ function ViewCard({ view }: { view: ViewSummary }) {
                 {view.presentation_stance}
               </span>
             )}
+            {!isChild && childCount !== undefined && childCount > 0 && (
+              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                {childCount} child{childCount !== 1 ? 'ren' : ''}
+              </span>
+            )}
           </div>
 
           <p className="text-xs font-mono text-gray-400 mb-2">
@@ -84,7 +93,10 @@ function ViewCard({ view }: { view: ViewSummary }) {
           </p>
 
           {view.description && (
-            <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed mb-3">
+            <p className={clsx(
+              'text-gray-600 line-clamp-2 leading-relaxed mb-3',
+              isChild ? 'text-xs' : 'text-sm'
+            )}>
               {view.description}
             </p>
           )}
@@ -94,11 +106,6 @@ function ViewCard({ view }: { view: ViewSummary }) {
               {view.target_app}:{view.target_page}
             </span>
             <span>pos: {view.position}</span>
-            {view.parent_view_key && (
-              <span className="text-gray-400">
-                child of {view.parent_view_key}
-              </span>
-            )}
             <span
               className={clsx(
                 'px-1.5 py-0.5 rounded border',
@@ -115,6 +122,58 @@ function ViewCard({ view }: { view: ViewSummary }) {
   );
 }
 
+/** Tree node: parent view with its children */
+interface ViewTreeNode {
+  view: ViewSummary;
+  children: ViewSummary[];
+}
+
+/** Build a tree from flat views: parents with children grouped, orphans standalone */
+function buildViewTree(views: ViewSummary[]): { trees: ViewTreeNode[]; standalone: ViewSummary[] } {
+  const byKey = new Map(views.map((v) => [v.view_key, v]));
+  const childKeys = new Set(views.filter((v) => v.parent_view_key).map((v) => v.view_key));
+  const parentKeys = new Set(views.filter((v) => v.parent_view_key).map((v) => v.parent_view_key!));
+
+  const trees: ViewTreeNode[] = [];
+  const standalone: ViewSummary[] = [];
+
+  for (const v of views) {
+    if (childKeys.has(v.view_key)) continue; // skip children, they'll be nested
+    if (parentKeys.has(v.view_key)) {
+      // This is a parent — collect its children
+      const children = views
+        .filter((c) => c.parent_view_key === v.view_key)
+        .sort((a, b) => a.position - b.position);
+      trees.push({ view: v, children });
+    } else {
+      standalone.push(v);
+    }
+  }
+
+  // Sort trees by position of the parent
+  trees.sort((a, b) => a.view.position - b.view.position);
+  standalone.sort((a, b) => a.position - b.position);
+
+  return { trees, standalone };
+}
+
+function ViewTreeGroup({ tree }: { tree: ViewTreeNode }) {
+  return (
+    <div className="space-y-0">
+      {/* Parent card — full width */}
+      <ViewCard view={tree.view} childCount={tree.children.length} />
+      {/* Children — indented with connector */}
+      {tree.children.length > 0 && (
+        <div className="ml-6 border-l-2 border-indigo-200 pl-4 py-2 space-y-2">
+          {tree.children.map((child) => (
+            <ViewCard key={child.view_key} view={child} isChild />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface GroupState {
   [key: string]: boolean;
 }
@@ -123,6 +182,7 @@ export default function ViewsListPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [appFilter, setAppFilter] = useState<string>('');
   const [pageFilter, setPageFilter] = useState<string>('');
+  const [structureFilter, setStructureFilter] = useState<string>('');
   const [collapsedGroups, setCollapsedGroups] = useState<GroupState>({});
 
   const {
@@ -151,9 +211,14 @@ export default function ViewsListPage() {
   // Filter views
   const filteredViews = useMemo(() => {
     if (!views) return [];
+    // Pre-compute parent keys for structure filter
+    const parentKeys = new Set(views.filter((v) => v.parent_view_key).map((v) => v.parent_view_key!));
     return views.filter((v) => {
       if (appFilter && v.target_app !== appFilter) return false;
       if (pageFilter && v.target_page !== pageFilter) return false;
+      if (structureFilter === 'top_level' && v.parent_view_key) return false;
+      if (structureFilter === 'parents' && !parentKeys.has(v.view_key)) return false;
+      if (structureFilter === 'children' && !v.parent_view_key) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         return (
@@ -165,7 +230,7 @@ export default function ViewsListPage() {
       }
       return true;
     });
-  }, [views, appFilter, pageFilter, searchQuery]);
+  }, [views, appFilter, pageFilter, structureFilter, searchQuery]);
 
   // Group by target_app:target_page
   const grouped = useMemo(() => {
@@ -268,6 +333,16 @@ export default function ViewsListPage() {
             </option>
           ))}
         </select>
+        <select
+          value={structureFilter}
+          onChange={(e) => setStructureFilter(e.target.value)}
+          className="input w-auto min-w-[160px]"
+        >
+          <option value="">All views</option>
+          <option value="top_level">Top-level only</option>
+          <option value="parents">Parents only</option>
+          <option value="children">Children only</option>
+        </select>
       </div>
 
       {/* Renderer Legend */}
@@ -336,13 +411,25 @@ export default function ViewsListPage() {
                     <ChevronUp className="h-4 w-4 text-gray-400" />
                   )}
                 </button>
-                {!isCollapsed && (
-                  <div className="p-4 grid gap-4 grid-cols-1 lg:grid-cols-2">
-                    {groupViews.map((view) => (
-                      <ViewCard key={view.view_key} view={view} />
-                    ))}
-                  </div>
-                )}
+                {!isCollapsed && (() => {
+                  const { trees, standalone } = buildViewTree(groupViews);
+                  return (
+                    <div className="p-4 space-y-4">
+                      {/* Tree views — parent + indented children */}
+                      {trees.map((tree) => (
+                        <ViewTreeGroup key={tree.view.view_key} tree={tree} />
+                      ))}
+                      {/* Standalone views — no parent, no children */}
+                      {standalone.length > 0 && (
+                        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+                          {standalone.map((view) => (
+                            <ViewCard key={view.view_key} view={view} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}
