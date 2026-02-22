@@ -1103,10 +1103,12 @@ function scoreRenderers(
     // App support (0.0-1.0)
     const appScore = r.supported_apps.includes(view.target_app) ? 1.0 : 0.2;
 
-    // Weighted composite
+    // Adaptive weighted composite — data shape matters MORE for structured renderers,
+    // stance matters MORE for narrative/prose renderers
+    const isStructuredRenderer = ['list', 'diagnostic'].includes(r.category);
     const weights = {
-      stance: stanceScore !== null ? 0.35 : 0,
-      shape: 0.30,
+      stance: stanceScore !== null ? (isStructuredRenderer ? 0.25 : 0.35) : 0,
+      shape: isStructuredRenderer ? 0.40 : 0.30,
       container: 0.20,
       app: 0.15,
     };
