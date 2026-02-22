@@ -172,21 +172,100 @@ function buildViewTree(views: ViewSummary[]): { trees: ViewTreeNode[]; standalon
   return { trees, standalone };
 }
 
+/* ---- Tree-line visual constants ---- */
+const TREE_INDENT = 24;            // horizontal indent per nesting level (px)
+const TREE_BRANCH_Y = 20;          // vertical position of the horizontal branch line
+const TREE_LINE_COLOR = '#d4d4d8';  // zinc-300: subtle but legible
+const TREE_DOT_COLOR = '#a1a1aa';   // zinc-400: slightly darker dot
+
+/**
+ * A single child row in a clean file-tree layout.
+ *
+ * Visual structure:
+ *   |              <-- vertical trunk (left edge)
+ *   |----o  Card   <-- horizontal branch + dot + content
+ *   |
+ */
+function TreeChildRow({
+  isLast,
+  children,
+}: {
+  isLast: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative" style={{ paddingLeft: TREE_INDENT }}>
+      {/* Vertical trunk:
+          - non-last child: full height so it continues to next sibling
+          - last child: only down to the branch point */}
+      <div
+        className="absolute left-0 top-0"
+        style={{
+          width: 1,
+          height: isLast ? TREE_BRANCH_Y : '100%',
+          backgroundColor: TREE_LINE_COLOR,
+        }}
+      />
+      {/* Horizontal branch from trunk to the card */}
+      <div
+        className="absolute"
+        style={{
+          left: 0,
+          top: TREE_BRANCH_Y,
+          width: TREE_INDENT - 6,
+          height: 1,
+          backgroundColor: TREE_LINE_COLOR,
+        }}
+      />
+      {/* Small endpoint circle */}
+      <div
+        className="absolute rounded-full"
+        style={{
+          left: TREE_INDENT - 8,
+          top: TREE_BRANCH_Y - 2,
+          width: 5,
+          height: 5,
+          backgroundColor: TREE_DOT_COLOR,
+        }}
+      />
+      {/* Child content */}
+      <div style={{ paddingTop: 4 }}>{children}</div>
+    </div>
+  );
+}
+
 function ViewTreeGroup({ tree, isChild }: { tree: ViewTreeNode; isChild?: boolean }) {
   return (
-    <div className="space-y-0">
-      {/* Parent card — badge shows direct children count */}
+    <div>
+      {/* Parent card */}
       <ViewCard view={tree.view} isChild={isChild} childCount={tree.children.length} />
-      {/* Children — indented with connector */}
+
+      {/* Children with tree lines */}
       {tree.children.length > 0 && (
-        <div className="ml-6 border-l-2 border-indigo-200 pl-4 py-2 space-y-2">
-          {tree.children.map((child) =>
-            child.children.length > 0 ? (
-              <ViewTreeGroup key={child.view.view_key} tree={child} isChild />
-            ) : (
-              <ViewCard key={child.view.view_key} view={child.view} isChild />
-            )
-          )}
+        <div className="relative" style={{ marginLeft: 16, marginTop: 2 }}>
+          {/* Vertical stub connecting parent card bottom to first child's trunk */}
+          <div
+            className="absolute"
+            style={{
+              left: 0,
+              top: 0,
+              width: 1,
+              height: TREE_BRANCH_Y,
+              backgroundColor: TREE_LINE_COLOR,
+            }}
+          />
+          {tree.children.map((child, idx) => (
+            <TreeChildRow
+              key={child.view.view_key}
+              isLast={idx === tree.children.length - 1}
+            >
+              {child.children.length > 0 ? (
+                <ViewTreeGroup tree={child} isChild />
+              ) : (
+                <ViewCard view={child.view} isChild />
+              )}
+            </TreeChildRow>
+          ))}
         </div>
       )}
     </div>
