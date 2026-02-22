@@ -81,7 +81,7 @@ function ViewCard({ view, isChild, childCount }: { view: ViewSummary; isChild?: 
                 {view.presentation_stance}
               </span>
             )}
-            {!isChild && childCount !== undefined && childCount > 0 && (
+            {childCount !== undefined && childCount > 0 && (
               <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
                 {childCount} child{childCount !== 1 ? 'ren' : ''}
               </span>
@@ -122,52 +122,71 @@ function ViewCard({ view, isChild, childCount }: { view: ViewSummary; isChild?: 
   );
 }
 
-/** Tree node: parent view with its children */
+/** Recursive tree node: a view with nested children (which may themselves have children) */
 interface ViewTreeNode {
   view: ViewSummary;
-  children: ViewSummary[];
+  children: ViewTreeNode[];
 }
 
-/** Build a tree from flat views: parents with children grouped, orphans standalone */
+/** Build a recursive tree from flat views. Handles multi-level nesting (grandchildren, etc.) */
 function buildViewTree(views: ViewSummary[]): { trees: ViewTreeNode[]; standalone: ViewSummary[] } {
   const byKey = new Map(views.map((v) => [v.view_key, v]));
-  const childKeys = new Set(views.filter((v) => v.parent_view_key).map((v) => v.view_key));
-  const parentKeys = new Set(views.filter((v) => v.parent_view_key).map((v) => v.parent_view_key!));
+  // Index: parent_key -> list of child views
+  const childrenOf = new Map<string, ViewSummary[]>();
+  for (const v of views) {
+    if (v.parent_view_key) {
+      const siblings = childrenOf.get(v.parent_view_key) || [];
+      siblings.push(v);
+      childrenOf.set(v.parent_view_key, siblings);
+    }
+  }
+
+  // Recursively build tree nodes
+  function buildNode(v: ViewSummary): ViewTreeNode {
+    const directChildren = (childrenOf.get(v.view_key) || [])
+      .sort((a, b) => a.position - b.position);
+    return {
+      view: v,
+      children: directChildren.map((c) => buildNode(c)),
+    };
+  }
+
+  // Top-level roots: views that have NO parent (or whose parent isn't in this group)
+  const roots = views.filter((v) => !v.parent_view_key || !byKey.has(v.parent_view_key));
 
   const trees: ViewTreeNode[] = [];
   const standalone: ViewSummary[] = [];
 
-  for (const v of views) {
-    if (childKeys.has(v.view_key)) continue; // skip children, they'll be nested
-    if (parentKeys.has(v.view_key)) {
-      // This is a parent — collect its children
-      const children = views
-        .filter((c) => c.parent_view_key === v.view_key)
-        .sort((a, b) => a.position - b.position);
-      trees.push({ view: v, children });
+  for (const v of roots) {
+    const node = buildNode(v);
+    if (node.children.length > 0) {
+      trees.push(node);
     } else {
       standalone.push(v);
     }
   }
 
-  // Sort trees by position of the parent
   trees.sort((a, b) => a.view.position - b.view.position);
   standalone.sort((a, b) => a.position - b.position);
 
   return { trees, standalone };
 }
 
-function ViewTreeGroup({ tree }: { tree: ViewTreeNode }) {
+function ViewTreeGroup({ tree, isChild }: { tree: ViewTreeNode; isChild?: boolean }) {
   return (
     <div className="space-y-0">
-      {/* Parent card — full width */}
-      <ViewCard view={tree.view} childCount={tree.children.length} />
+      {/* Parent card — badge shows direct children count */}
+      <ViewCard view={tree.view} isChild={isChild} childCount={tree.children.length} />
       {/* Children — indented with connector */}
       {tree.children.length > 0 && (
         <div className="ml-6 border-l-2 border-indigo-200 pl-4 py-2 space-y-2">
-          {tree.children.map((child) => (
-            <ViewCard key={child.view_key} view={child} isChild />
-          ))}
+          {tree.children.map((child) =>
+            child.children.length > 0 ? (
+              <ViewTreeGroup key={child.view.view_key} tree={child} isChild />
+            ) : (
+              <ViewCard key={child.view.view_key} view={child.view} isChild />
+            )
+          )}
         </div>
       )}
     </div>
