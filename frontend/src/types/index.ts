@@ -1427,6 +1427,10 @@ export interface ViewSummary {
   parent_view_key: string | null;
   visibility: string;
   status: string;
+  // Structural hints from renderer_config
+  sections_count: number;
+  has_sub_renderers: boolean;
+  config_hints: string[];
 }
 
 // ============================================================================

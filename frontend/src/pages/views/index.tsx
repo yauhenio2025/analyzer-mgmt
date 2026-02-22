@@ -86,6 +86,11 @@ function ViewCard({ view, isChild, childCount, hasChildren }: { view: ViewSummar
               {view.presentation_stance}
             </span>
           )}
+          {view.config_hints && view.config_hints.length > 0 && (
+            <span className="text-[9px] text-slate-400 hidden lg:inline whitespace-nowrap">
+              {view.config_hints.slice(0, 2).join(' · ')}
+            </span>
+          )}
         </div>
         <ChevronRight className="h-3.5 w-3.5 text-gray-300 group-hover:text-primary-500 transition-colors flex-shrink-0" />
       </Link>
@@ -160,6 +165,20 @@ function ViewCard({ view, isChild, childCount, hasChildren }: { view: ViewSummar
               {view.visibility}
             </span>
           </div>
+
+          {/* Config structure hints */}
+          {view.config_hints && view.config_hints.length > 0 && (
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              {view.config_hints.map((hint) => (
+                <span
+                  key={hint}
+                  className="px-1.5 py-0.5 text-[10px] rounded bg-slate-100 text-slate-500 border border-slate-200"
+                >
+                  {hint}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-primary-500 transition-colors flex-shrink-0 mt-1.5" />
       </div>
