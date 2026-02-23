@@ -1559,6 +1559,32 @@ export interface TransformationTemplateSummary {
   status: string;
 }
 
+// -- Sub-Renderer Types --
+
+export interface SubRendererDefinition {
+  sub_renderer_key: string;
+  sub_renderer_name: string;
+  description: string;
+  category: string;
+  ideal_data_shapes: string[];
+  config_schema: Record<string, unknown>;
+  stance_affinities: Record<string, number>;
+  parent_renderer_types: string[];
+  status: string;
+  tags: string[];
+}
+
+export interface SubRendererSummary {
+  sub_renderer_key: string;
+  sub_renderer_name: string;
+  description: string;
+  category: string;
+  ideal_data_shapes: string[];
+  stance_affinities: Record<string, number>;
+  parent_renderer_types: string[];
+  status: string;
+}
+
 export interface TransformationExecuteRequest {
   data: unknown;
   template_key?: string;

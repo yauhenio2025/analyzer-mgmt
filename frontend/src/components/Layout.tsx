@@ -23,6 +23,7 @@ import {
   Eye,
   Repeat,
   Monitor,
+  Component,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -48,6 +49,7 @@ const navigation: NavItem[] = [
   { name: 'Stances', href: '/stances', icon: Compass },
   { name: 'Views', href: '/views', icon: Eye },
   { name: 'Renderers', href: '/renderers', icon: Monitor },
+  { name: 'Sub-Renderers', href: '/sub-renderers', icon: Component },
   { name: 'Transformations', href: '/transformations', icon: Repeat },
   { name: 'Operationalizations', href: '/operationalizations', icon: Combine },
   { name: 'Rhetoric', href: '/rhetoric', icon: MessageSquareWarning },

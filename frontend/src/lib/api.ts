@@ -1629,6 +1629,64 @@ class ApiClient {
   };
 
   // ============================================================================
+  // Sub-Renderers Endpoints (from analyzer-v2)
+  // ============================================================================
+
+  subRenderers = {
+    list: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/sub-renderers`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').SubRendererSummary[]>;
+    },
+
+    get: async (key: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/sub-renderers/${key}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').SubRendererDefinition>;
+    },
+
+    create: async (data: import('@/types').SubRendererDefinition) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/sub-renderers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const e = await response.json().catch(() => ({}));
+        throw new Error(e.detail || `HTTP ${response.status}`);
+      }
+      return response.json() as Promise<import('@/types').SubRendererDefinition>;
+    },
+
+    update: async (key: string, data: import('@/types').SubRendererDefinition) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/sub-renderers/${key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const e = await response.json().catch(() => ({}));
+        throw new Error(e.detail || `HTTP ${response.status}`);
+      }
+      return response.json() as Promise<import('@/types').SubRendererDefinition>;
+    },
+
+    delete: async (key: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/sub-renderers/${key}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<{ deleted: string }>;
+    },
+
+    forParent: async (rendererType: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/sub-renderers/for-parent/${rendererType}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').SubRendererSummary[]>;
+    },
+  };
+
+  // ============================================================================
   // Transformations Endpoints (from analyzer-v2)
   // ============================================================================
 
