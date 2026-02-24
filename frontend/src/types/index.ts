@@ -1631,3 +1631,107 @@ export interface TransformationExecuteResponse {
   cached: boolean;
   execution_time_ms: number;
 }
+
+// ============================================================================
+// Decision Trace Types (from adaptive planner)
+// ============================================================================
+
+export interface SamplingInsight {
+  work_title: string;
+  role: string;
+  key_observations: string[];
+  implications: string[];
+  affinity_rationale: string;
+}
+
+export interface ObjectiveAlignmentEntry {
+  goal: string;
+  serving_engines: string[];
+  serving_chains: string[];
+  coverage_assessment: string;
+}
+
+export interface PhaseDecision {
+  phase_number: number;
+  phase_name: string;
+  chain_or_engine: string;
+  selection_rationale: string;
+  depth_rationale: string;
+  iteration_mode_rationale: string;
+  alternatives_considered: string[];
+  dependency_rationale: string;
+}
+
+export interface PerWorkDecision {
+  phase_number: number;
+  work_title: string;
+  chain_key: string;
+  rationale: string;
+}
+
+export interface CatalogCoverageEntry {
+  engine_key: string;
+  status: string;
+  reason: string;
+  used_in_phases: number[];
+}
+
+export interface PlannerDecisionTrace {
+  sampling_insights: SamplingInsight[];
+  objective_alignment: ObjectiveAlignmentEntry[];
+  phase_decisions: PhaseDecision[];
+  per_work_decisions: PerWorkDecision[];
+  catalog_coverage: CatalogCoverageEntry[];
+  overall_strategy_rationale: string;
+}
+
+export interface PlanSummary {
+  plan_id: string;
+  thinker_name: string;
+  target_work_title: string;
+  workflow_key: string;
+  status: string;
+  objective_key: string | null;
+  phase_count: number;
+  estimated_total_cost_usd: number;
+  estimated_depth_profile: string;
+  created_at: string;
+}
+
+export interface PlanDetail {
+  plan_id: string;
+  created_at: string;
+  workflow_key: string;
+  thinker_name: string;
+  target_work: { title: string; author?: string; year?: number; description: string };
+  prior_works: { title: string; author?: string; year?: number; description: string; relationship_hint: string }[];
+  research_question: string | null;
+  strategy_summary: string;
+  phases: PlanPhaseSpec[];
+  recommended_views: { view_key: string; priority: string; rationale: string }[];
+  estimated_llm_calls: number;
+  estimated_depth_profile: string;
+  status: string;
+  model_used: string;
+  generation_tokens: number;
+  objective_key: string | null;
+  estimated_total_cost_usd: number;
+  decision_trace: PlannerDecisionTrace | null;
+}
+
+export interface PlanPhaseSpec {
+  phase_number: number;
+  phase_name: string;
+  skip: boolean;
+  depth: string;
+  chain_key: string | null;
+  engine_key: string | null;
+  iteration_mode: string | null;
+  per_work_chain_map: Record<string, string> | null;
+  depends_on: number[] | null;
+  model_hint: string | null;
+  requires_full_documents: boolean;
+  estimated_tokens: number;
+  estimated_cost_usd: number;
+  rationale: string;
+}
