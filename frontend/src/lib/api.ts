@@ -58,6 +58,7 @@ import type {
   AddEngineResponse,
   EngineChainSpec,
   ChainSummary,
+  ChainViewInfo,
   TransformationTemplate,
   TransformationTemplateSummary,
   TransformationExecuteRequest,
@@ -558,6 +559,15 @@ class ApiClient {
      */
     get: async (chainKey: string): Promise<EngineChainSpec> => {
       const response = await fetch(`${ANALYZER_V2_URL}/v1/chains/${chainKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+
+    /**
+     * Get views connected to a chain (presentation pipeline).
+     */
+    views: async (chainKey: string): Promise<ChainViewInfo[]> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/views/for-chain/${chainKey}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     },

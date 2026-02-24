@@ -1,8 +1,9 @@
 import { useRouter } from 'next/router';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { ArrowLeft, AlertCircle, Copy, Check, ArrowRight } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Copy, Check, ArrowRight, Eye, Monitor, Component, Layers } from 'lucide-react';
 import { api } from '@/lib/api';
+import type { ChainViewInfo } from '@/types';
 import { useState } from 'react';
 import clsx from 'clsx';
 
@@ -25,6 +26,17 @@ const blendModeDescriptions: Record<string, string> = {
   parallel: 'All engines run independently. Their outputs are kept separate.',
   merge: 'All engines run, then their outputs are merged into a unified result.',
   llm_selection: 'An LLM selects the best subset of engines for the task based on selection criteria.',
+};
+
+const rendererTypeColors: Record<string, string> = {
+  accordion: 'bg-blue-50 text-blue-700 border-blue-200',
+  card_grid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  tab: 'bg-amber-50 text-amber-700 border-amber-200',
+  prose: 'bg-rose-50 text-rose-700 border-rose-200',
+  table: 'bg-gray-50 text-gray-700 border-gray-200',
+  stat_summary: 'bg-violet-50 text-violet-700 border-violet-200',
+  timeline: 'bg-teal-50 text-teal-700 border-teal-200',
+  raw_json: 'bg-gray-50 text-gray-500 border-gray-200',
 };
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -56,11 +68,99 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="card p-5">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">{title}</h3>
+      <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        {icon}
+        {title}
+      </h3>
       {children}
+    </div>
+  );
+}
+
+function ViewCard({ view, depth = 0 }: { view: ChainViewInfo; depth?: number }) {
+  const router = useRouter();
+  const sourceLabel = view.source_chain_key
+    ? `chain: ${view.source_chain_key}`
+    : view.source_engine_key
+      ? `engine: ${view.source_engine_key}`
+      : 'unknown';
+
+  return (
+    <div className={clsx(depth > 0 && 'ml-6 border-l-2 border-gray-100 pl-4')}>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => router.push(`/views/${view.view_key}`)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') router.push(`/views/${view.view_key}`); }}
+        className="block p-4 hover:bg-gray-50 rounded-lg transition-colors group cursor-pointer"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <h4 className="text-sm font-semibold text-gray-900 group-hover:text-primary-700 transition-colors">
+                {view.view_name}
+              </h4>
+              <span
+                className={clsx(
+                  'px-1.5 py-0.5 text-xs font-medium rounded border',
+                  rendererTypeColors[view.renderer_type] || 'bg-gray-50 text-gray-600 border-gray-200'
+                )}
+              >
+                {view.renderer_type}
+              </span>
+              {view.presentation_stance && (
+                <span className="px-1.5 py-0.5 text-xs text-gray-500 bg-gray-50 rounded">
+                  {view.presentation_stance}
+                </span>
+              )}
+              {view.source_type === 'secondary' && (
+                <span className="px-1.5 py-0.5 text-xs text-orange-600 bg-orange-50 rounded border border-orange-200">
+                  secondary
+                </span>
+              )}
+            </div>
+
+            <p className="text-xs text-gray-500 line-clamp-1 mb-2">{view.description}</p>
+
+            <div className="flex items-center gap-3 text-xs text-gray-400">
+              <span className="font-mono">{sourceLabel}</span>
+              <span>{view.target_app} / {view.target_page}</span>
+              {view.sections_count > 0 && (
+                <span>{view.sections_count} sections</span>
+              )}
+            </div>
+
+            {/* Sub-renderers */}
+            {view.sub_renderers_used.length > 0 && (
+              <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                <Component className="h-3 w-3 text-gray-400" />
+                {view.sub_renderers_used.map((sr) => (
+                  <Link
+                    key={sr}
+                    href={`/sub-renderers/${sr}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="px-1.5 py-0.5 text-xs bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors"
+                  >
+                    {sr}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Render children recursively */}
+      {view.children.length > 0 && (
+        <div className="space-y-1">
+          {view.children.map((child) => (
+            <ViewCard key={child.view_key} view={child} depth={depth + 1} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -72,6 +172,12 @@ export default function ChainDetailPage() {
   const { data: chain, isLoading, error } = useQuery({
     queryKey: ['chain', key],
     queryFn: () => api.chains.get(key as string),
+    enabled: !!key,
+  });
+
+  const { data: chainViews, isLoading: viewsLoading } = useQuery({
+    queryKey: ['chain-views', key],
+    queryFn: () => api.chains.views(key as string),
     enabled: !!key,
   });
 
@@ -103,6 +209,23 @@ export default function ChainDetailPage() {
       </div>
     );
   }
+
+  // Count total views including nested children
+  const totalViews = chainViews
+    ? chainViews.reduce((acc, v) => acc + 1 + v.children.length, 0)
+    : 0;
+
+  // Collect all unique renderer types across views
+  const allRendererTypes = new Set<string>();
+  const allSubRenderers = new Set<string>();
+  chainViews?.forEach((v) => {
+    allRendererTypes.add(v.renderer_type);
+    v.sub_renderers_used.forEach((sr) => allSubRenderers.add(sr));
+    v.children.forEach((c) => {
+      allRendererTypes.add(c.renderer_type);
+      c.sub_renderers_used.forEach((sr) => allSubRenderers.add(sr));
+    });
+  });
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -206,6 +329,78 @@ export default function ChainDetailPage() {
             </div>
           ))}
         </div>
+      </Section>
+
+      {/* ── PRESENTATION PIPELINE ────────────────────────────── */}
+      <Section
+        title={`Presentation Pipeline (${totalViews} view${totalViews !== 1 ? 's' : ''})`}
+        icon={<Layers className="h-4 w-4 text-gray-400" />}
+      >
+        {viewsLoading ? (
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="animate-pulse p-4">
+                <div className="h-4 bg-gray-200 rounded w-48 mb-2" />
+                <div className="h-3 bg-gray-200 rounded w-full mb-1" />
+                <div className="h-3 bg-gray-200 rounded w-2/3" />
+              </div>
+            ))}
+          </div>
+        ) : chainViews && chainViews.length > 0 ? (
+          <div>
+            {/* Summary chips */}
+            <div className="flex items-center gap-3 mb-4 pb-4 border-b flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <Eye className="h-3.5 w-3.5 text-gray-400" />
+                <span className="text-xs text-gray-500">{totalViews} views</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Monitor className="h-3.5 w-3.5 text-gray-400" />
+                {[...allRendererTypes].sort().map((rt) => (
+                  <Link
+                    key={rt}
+                    href={`/renderers/${rt}`}
+                    className={clsx(
+                      'px-1.5 py-0.5 text-xs rounded border hover:opacity-80 transition-opacity',
+                      rendererTypeColors[rt] || 'bg-gray-50 text-gray-600 border-gray-200'
+                    )}
+                  >
+                    {rt}
+                  </Link>
+                ))}
+              </div>
+              {allSubRenderers.size > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <Component className="h-3.5 w-3.5 text-gray-400" />
+                  {[...allSubRenderers].sort().map((sr) => (
+                    <Link
+                      key={sr}
+                      href={`/sub-renderers/${sr}`}
+                      className="px-1.5 py-0.5 text-xs bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors"
+                    >
+                      {sr}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* View tree */}
+            <div className="space-y-1">
+              {chainViews.map((view) => (
+                <ViewCard key={view.view_key} view={view} />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Eye className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-400">No views consume this chain&apos;s output yet.</p>
+            <p className="text-xs text-gray-300 mt-1">
+              Views are defined in analyzer-v2 and reference chains by key in their data_source.
+            </p>
+          </div>
+        )}
       </Section>
 
       {/* Metadata Grid */}

@@ -495,6 +495,27 @@ export interface ChainSummary {
   has_context_parameters: boolean;
 }
 
+export interface ChainViewInfo {
+  view_key: string;
+  view_name: string;
+  description: string;
+  target_app: string;
+  target_page: string;
+  renderer_type: string;
+  presentation_stance: string | null;
+  position: number;
+  parent_view_key: string | null;
+  sections_count: number;
+  has_sub_renderers: boolean;
+  config_hints: string[];
+  source_chain_key: string | null;
+  source_engine_key: string | null;
+  source_scope: string;
+  source_type: string;
+  sub_renderers_used: string[];
+  children: ChainViewInfo[];
+}
+
 // ============================================================================
 // Pipeline Types
 // ============================================================================
