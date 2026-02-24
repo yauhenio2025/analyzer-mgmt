@@ -57,6 +57,7 @@ import type {
   WorkflowExtensionAnalysis,
   AddEngineResponse,
   EngineChainSpec,
+  ChainSummary,
   TransformationTemplate,
   TransformationTemplateSummary,
   TransformationExecuteRequest,
@@ -546,7 +547,7 @@ class ApiClient {
     /**
      * List all engine chains from analyzer-v2.
      */
-    list: async (): Promise<EngineChainSpec[]> => {
+    list: async (): Promise<ChainSummary[]> => {
       const response = await fetch(`${ANALYZER_V2_URL}/v1/chains`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();

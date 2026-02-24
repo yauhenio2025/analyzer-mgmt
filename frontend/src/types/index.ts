@@ -492,6 +492,7 @@ export interface ChainSummary {
   blend_mode: ChainBlendMode;
   engine_count: number;
   category: string | null;
+  has_context_parameters: boolean;
 }
 
 // ============================================================================

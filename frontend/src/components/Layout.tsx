@@ -24,6 +24,7 @@ import {
   Repeat,
   Monitor,
   Component,
+  Network,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -38,6 +39,7 @@ const navigation: NavItem[] = [
   { name: 'Engines', href: '/engines', icon: Cpu },
   { name: 'Paradigms', href: '/paradigms', icon: Layers },
   { name: 'Audiences', href: '/audiences', icon: UserCircle },
+  { name: 'Chains', href: '/chains', icon: Network },
   { name: 'Pipelines', href: '/pipelines', icon: GitBranch },
   { name: 'Workflows', href: '/workflows', icon: GitMerge },
   { name: 'Implementations', href: '/implementations', icon: Workflow },
