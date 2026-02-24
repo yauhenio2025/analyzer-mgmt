@@ -138,6 +138,7 @@ class ApiClient {
       status?: string;
       search?: string;
       app?: string;
+      function?: string;
       limit?: number;
       offset?: number;
     }) => {
@@ -231,6 +232,15 @@ class ApiClient {
      */
     getApps: async () => {
       const response = await fetch(`${ANALYZER_V2_URL}/v1/engines/apps`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<string[]>;
+    },
+
+    /**
+     * Get function tags from analyzer-v2.
+     */
+    getFunctions: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/engines/functions`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json() as Promise<string[]>;
     },

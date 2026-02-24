@@ -164,6 +164,7 @@ export interface Engine {
   extraction_focus: string[];
   primary_output_modes: string[];
   paradigm_keys: string[];
+  function?: string;
   status: EngineStatus;
   engine_profile?: EngineProfile;
   created_at?: string;
@@ -182,6 +183,7 @@ export interface EngineSummary {
   has_stage_context?: boolean;  // Indicates if engine uses stage_context
   has_profile?: boolean;        // Indicates if engine has rich profile/about section
   apps?: string[];              // Apps that use this engine (e.g., 'critic')
+  function?: string;              // Primary function/role (e.g., 'genealogy')
 }
 
 export interface EngineVersion {

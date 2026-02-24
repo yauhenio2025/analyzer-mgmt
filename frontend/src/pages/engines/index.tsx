@@ -262,15 +262,17 @@ function SearchResults({ engines }: { engines: EngineSummary[] }) {
 export default function EnginesPage() {
   const [search, setSearch] = useState('');
   const [selectedApp, setSelectedApp] = useState<string | null>(null);
+  const [selectedFunction, setSelectedFunction] = useState<string | null>(null);
   const [capabilityOnly, setCapabilityOnly] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   const { data: engineData, isLoading, error } = useQuery({
-    queryKey: ['engines', { search, app: selectedApp }],
+    queryKey: ['engines', { search, app: selectedApp, function: selectedFunction }],
     queryFn: () =>
       api.engines.list({
         search: search || undefined,
         app: selectedApp || undefined,
+        function: selectedFunction || undefined,
         limit: 500,
       }),
   });
@@ -278,6 +280,11 @@ export default function EnginesPage() {
   const { data: appsData } = useQuery({
     queryKey: ['engines', 'apps'],
     queryFn: () => api.engines.getApps(),
+  });
+
+  const { data: functionsData } = useQuery({
+    queryKey: ['engines', 'functions'],
+    queryFn: () => api.engines.getFunctions(),
   });
 
   const { data: capabilityKeys } = useQuery({
@@ -296,6 +303,7 @@ export default function EnginesPage() {
     ? allEnginesRaw.filter(e => capKeySet.has(e.engine_key))
     : allEnginesRaw;
   const apps = appsData ?? [];
+  const functions = functionsData ?? [];
 
   // Group engines by category
   const enginesByCategory = useMemo(() => {
@@ -411,6 +419,35 @@ export default function EnginesPage() {
                   )}
                 >
                   {app}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {functions.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-gray-400 font-medium">Function:</span>
+              <button
+                onClick={() => setSelectedFunction(null)}
+                className={clsx(
+                  'badge cursor-pointer text-xs',
+                  selectedFunction === null ? 'badge-primary' : 'badge-gray hover:bg-gray-200'
+                )}
+              >
+                All
+              </button>
+              {functions.map((fn) => (
+                <button
+                  key={fn}
+                  onClick={() => setSelectedFunction(selectedFunction === fn ? null : fn)}
+                  className={clsx(
+                    'badge cursor-pointer capitalize text-xs',
+                    selectedFunction === fn
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'badge-gray hover:bg-gray-200'
+                  )}
+                >
+                  {fn}
                 </button>
               ))}
             </div>
