@@ -1,7 +1,7 @@
 import { useRouter } from 'next/router';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { ArrowLeft, AlertCircle, Copy, Check } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Copy, Check, Palette } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { StyleGuide, StyleSchool } from '@/types';
 import { useState } from 'react';
@@ -101,7 +101,16 @@ export default function StyleDetailPage() {
           <ArrowLeft className="h-4 w-4 mr-1" />
           Back to Styles
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">{style.name}</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900">{style.name}</h1>
+          <Link
+            href={`/styles/${key}/tokens`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Palette className="h-3.5 w-3.5" />
+            Design Tokens
+          </Link>
+        </div>
         <p className="mt-2 text-gray-600 max-w-3xl">{style.philosophy}</p>
       </div>
 

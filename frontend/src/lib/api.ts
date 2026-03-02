@@ -1121,6 +1121,35 @@ class ApiClient {
         audience_affinities: number;
       }>;
     },
+
+    /**
+     * Get design tokens for a style school.
+     */
+    getTokens: async (styleKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/styles/tokens/${styleKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').DesignTokenSet>;
+    },
+
+    /**
+     * Regenerate design tokens for a style school (clears cache).
+     */
+    regenerateTokens: async (styleKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/styles/tokens/${styleKey}/regenerate`, {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<import('@/types').DesignTokenSet>;
+    },
+
+    /**
+     * Get design tokens as CSS custom properties.
+     */
+    getTokensCss: async (styleKey: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/styles/tokens/${styleKey}/css`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.text();
+    },
   };
 
   // ============================================================================

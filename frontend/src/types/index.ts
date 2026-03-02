@@ -888,6 +888,36 @@ export interface EngineStyleMapping {
 }
 
 // ============================================================================
+// Design Token Types (from analyzer-v2 token generation)
+// ============================================================================
+
+export interface SemanticTriple {
+  bg: string;
+  text: string;
+  border: string;
+}
+
+export interface CategoricalItem {
+  bg: string;
+  text: string;
+  border: string;
+  label: string;
+}
+
+export interface DesignTokenSet {
+  school_key: string;
+  school_name: string;
+  generated_at: string;
+  version: string;
+  primitives: Record<string, unknown>;
+  surfaces: Record<string, string>;
+  scales: Record<string, string>;
+  semantic: Record<string, SemanticTriple>;
+  categorical: Record<string, CategoricalItem>;
+  components: Record<string, string>;
+}
+
+// ============================================================================
 // Primitive Types (from analyzer-v2)
 // ============================================================================
 
