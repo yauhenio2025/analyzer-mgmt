@@ -23,6 +23,7 @@ const SOURCE_COLORS: Record<string, string> = {
 interface WorkflowWithChainInfo extends WorkflowSummary {
   chain_count: number;
   engine_count: number;
+  transformation_count: number;
 }
 
 function ImplementationCard({ workflow }: { workflow: WorkflowWithChainInfo }) {
@@ -52,6 +53,12 @@ function ImplementationCard({ workflow }: { workflow: WorkflowWithChainInfo }) {
               <span className="badge text-xs bg-violet-100 text-violet-800 flex items-center gap-1">
                 <GitBranch className="h-3 w-3" />
                 {workflow.chain_count} chains
+              </span>
+            )}
+            {workflow.transformation_count > 0 && (
+              <span className="badge text-xs bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                <Layers className="h-3 w-3" />
+                {workflow.transformation_count} transforms
               </span>
             )}
             <span className="badge badge-gray text-xs flex items-center gap-1">
@@ -100,7 +107,7 @@ export default function ImplementationsPage() {
   const enriched: WorkflowWithChainInfo[] = (workflowData?.workflows ?? []).map((ws) => {
     const full = fullWorkflows?.find((w) => w.workflow_key === ws.workflow_key);
     if (!full) {
-      return { ...ws, chain_count: 0, engine_count: 0 };
+      return { ...ws, chain_count: 0, engine_count: 0, transformation_count: ws.linked_transformation_keys?.length ?? 0 };
     }
 
     const chainKeys = new Set<string>();
@@ -133,6 +140,7 @@ export default function ImplementationsPage() {
       phase_count: full.phases?.length ?? ws.phase_count,
       chain_count: chainKeys.size,
       engine_count: engineKeys.size + engineCountFromChains,
+      transformation_count: full.linked_transformation_keys?.length ?? ws.linked_transformation_keys?.length ?? 0,
     };
   });
 

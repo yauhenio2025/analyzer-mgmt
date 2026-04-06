@@ -8,13 +8,16 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronRight,
+  Cpu,
   FileText,
+  GitBranch,
   Link2,
   Database,
+  Layers,
   Zap,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { Workflow, WorkflowPhase, AudienceType } from '@/types';
+import type { Workflow, WorkflowPhase, AudienceType, EngineChainSpec, TransformationTemplate } from '@/types';
 import clsx from 'clsx';
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -30,10 +33,12 @@ function PhaseCard({
   phase,
   workflowKey,
   allPhases,
+  chain,
 }: {
   phase: WorkflowPhase;
   workflowKey: string;
   allPhases: WorkflowPhase[];
+  chain: EngineChainSpec | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -93,17 +98,50 @@ function PhaseCard({
 
       {expanded && (
         <div className="border-t bg-gray-50 p-4 space-y-3">
-          {/* Engine Link */}
-          <div className="flex items-center gap-2 text-sm">
-            <Zap className="h-4 w-4 text-gray-400" />
-            <span className="text-gray-600">Engine:</span>
-            <Link
-              href={`/engines/${phase.engine_key}`}
-              className="text-primary-600 hover:underline font-mono text-xs"
-            >
-              {phase.engine_key}
-            </Link>
-          </div>
+          {phase.engine_key ? (
+            <div className="flex items-center gap-2 text-sm">
+              <Zap className="h-4 w-4 text-gray-400" />
+              <span className="text-gray-600">Engine:</span>
+              <Link
+                href={`/engines/${phase.engine_key}`}
+                className="text-primary-600 hover:underline font-mono text-xs"
+              >
+                {phase.engine_key}
+              </Link>
+            </div>
+          ) : chain ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <GitBranch className="h-4 w-4 text-violet-500" />
+                <span className="text-gray-600">Chain:</span>
+                <Link
+                  href={`/chains/${chain.chain_key}`}
+                  className="text-violet-700 hover:underline font-mono text-xs"
+                >
+                  {chain.chain_key}
+                </Link>
+                <span className="badge text-xs bg-violet-100 text-violet-800">
+                  {chain.blend_mode}
+                </span>
+              </div>
+              {chain.engine_keys.length > 0 && (
+                <div className="flex items-start gap-2 text-sm">
+                  <Cpu className="h-4 w-4 text-gray-400 mt-0.5" />
+                  <div className="flex flex-wrap gap-1">
+                    {chain.engine_keys.map((engineKey) => (
+                      <Link
+                        key={engineKey}
+                        href={`/engines/${engineKey}`}
+                        className="badge text-xs bg-white text-primary-700 border border-primary-200 hover:bg-primary-50"
+                      >
+                        {engineKey}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
 
           {/* Dependencies */}
           {phase.depends_on_phases.length > 0 && (
@@ -247,6 +285,35 @@ export default function WorkflowDetailPage() {
     enabled: !!key,
   });
 
+  const chainKeys = Array.from(new Set((workflow?.phases ?? []).flatMap((phase) => phase.chain_key ? [phase.chain_key] : [])));
+
+  const { data: chainsData } = useQuery({
+    queryKey: ['workflow-chain-details', chainKeys],
+    queryFn: async () => {
+      const results = await Promise.all(chainKeys.map((chainKey) => api.chains.get(chainKey)));
+      return new Map(results.map((chain) => [chain.chain_key, chain] as const));
+    },
+    enabled: chainKeys.length > 0,
+  });
+
+  const { data: linkedTransformations } = useQuery({
+    queryKey: ['workflow-linked-transformations', workflow?.workflow_key, workflow?.linked_transformation_keys],
+    queryFn: async () => {
+      const keys = workflow?.linked_transformation_keys ?? [];
+      const results = await Promise.all(
+        keys.map(async (templateKey) => {
+          try {
+            return await api.transformations.get(templateKey);
+          } catch {
+            return null;
+          }
+        })
+      );
+      return results.filter((template): template is TransformationTemplate => template !== null);
+    },
+    enabled: !!workflow && (workflow.linked_transformation_keys?.length ?? 0) > 0,
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -305,6 +372,24 @@ export default function WorkflowDetailPage() {
         </div>
       </div>
 
+      <div className="card p-4 border border-indigo-200 bg-indigo-50/70">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-sm font-semibold text-indigo-900">Canonical composition view</p>
+            <p className="mt-1 text-sm text-indigo-800">
+              For chain-backed workflows, use the implementation detail page as the canonical composition
+              surface. This workflow page stays useful for quick phase inspection and prompt preview.
+            </p>
+          </div>
+          <Link
+            href={`/implementations/${workflow.workflow_key}`}
+            className="inline-flex items-center rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+          >
+            Open implementation detail
+          </Link>
+        </div>
+      </div>
+
       {/* Info Card */}
       <div className="card p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Workflow Information</h2>
@@ -332,6 +417,10 @@ export default function WorkflowDetailPage() {
             <div>
               <label className="label">Phases</label>
               <span className="text-gray-700 font-medium">{phases.length}</span>
+            </div>
+            <div>
+              <label className="label">Transforms</label>
+              <span className="text-gray-700 font-medium">{workflow.linked_transformation_keys?.length ?? 0}</span>
             </div>
             <div>
               <label className="label">Source Project</label>
@@ -376,6 +465,38 @@ export default function WorkflowDetailPage() {
         )}
       </div>
 
+      {(workflow.linked_transformation_keys?.length ?? 0) > 0 && (
+        <div className="card p-6">
+          <div className="flex items-center gap-2">
+            <Layers className="h-5 w-5 text-emerald-500" />
+            <h2 className="text-lg font-semibold text-gray-900">Linked Transformations</h2>
+          </div>
+          <p className="mt-2 text-sm text-gray-500">
+            Explicit workflow-to-transformation linkage for the artifacts this workflow materializes.
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {(linkedTransformations ?? []).map((template) => (
+              <Link
+                key={template.template_key}
+                href={`/transformations/${template.template_key}`}
+                className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 transition-colors hover:bg-emerald-50"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">{template.template_name}</h3>
+                    <p className="mt-1 font-mono text-xs text-gray-500">{template.template_key}</p>
+                  </div>
+                  <span className="badge text-xs bg-white text-emerald-700 border border-emerald-200">
+                    {template.transformation_type}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm text-gray-600">{template.description}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Dependency Graph */}
       {phases.length > 0 && (
         <div className="card p-6">
@@ -402,6 +523,7 @@ export default function WorkflowDetailPage() {
               phase={phase}
               workflowKey={workflow.workflow_key}
               allPhases={phases}
+              chain={phase.chain_key ? (chainsData?.get(phase.chain_key) ?? null) : null}
             />
           ))}
         </div>

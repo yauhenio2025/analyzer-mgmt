@@ -26,19 +26,19 @@ import {
   Loader2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { buildPassesByDepth } from '@/enginePasses';
 import type {
   Workflow as WorkflowType,
   WorkflowPhase,
   EngineChainSpec,
   CapabilityEngineDefinition,
   EngineOperationalization,
-  DepthLevel,
-  PassDefinition,
   WorkflowExtensionAnalysis,
   PhaseExtensionPoint,
   CandidateEngine,
   DimensionCoverage,
   CapabilityGap,
+  TransformationTemplate,
 } from '@/types';
 import clsx from 'clsx';
 
@@ -123,8 +123,10 @@ function EngineCard({
   const depthSequence = opDef?.depth_sequences?.find((d) => d.depth_key === depth);
   const stanceSequence = depthSequence?.passes?.map((p) => p.stance_key) ?? [];
 
-  // Get depth level info from capability definition
-  const depthLevel = capDef?.depth_levels?.find((d) => d.key === depth);
+  const depthPasses = useMemo(() => {
+    const passesByDepth = buildPassesByDepth(capDef, opDef);
+    return passesByDepth[depth] ?? [];
+  }, [capDef, opDef, depth]);
 
   // First paragraph of problematique
   const problematique = capDef?.problematique ?? '';
@@ -178,14 +180,14 @@ function EngineCard({
               </div>
             )}
 
-            {/* Depth level passes (from capability definition) */}
-            {depthLevel && depthLevel.passes && depthLevel.passes.length > 0 && (
+            {/* Pass structure (inline capability passes first, then operationalization fallback) */}
+            {depthPasses.length > 0 && (
               <div>
                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  {depth} depth — {depthLevel.passes.length} passes
+                  {depth} depth — {depthPasses.length} passes
                 </span>
                 <div className="mt-1 space-y-1">
-                  {depthLevel.passes.map((p: PassDefinition) => (
+                  {depthPasses.map((p) => (
                     <div key={p.pass_number} className="flex items-center gap-2 text-xs">
                       <span className="w-5 h-5 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-medium text-[10px]">
                         {p.pass_number}
@@ -686,7 +688,7 @@ function PhaseBlock({
           <div className="flex items-center gap-2 flex-wrap">
             <GitBranch className="h-4 w-4 text-violet-500" />
             <Link
-              href={`/workflows/${phase.chain_key}`}
+              href={`/chains/${phase.chain_key}`}
               className="text-sm font-medium text-violet-700 hover:underline"
             >
               {chain.chain_name}
@@ -904,6 +906,24 @@ export default function ImplementationDetailPage() {
   const opDefs = opDefsData ?? new Map<string, EngineOperationalization | null>();
   const chainMap = chainsData ?? new Map<string, EngineChainSpec>();
 
+  const { data: linkedTransformations } = useQuery({
+    queryKey: ['workflow-transformations', workflow?.workflow_key, workflow?.linked_transformation_keys],
+    queryFn: async () => {
+      const keys = workflow?.linked_transformation_keys ?? [];
+      const results = await Promise.all(
+        keys.map(async (templateKey) => {
+          try {
+            return await api.transformations.get(templateKey);
+          } catch {
+            return null;
+          }
+        })
+      );
+      return results.filter((template): template is TransformationTemplate => template !== null);
+    },
+    enabled: !!workflow && (workflow.linked_transformation_keys?.length ?? 0) > 0,
+  });
+
   // Build extension map by phase number
   const extensionMap = useMemo(() => {
     if (!extensionAnalysis) return new Map<number, PhaseExtensionPoint>();
@@ -978,6 +998,25 @@ export default function ImplementationDetailPage() {
         </div>
       </div>
 
+      <div className="card p-4 border border-indigo-200 bg-indigo-50/70">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-sm font-semibold text-indigo-900">Canonical composition view</p>
+            <p className="mt-1 text-sm text-indigo-800">
+              This implementation page is the canonical composition surface for chain-backed workflows.
+              Use the workflow detail page for the simpler phase listing; use this page to inspect chain
+              composition and linked transformations.
+            </p>
+          </div>
+          <Link
+            href={`/workflows/${workflow.workflow_key}`}
+            className="inline-flex items-center rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+          >
+            Open workflow detail
+          </Link>
+        </div>
+      </div>
+
       {/* Info Card */}
       <div className="card p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1021,6 +1060,13 @@ export default function ImplementationDetailPage() {
                 {engineCount}
               </span>
             </div>
+            <div>
+              <label className="label">Transforms</label>
+              <span className="text-gray-700 font-medium flex items-center gap-1">
+                <Layers className="h-4 w-4 text-emerald-500" />
+                {workflow.linked_transformation_keys?.length ?? 0}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -1050,6 +1096,40 @@ export default function ImplementationDetailPage() {
           )}
         </div>
       </div>
+
+      {(workflow.linked_transformation_keys?.length ?? 0) > 0 && (
+        <div className="card p-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Linked Transformations</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Explicit workflow-to-transformation linkage for the artifacts this implementation materializes.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {(linkedTransformations ?? []).map((template) => (
+              <Link
+                key={template.template_key}
+                href={`/transformations/${template.template_key}`}
+                className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 transition-colors hover:bg-emerald-50"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">{template.template_name}</h3>
+                    <p className="mt-1 font-mono text-xs text-gray-500">{template.template_key}</p>
+                  </div>
+                  <span className="badge text-xs bg-white text-emerald-700 border border-emerald-200">
+                    {template.transformation_type}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm text-gray-600">{template.description}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Depth Toggle + Extension Points Toggle */}
       <div className="card p-4">

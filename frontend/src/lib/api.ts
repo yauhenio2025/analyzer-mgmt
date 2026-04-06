@@ -63,6 +63,20 @@ import type {
   TransformationTemplateSummary,
   TransformationExecuteRequest,
   TransformationExecuteResponse,
+  ExecutorJobListResponse,
+  ExecutorJobSummary,
+  PresentationStatusResponse,
+  EffectivePresentationManifest,
+  PresentationDecisionTrace,
+  PagePresentation,
+  ViewPayload,
+  VariantSetResponse,
+  VariantTargetResponse,
+  VariantSelectionRecord,
+  VariantSelectionResponse,
+  RuntimeConsumerSummary,
+  AnalysisResultManifest,
+  RunDetail,
 } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
@@ -468,6 +482,7 @@ class ApiClient {
         phase_count: (w.phase_count as number) ?? (w.pass_count as number) ?? (w.phases as unknown[] | undefined)?.length ?? (w.passes as unknown[] | undefined)?.length ?? 0,
         source_project: (w.source_project as string) ?? '',
         required_inputs: (w.required_inputs as string[]) ?? [],
+        linked_transformation_keys: (w.linked_transformation_keys as string[]) ?? [],
       }));
       return { workflows: summaries, total: summaries.length };
     },
@@ -492,6 +507,9 @@ class ApiClient {
       }
       if (data.estimated_passes !== undefined && data.estimated_phases === undefined) {
         data.estimated_phases = data.estimated_passes;
+      }
+      if (!Array.isArray(data.linked_transformation_keys)) {
+        data.linked_transformation_keys = [];
       }
       return data as Workflow;
     },
@@ -644,6 +662,202 @@ class ApiClient {
 
     removeDependency: (consumerId: string, dependencyId: string) =>
       this.delete<{ message: string }>(`/consumers/${consumerId}/dependencies/${dependencyId}`),
+  };
+
+  // ============================================================================
+  // Runtime Presentation Endpoints (from analyzer-v2)
+  // ============================================================================
+
+  executorJobs = {
+    list: async (params?: { status?: string; limit?: number; project_id?: string; plan_id?: string }) => {
+      const queryParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) queryParams.set(key, String(value));
+        });
+      }
+      const query = queryParams.toString();
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/executor/jobs${query ? `?${query}` : ''}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<ExecutorJobListResponse>;
+    },
+
+    get: async (jobId: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/executor/jobs/${jobId}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<ExecutorJobSummary>;
+    },
+  };
+
+  runtimeConsumers = {
+    list: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/consumers`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<RuntimeConsumerSummary[]>;
+    },
+  };
+
+  presenter = {
+    getStatus: async (jobId: string, consumerKey = 'the-critic') => {
+      const query = new URLSearchParams({ consumer_key: consumerKey }).toString();
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/presenter/status/${jobId}?${query}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<PresentationStatusResponse>;
+    },
+
+    getManifest: async (
+      jobId: string,
+      params?: { consumerKey?: string; slim?: boolean }
+    ) => {
+      const queryParams = new URLSearchParams({
+        consumer_key: params?.consumerKey || 'the-critic',
+        slim: String(params?.slim ?? true),
+      });
+      const response = await fetch(
+        `${ANALYZER_V2_URL}/v1/presenter/manifest/${jobId}?${queryParams.toString()}`
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<EffectivePresentationManifest>;
+    },
+
+    getTrace: async (jobId: string, consumerKey = 'the-critic') => {
+      const query = new URLSearchParams({ consumer_key: consumerKey }).toString();
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/presenter/trace/${jobId}?${query}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<PresentationDecisionTrace>;
+    },
+
+    getPage: async (
+      jobId: string,
+      params?: { consumerKey?: string; slim?: boolean }
+    ) => {
+      const queryParams = new URLSearchParams({
+        consumer_key: params?.consumerKey || 'the-critic',
+        slim: String(params?.slim ?? true),
+      });
+      const response = await fetch(
+        `${ANALYZER_V2_URL}/v1/presenter/page/${jobId}?${queryParams.toString()}`
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<PagePresentation>;
+    },
+
+    getView: async (jobId: string, viewKey: string, consumerKey = 'the-critic') => {
+      const query = new URLSearchParams({ consumer_key: consumerKey }).toString();
+      const response = await fetch(
+        `${ANALYZER_V2_URL}/v1/presenter/view/${jobId}/${encodeURIComponent(viewKey)}?${query}`
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<ViewPayload>;
+    },
+  };
+
+  presentationVariants = {
+    listTargets: async () => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/variants/targets`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<VariantTargetResponse>;
+    },
+
+    generate: async (data: {
+      job_id: string;
+      view_key: string;
+      dimension: 'renderer_type' | 'sub_renderer_strategy';
+      max_variants?: number;
+      style_school?: string;
+      force?: boolean;
+    }) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/variants/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+      }
+      return response.json() as Promise<VariantSetResponse>;
+    },
+
+    listSets: async (jobId: string, viewKey: string) => {
+      const query = new URLSearchParams({ job_id: jobId, view_key: viewKey }).toString();
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/variants/sets?${query}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<VariantSetResponse[]>;
+    },
+
+    getSet: async (variantSetId: string) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/variants/sets/${variantSetId}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<VariantSetResponse>;
+    },
+
+    getSelection: async (jobId: string, viewKey: string) => {
+      const query = new URLSearchParams({ job_id: jobId, view_key: viewKey }).toString();
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/variants/selection?${query}`);
+      if (response.status === 204) {
+        return [] as VariantSelectionRecord[];
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<VariantSelectionRecord[]>;
+    },
+
+    select: async (data: {
+      variant_set_id: string;
+      variant_id: string;
+      job_id: string;
+      project_id?: string;
+    }) => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/variants/select`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+      }
+      return response.json() as Promise<VariantSelectionResponse>;
+    },
+  };
+
+  // ============================================================================
+  // Result Boundary Endpoints
+  // ============================================================================
+
+  resultBoundary = {
+    getManifest: async (jobId: string, consumerKey = 'the-critic') => {
+      const query = new URLSearchParams({ consumer_key: consumerKey }).toString();
+      const response = await fetch(
+        `${ANALYZER_V2_URL}/v1/results/by-job/${jobId}?${query}`
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<AnalysisResultManifest>;
+    },
+
+    refreshPresentation: async (jobId: string, consumerKey = 'the-critic') => {
+      const query = new URLSearchParams({ consumer_key: consumerKey }).toString();
+      const response = await fetch(
+        `${ANALYZER_V2_URL}/v1/results/by-job/${jobId}/refresh-presentation?${query}`,
+        { method: 'POST' }
+      );
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+      }
+      return response.json();
+    },
+  };
+
+  runBoundary = {
+    getRun: async (jobId: string, consumerKey = 'the-critic') => {
+      const query = new URLSearchParams({ consumer_key: consumerKey }).toString();
+      const response = await fetch(
+        `${ANALYZER_V2_URL}/v1/runs/by-job/${jobId}?${query}`
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<RunDetail>;
+    },
   };
 
   // ============================================================================

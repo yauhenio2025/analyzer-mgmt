@@ -444,6 +444,7 @@ export default function OperationalizationDetailPage() {
   const router = useRouter();
   const { key } = router.query;
   const queryClient = useQueryClient();
+  const routeKey = typeof key === 'string' ? key : null;
   const [generating, setGenerating] = useState(false);
   const [generatingStance, setGeneratingStance] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -454,9 +455,9 @@ export default function OperationalizationDetailPage() {
   const [dirtyDepths, setDirtyDepths] = useState<Set<string>>(new Set());
 
   const { data: op, isLoading, error } = useQuery({
-    queryKey: ['operationalization', key],
-    queryFn: () => api.operationalizations.get(key as string),
-    enabled: !!key,
+    queryKey: ['operationalization', routeKey],
+    queryFn: () => api.operationalizations.get(routeKey as string),
+    enabled: !!routeKey,
   });
 
   // Fetch all stances for the "add stance" dropdown
@@ -472,7 +473,13 @@ export default function OperationalizationDetailPage() {
     }
   }, [op]);
 
-  if (isLoading || !key) {
+  useEffect(() => {
+    if (routeKey && op?.engine_key && op.engine_key !== routeKey) {
+      router.replace(`/operationalizations/${op.engine_key}`);
+    }
+  }, [op?.engine_key, routeKey, router]);
+
+  if (isLoading || !routeKey) {
     return (
       <div className="p-8">
         <div className="animate-pulse space-y-4">
@@ -498,6 +505,7 @@ export default function OperationalizationDetailPage() {
   }
 
   if (!op) return null;
+  const canonicalKey = op.engine_key;
 
   const sequences = editedSequences || op.depth_sequences;
 
@@ -521,8 +529,8 @@ export default function OperationalizationDetailPage() {
         ...op,
         depth_sequences: editedSequences,
       };
-      await api.operationalizations.update(key as string, updated);
-      queryClient.invalidateQueries({ queryKey: ['operationalization', key] });
+      await api.operationalizations.update(canonicalKey, updated);
+      queryClient.invalidateQueries({ queryKey: ['operationalization', routeKey] });
       setDirtyDepths(new Set());
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
@@ -544,8 +552,8 @@ export default function OperationalizationDetailPage() {
   const handleGenerateAll = async () => {
     setGenerating(true);
     try {
-      await api.operationalizations.generateAll(key as string);
-      queryClient.invalidateQueries({ queryKey: ['operationalization', key] });
+      await api.operationalizations.generateAll(canonicalKey);
+      queryClient.invalidateQueries({ queryKey: ['operationalization', routeKey] });
       setEditedSequences(null); // Reset to let new data load
     } catch (err) {
       console.error('Generation failed:', err);
@@ -558,11 +566,11 @@ export default function OperationalizationDetailPage() {
   const handleGenerateStance = async (stanceKey: string) => {
     setGeneratingStance(stanceKey);
     try {
-      const result = await api.operationalizations.generate(key as string, stanceKey);
+      const result = await api.operationalizations.generate(canonicalKey, stanceKey);
       // The result contains the generated operationalization — save it
       if (result.operationalization) {
-        await api.operationalizations.updateStanceOp(key as string, stanceKey, result.operationalization);
-        queryClient.invalidateQueries({ queryKey: ['operationalization', key] });
+        await api.operationalizations.updateStanceOp(canonicalKey, stanceKey, result.operationalization);
+        queryClient.invalidateQueries({ queryKey: ['operationalization', routeKey] });
       }
     } catch (err) {
       console.error(`Generation failed for ${stanceKey}:`, err);

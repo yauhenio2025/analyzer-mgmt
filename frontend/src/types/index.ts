@@ -371,6 +371,7 @@ export interface Workflow {
   required_inputs: string[];
   optional_inputs: string[];
   output_description: string;
+  linked_transformation_keys: string[];
   final_output_schema: Record<string, unknown> | null;
   estimated_phases: number;
   source_project: string;
@@ -385,6 +386,7 @@ export interface WorkflowSummary {
   phase_count: number;
   source_project: string;
   required_inputs: string[];
+  linked_transformation_keys: string[];
 }
 
 // ============================================================================
@@ -1764,4 +1766,377 @@ export interface PlanPhaseSpec {
   estimated_tokens: number;
   estimated_cost_usd: number;
   rationale: string;
+}
+
+// ============================================================================
+// Runtime Presentation Types
+// ============================================================================
+
+export interface RuntimeConsumerSummary {
+  consumer_key: string;
+  consumer_name: string;
+  description: string;
+  consumer_type: string;
+  supported_renderers: string[];
+  supported_sub_renderers: string[];
+  page_count: number;
+  status: string;
+}
+
+export interface ExecutorJobProgress {
+  current_phase: number;
+  total_phases: number;
+  phase_name: string;
+  detail: string;
+  completed_phases: string[];
+  phase_statuses: Record<string, string>;
+}
+
+export interface ExecutorJobSummary {
+  job_id: string;
+  plan_id: string;
+  status: string;
+  progress: ExecutorJobProgress;
+  error?: string | null;
+  workflow_key: string;
+  project_id?: string | null;
+  created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  total_llm_calls: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+}
+
+export interface ExecutorJobListResponse {
+  jobs: ExecutorJobSummary[];
+  count: number;
+}
+
+export interface PresentationPreparationState {
+  job_id: string;
+  status: string;
+  detail: string;
+  stats: Record<string, unknown>;
+  error?: string | null;
+  started_at?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
+  active: boolean;
+}
+
+export interface PresentationStatusView {
+  view_key: string;
+  status: string;
+  has_prose: boolean;
+  has_structured_data: boolean;
+  derived_from_children?: boolean;
+  derived_from_parent?: string;
+}
+
+export interface PresentationStatusResponse {
+  job_id: string;
+  consumer_key: string;
+  presentation_contract_version: number;
+  presentation_hash: string;
+  presentation_content_hash: string;
+  prepared_at: string;
+  artifacts_ready: boolean;
+  manifest_schema_version: number;
+  trace_schema_version: number;
+  resolver_version: string;
+  style_school?: string;
+  polish_state?: 'raw' | 'partial' | 'polished';
+  preparation: PresentationPreparationState;
+  views: PresentationStatusView[];
+  total: number;
+  ready: number;
+  prose_only: number;
+  empty: number;
+}
+
+export interface ViewPayload {
+  view_key: string;
+  view_name: string;
+  description: string;
+  renderer_type: string;
+  renderer_config: Record<string, unknown>;
+  presentation_stance?: string | null;
+  priority: string;
+  rationale: string;
+  data_quality: string;
+  top_level_group?: string | null;
+  source_parent_view_key?: string | null;
+  promoted_to_top_level: boolean;
+  selection_priority?: string | null;
+  navigation_state?: string | null;
+  structuring_policy?: string | null;
+  semantic_scaffold_type?: string | null;
+  scaffold_hosting_mode?: string | null;
+  derivation_kind?: string | null;
+  phase_number?: number | null;
+  engine_key?: string | null;
+  chain_key?: string | null;
+  scope: string;
+  has_structured_data: boolean;
+  structured_data?: unknown;
+  reading_scaffold?: Record<string, unknown> | null;
+  raw_prose?: string | null;
+  prose_ref_view_key?: string | null;
+  items?: Array<Record<string, unknown>> | null;
+  tab_count?: number | null;
+  visibility: string;
+  position: number;
+  children: ViewPayload[];
+}
+
+export interface PagePresentation {
+  job_id: string;
+  plan_id: string;
+  consumer_key: string;
+  presentation_version: number;
+  presentation_contract_version: number;
+  presentation_hash: string;
+  presentation_content_hash: string;
+  prepared_at: string;
+  artifacts_ready: boolean;
+  manifest_schema_version: number;
+  trace_schema_version: number;
+  resolver_version: string;
+  style_school?: string;
+  polish_state?: 'raw' | 'partial' | 'polished';
+  thinker_name: string;
+  strategy_summary: string;
+  views: ViewPayload[];
+  view_count: number;
+  execution_summary: Record<string, unknown>;
+  refinement_applied: boolean;
+  refinement_summary: string;
+}
+
+export interface EffectiveManifestView {
+  view_key: string;
+  view_name: string;
+  description: string;
+  renderer_type: string;
+  renderer_config: Record<string, unknown>;
+  presentation_stance?: string | null;
+  selection_priority: string;
+  navigation_state: string;
+  promoted_to_top_level: boolean;
+  source_parent_view_key?: string | null;
+  display_parent_view_key?: string | null;
+  child_view_keys: string[];
+  top_level_group?: string | null;
+  position: number;
+  semantic_scaffold_type: string;
+  scaffold_hosting_mode: string;
+  structuring_policy?: string | null;
+  derivation_kind?: string | null;
+  legacy_visibility?: string | null;
+}
+
+export interface EffectivePresentationManifest {
+  job_id: string;
+  plan_id: string;
+  consumer_key: string;
+  presentation_contract_version: number;
+  presentation_hash: string;
+  presentation_content_hash: string;
+  prepared_at: string;
+  artifacts_ready: boolean;
+  manifest_schema_version: number;
+  trace_schema_version: number;
+  resolver_version: string;
+  style_school?: string;
+  polish_state?: 'raw' | 'partial' | 'polished';
+  thinker_name: string;
+  strategy_summary: string;
+  views: EffectiveManifestView[];
+  view_count: number;
+}
+
+export interface DecisionTraceChange {
+  view_key: string;
+  field: string;
+  before?: unknown;
+  after?: unknown;
+  reason: string;
+}
+
+export interface IgnoredOverride {
+  view_key: string;
+  field: string;
+  value?: unknown;
+  reason: string;
+}
+
+export interface DecisionTraceEntry {
+  stage: string;
+  reason: string;
+  applied_changes: DecisionTraceChange[];
+  ignored_changes: IgnoredOverride[];
+  snapshot: EffectiveManifestView[];
+}
+
+export interface PresentationDecisionTrace {
+  job_id: string;
+  plan_id: string;
+  consumer_key: string;
+  manifest_schema_version: number;
+  trace_schema_version: number;
+  resolver_version: string;
+  style_school?: string;
+  polish_state?: 'raw' | 'partial' | 'polished';
+  entries: DecisionTraceEntry[];
+  final_manifest: EffectivePresentationManifest;
+}
+
+export interface VariantResponse {
+  variant_id: string;
+  variant_index: number;
+  is_control: boolean;
+  renderer_type: string;
+  renderer_config: Record<string, unknown>;
+  rationale: string;
+  compatibility_score: number;
+}
+
+export interface VariantSetResponse {
+  variant_set_id: string;
+  job_id: string;
+  view_key: string;
+  dimension: string;
+  base_renderer: string;
+  variants: VariantResponse[];
+  variant_count: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface VariantTargetResponse {
+  view_keys: string[];
+  count: number;
+}
+
+export interface VariantSelectionRecord {
+  variant_set_id: string;
+  job_id: string;
+  view_key: string;
+  dimension: string;
+  base_renderer: string;
+  style_school?: string;
+  variant_count: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  selected_variant_id: string;
+  selected_at: string;
+}
+
+export interface VariantSelectionResponse {
+  variant_set_id: string;
+  variant_id: string;
+  view_key: string;
+  selected_at: string;
+  feedback_event_emitted: boolean;
+}
+
+// ============================================================================
+// Stage 3 Result Boundary Types
+// ============================================================================
+
+export interface ArtifactSlotSummary {
+  slot: string;
+  state: string;
+  artifact_ref?: string;
+  source_output_id?: string;
+}
+
+export interface ArtifactFamilySummary {
+  artifact_family: string;
+  state: string;
+  format: string;
+  total_slots: number;
+  ready_slots: number;
+  pending_slots: number;
+  stale_slots: number;
+  unavailable_slots: number;
+  slots: ArtifactSlotSummary[];
+}
+
+export interface AnalysisResultLinks {
+  page_url: string;
+  presentation_url: string;
+  manifest_url: string;
+  trace_url: string;
+  refresh_presentation_url: string;
+}
+
+export interface AnalysisResultManifest {
+  job_id: string;
+  plan_id: string;
+  workflow_key: string;
+  consumer_key: string;
+  result_id: string;
+  result_state: string;
+  corpus_ref?: string;
+  status: string;
+  presentation_contract_version: number;
+  presentation_hash: string;
+  presentation_content_hash: string;
+  prepared_at: string;
+  artifacts_ready: boolean;
+  presentation_status: string;
+  preparation_detail: string;
+  presentation_active: boolean;
+  restore_available: boolean;
+  restore_reason: string;
+  staleness_reasons: string[];
+  product_warnings: string[];
+  links: AnalysisResultLinks;
+  artifact_families: ArtifactFamilySummary[];
+}
+
+// ============================================================================
+// Stage 4 Run Boundary Types
+// ============================================================================
+
+export interface RunLinks {
+  result_url: string;
+  presentation_url: string;
+}
+
+export interface RunProgress {
+  current_phase: number;
+  total_phases: number;
+  phase_name: string;
+  detail: string;
+  completed_phases: string[];
+  phase_statuses: Record<string, string>;
+  structured_detail?: Record<string, unknown> | null;
+  current_pass: number;
+  total_passes: number;
+  current_pass_name: string;
+}
+
+export interface RunDetail {
+  job_id: string;
+  plan_id: string;
+  project_id?: string | null;
+  workflow_key: string;
+  consumer_key: string;
+  status: string;
+  created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  error?: string | null;
+  progress: RunProgress;
+  presentation_status: string;
+  presentation_active: boolean;
+  result_state: string;
+  restore_available: boolean;
+  restore_reason: string;
+  selected_source_thinker_id?: string | null;
+  selected_source_thinker_name?: string | null;
+  links: RunLinks;
 }

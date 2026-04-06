@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -18,7 +18,15 @@ import {
   Settings2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { Engine, EngineUpdate, StageContext, AudienceType, EngineProfile, CapabilityEngineDefinition, ThinkerReference, TraditionEntry, KeyConceptEntry } from '@/types';
+import {
+  buildCapabilityPassMap,
+  buildDimensionPassMap,
+  buildPassesByDepth,
+  type DimensionPassMap,
+  type PassHit,
+  type PassesByDepth,
+} from '@/enginePasses';
+import type { Engine, EngineUpdate, StageContext, AudienceType, EngineProfile, CapabilityEngineDefinition, EngineOperationalization, ThinkerReference, TraditionEntry, KeyConceptEntry } from '@/types';
 import clsx from 'clsx';
 import { StageContextEditor } from '@/components/StageContextEditor';
 import { EngineProfileEditor } from '@/components/EngineProfileEditor';
@@ -150,57 +158,6 @@ function getStanceStyle(stance: string) {
   return STANCE_STYLES[stance] || DEFAULT_STANCE_STYLE;
 }
 
-/** Info about which pass targets a dimension at a given depth */
-interface PassHit {
-  passNumber: number;
-  stance: string;
-  label: string;
-}
-
-/** Pre-computed map: dimensionKey → { surface: PassHit[], standard: PassHit[], deep: PassHit[] } */
-type DimensionPassMap = Record<string, Record<string, PassHit[]>>;
-
-function buildDimensionPassMap(depthLevels: CapabilityEngineDefinition['depth_levels']): DimensionPassMap {
-  const map: DimensionPassMap = {};
-  for (const dl of depthLevels) {
-    if (!dl.passes) continue;
-    for (const pass of dl.passes) {
-      for (const dimKey of (pass.focus_dimensions || [])) {
-        if (!map[dimKey]) map[dimKey] = {};
-        if (!map[dimKey][dl.key]) map[dimKey][dl.key] = [];
-        map[dimKey][dl.key].push({
-          passNumber: pass.pass_number,
-          stance: pass.stance,
-          label: pass.label || `Pass ${pass.pass_number}`,
-        });
-      }
-    }
-  }
-  return map;
-}
-
-/** Pre-computed map: capabilityKey → { surface: PassHit[], standard: PassHit[], deep: PassHit[] } */
-type CapabilityPassMap = Record<string, Record<string, PassHit[]>>;
-
-function buildCapabilityPassMap(depthLevels: CapabilityEngineDefinition['depth_levels']): CapabilityPassMap {
-  const map: CapabilityPassMap = {};
-  for (const dl of depthLevels) {
-    if (!dl.passes) continue;
-    for (const pass of dl.passes) {
-      for (const capKey of (pass.focus_capabilities || [])) {
-        if (!map[capKey]) map[capKey] = {};
-        if (!map[capKey][dl.key]) map[capKey][dl.key] = [];
-        map[capKey][dl.key].push({
-          passNumber: pass.pass_number,
-          stance: pass.stance,
-          label: pass.label || `Pass ${pass.pass_number}`,
-        });
-      }
-    }
-  }
-  return map;
-}
-
 /** Enriched capability card with expandable detail */
 function CapabilityCard({ cap, passMap, index }: {
   cap: import('@/types').EngineCapabilityItem;
@@ -211,7 +168,7 @@ function CapabilityCard({ cap, passMap, index }: {
   const hasRichContent = !!(cap.extended_description || cap.intellectual_grounding || cap.indicators?.length);
 
   // Collect all stances that exercise this capability
-  const allHits = Object.values(passMap).flat();
+  const allHits = Object.values(passMap).flat() as PassHit[];
   const uniqueStances = [...new Set(allHits.map(h => h.stance))];
 
   return (
@@ -384,16 +341,15 @@ function CapabilityCard({ cap, passMap, index }: {
 }
 
 /** Dimension × Pass pipeline matrix: shows which passes target which dimensions */
-function DimensionPassMatrix({ depthLevels, dimensions, selectedDepth, onDepthChange }: {
+function DimensionPassMatrix({ depthLevels, passesByDepth, dimensions, selectedDepth, onDepthChange }: {
   depthLevels: CapabilityEngineDefinition['depth_levels'];
+  passesByDepth: PassesByDepth;
   dimensions: CapabilityEngineDefinition['analytical_dimensions'];
   selectedDepth: string;
   onDepthChange: (d: string) => void;
 }) {
-  const dl = depthLevels.find(d => d.key === selectedDepth);
-  if (!dl?.passes?.length) return null;
-
-  const passes = [...dl.passes].sort((a, b) => a.pass_number - b.pass_number);
+  const passes = [...(passesByDepth[selectedDepth] || [])].sort((a, b) => a.pass_number - b.pass_number);
+  if (!passes.length) return null;
 
   return (
     <div className="rounded-xl border border-stone-200 overflow-hidden bg-white">
@@ -772,6 +728,7 @@ export default function EngineDetailPage() {
   const router = useRouter();
   const { key } = router.query;
   const queryClient = useQueryClient();
+  const routeKey = typeof key === 'string' ? key : null;
 
   const [activeTab, setActiveTab] = useState<TabId>('about');
   const [hasChanges, setHasChanges] = useState(false);
@@ -779,38 +736,78 @@ export default function EngineDetailPage() {
   const [localProfile, setLocalProfile] = useState<EngineProfile | null>(null);
   const [previewAudience, setPreviewAudience] = useState<AudienceType>('analyst');
 
-  const { data: engine, isLoading, error } = useQuery({
-    queryKey: ['engines', key],
-    queryFn: () => api.engines.get(key as string),
-    enabled: !!key,
+  useEffect(() => {
+    setLocalEngine(null);
+    setLocalProfile(null);
+    setHasChanges(false);
+    setActiveTab('about');
+  }, [routeKey]);
+
+  // Query for capability definition (v2 prose-mode definition)
+  const {
+    data: capabilityDef,
+    isLoading: capabilityLoading,
+  } = useQuery({
+    queryKey: ['engines', routeKey, 'capability-definition'],
+    queryFn: () => api.engines.getCapabilityDefinition(routeKey as string),
+    enabled: !!routeKey,
+  });
+
+  useEffect(() => {
+    if (routeKey && capabilityDef?.engine_key && capabilityDef.engine_key !== routeKey) {
+      router.replace(`/engines/${capabilityDef.engine_key}`);
+    }
+  }, [capabilityDef?.engine_key, routeKey, router]);
+
+  const legacyEngineKey = capabilityDef?.legacy_engine_key ?? routeKey;
+  const canonicalEngineKey = capabilityDef?.engine_key ?? routeKey;
+
+  const { data: engine, isLoading: engineLoading } = useQuery({
+    queryKey: ['engines', legacyEngineKey, 'legacy-detail'],
+    queryFn: async () => {
+      if (!legacyEngineKey) return null;
+      try {
+        return await api.engines.get(legacyEngineKey);
+      } catch {
+        return null;
+      }
+    },
+    enabled: !!legacyEngineKey,
+  });
+
+  // Query for operationalization (for pass fallbacks)
+  const { data: operationalizationDef } = useQuery({
+    queryKey: ['engines', canonicalEngineKey, 'operationalization'],
+    queryFn: async () => {
+      if (!canonicalEngineKey) return null;
+      try {
+        return await api.operationalizations.get(canonicalEngineKey);
+      } catch {
+        return null;
+      }
+    },
+    enabled: !!canonicalEngineKey && !!capabilityDef,
   });
 
   // Query for profile
   const { data: profileData } = useQuery({
-    queryKey: ['engines', key, 'profile'],
-    queryFn: () => api.engines.getProfile(key as string),
-    enabled: !!key,
-  });
-
-  // Query for capability definition (v2 prose-mode definition)
-  const { data: capabilityDef } = useQuery({
-    queryKey: ['engines', key, 'capability-definition'],
-    queryFn: () => api.engines.getCapabilityDefinition(key as string),
-    enabled: !!key,
+    queryKey: ['engines', legacyEngineKey, 'profile'],
+    queryFn: () => api.engines.getProfile(legacyEngineKey as string),
+    enabled: !!legacyEngineKey && !capabilityDef,
   });
 
   const [matrixDepth, setMatrixDepth] = useState<string>('deep');
 
   // Query for capability definition history (lazy — only when History tab active)
   const { data: capabilityHistory } = useQuery({
-    queryKey: ['engines', key, 'capability-history'],
-    queryFn: () => api.engines.getCapabilityHistory(key as string),
-    enabled: !!key && activeTab === 'history' && !!capabilityDef,
+    queryKey: ['engines', canonicalEngineKey, 'capability-history'],
+    queryFn: () => api.engines.getCapabilityHistory(canonicalEngineKey as string),
+    enabled: !!canonicalEngineKey && activeTab === 'history' && !!capabilityDef,
   });
 
   // Initialize local state when engine data loads
   useEffect(() => {
-    if (engine && !localEngine) {
+    if (engine && (!localEngine || localEngine.engine_key !== engine.engine_key)) {
       setLocalEngine(engine);
     }
   }, [engine, localEngine]);
@@ -824,53 +821,53 @@ export default function EngineDetailPage() {
 
   // Query for composed prompts (preview tab)
   const { data: extractionPreview } = useQuery({
-    queryKey: ['engines', key, 'extraction-prompt', previewAudience],
-    queryFn: () => api.engines.getPrompt(key as string, 'extraction', previewAudience),
-    enabled: !!key && activeTab === 'preview' && !!engine?.stage_context,
+    queryKey: ['engines', legacyEngineKey, 'extraction-prompt', previewAudience],
+    queryFn: () => api.engines.getPrompt(legacyEngineKey as string, 'extraction', previewAudience),
+    enabled: !!legacyEngineKey && activeTab === 'preview' && !!engine?.stage_context,
   });
 
   const { data: curationPreview } = useQuery({
-    queryKey: ['engines', key, 'curation-prompt', previewAudience],
-    queryFn: () => api.engines.getPrompt(key as string, 'curation', previewAudience),
-    enabled: !!key && activeTab === 'preview' && !!engine?.stage_context,
+    queryKey: ['engines', legacyEngineKey, 'curation-prompt', previewAudience],
+    queryFn: () => api.engines.getPrompt(legacyEngineKey as string, 'curation', previewAudience),
+    enabled: !!legacyEngineKey && activeTab === 'preview' && !!engine?.stage_context,
   });
 
   const { data: consumers } = useQuery({
-    queryKey: ['consumers', 'by-construct', 'engine', key],
+    queryKey: ['consumers', 'by-construct', 'engine', canonicalEngineKey],
     queryFn: async () => {
       try {
-        return await api.consumers.getByConstruct('engine', key as string);
+        return await api.consumers.getByConstruct('engine', canonicalEngineKey as string);
       } catch {
         // Engine may only exist in analyzer-v2, not in mgmt DB
-        return { construct_type: 'engine', construct_key: key as string, consumers: [], total: 0 };
+        return { construct_type: 'engine', construct_key: canonicalEngineKey as string, consumers: [], total: 0 };
       }
     },
-    enabled: !!key && activeTab === 'consumers',
+    enabled: !!canonicalEngineKey && activeTab === 'consumers' && !!engine,
   });
 
   const { data: versions } = useQuery({
-    queryKey: ['engines', key, 'versions'],
+    queryKey: ['engines', legacyEngineKey, 'versions'],
     queryFn: async () => {
       try {
-        return await api.engines.getVersions(key as string);
+        return await api.engines.getVersions(legacyEngineKey as string);
       } catch {
         // Engine may only exist in analyzer-v2, not in mgmt DB
-        return { engine_key: key as string, current_version: 0, versions: [] };
+        return { engine_key: legacyEngineKey as string, current_version: 0, versions: [] };
       }
     },
-    enabled: !!key && activeTab === 'history',
+    enabled: !!legacyEngineKey && activeTab === 'history' && !capabilityDef,
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: EngineUpdate) => api.engines.update(key as string, data),
+    mutationFn: (data: EngineUpdate) => api.engines.update(legacyEngineKey as string, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['engines', key] });
+      queryClient.invalidateQueries({ queryKey: ['engines', legacyEngineKey, 'legacy-detail'] });
       setHasChanges(false);
     },
   });
 
   const generateProfileMutation = useMutation({
-    mutationFn: () => api.llm.generateProfile(key as string),
+    mutationFn: () => api.llm.generateProfile(legacyEngineKey as string),
     onSuccess: (data) => {
       setLocalProfile(data.profile);
       setHasChanges(true);
@@ -878,9 +875,9 @@ export default function EngineDetailPage() {
   });
 
   const saveProfileMutation = useMutation({
-    mutationFn: (profile: EngineProfile) => api.engines.saveProfile(key as string, profile),
+    mutationFn: (profile: EngineProfile) => api.engines.saveProfile(legacyEngineKey as string, profile),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['engines', key, 'profile'] });
+      queryClient.invalidateQueries({ queryKey: ['engines', legacyEngineKey, 'profile'] });
       setHasChanges(false);
     },
   });
@@ -918,7 +915,25 @@ export default function EngineDetailPage() {
     }
   }, [activeTab, localProfile, localEngine, updateMutation, saveProfileMutation]);
 
-  if (isLoading) {
+  const displayEngine = localEngine || engine;
+  const displayIdentity = capabilityDef
+    ? {
+        engine_name: capabilityDef.engine_name,
+        engine_key: capabilityDef.engine_key,
+        category: capabilityDef.category,
+        kind: capabilityDef.kind,
+        version: capabilityDef.version,
+        paradigm_keys: capabilityDef.paradigm_keys,
+        description: capabilityDef.problematique.split('\n\n')[0] || capabilityDef.problematique,
+        researcher_question: capabilityDef.researcher_question,
+      }
+    : engine;
+  const passesByDepth = useMemo(
+    () => buildPassesByDepth(capabilityDef, operationalizationDef as EngineOperationalization | null | undefined),
+    [capabilityDef, operationalizationDef]
+  );
+
+  if (!routeKey || capabilityLoading || engineLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
@@ -926,7 +941,7 @@ export default function EngineDetailPage() {
     );
   }
 
-  if (error || !engine) {
+  if (!displayIdentity) {
     return (
       <div className="flex items-center justify-center h-64 text-red-600">
         <AlertCircle className="h-6 w-6 mr-2" />
@@ -934,8 +949,6 @@ export default function EngineDetailPage() {
       </div>
     );
   }
-
-  const displayEngine = localEngine || engine;
 
   return (
     <div className="space-y-6">
@@ -949,13 +962,13 @@ export default function EngineDetailPage() {
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{engine.engine_name}</h1>
-            <p className="mt-1 text-gray-500">{engine.engine_key}</p>
+            <h1 className="text-2xl font-bold text-gray-900">{displayIdentity.engine_name}</h1>
+            <p className="mt-1 text-gray-500">{displayIdentity.engine_key}</p>
             <div className="mt-2 flex items-center gap-2">
-              <span className="badge badge-primary capitalize">{engine.category}</span>
-              <span className="badge badge-gray capitalize">{engine.kind}</span>
-              <span className="badge badge-gray">v{engine.version}</span>
-              {engine.paradigm_keys.map((pk) => (
+              <span className="badge badge-primary capitalize">{displayIdentity.category}</span>
+              <span className="badge badge-gray capitalize">{displayIdentity.kind}</span>
+              <span className="badge badge-gray">v{displayIdentity.version}</span>
+              {displayIdentity.paradigm_keys.map((pk) => (
                 <span key={pk} className="badge badge-success">
                   {pk}
                 </span>
@@ -980,10 +993,10 @@ export default function EngineDetailPage() {
 
       {/* Description */}
       <div className="card p-4">
-        <p className="text-gray-700">{engine.description}</p>
-        {engine.researcher_question && (
+        <p className="text-gray-700">{displayIdentity.description}</p>
+        {displayIdentity.researcher_question && (
           <p className="mt-2 text-sm text-gray-500 italic">
-            Researcher question: {engine.researcher_question}
+            Researcher question: {displayIdentity.researcher_question}
           </p>
         )}
       </div>
@@ -1000,13 +1013,25 @@ export default function EngineDetailPage() {
               <Tab id="dimensions" label="Dimensions" active={activeTab === 'dimensions'} onClick={() => setActiveTab('dimensions')} />
               <Tab id="capabilities" label="Capabilities" active={activeTab === 'capabilities'} onClick={() => setActiveTab('capabilities')} />
               <Tab id="composability" label="Composability" active={activeTab === 'composability'} onClick={() => setActiveTab('composability')} />
+              {displayEngine?.stage_context && (
+                <>
+                  <Tab id="context" label="Stage Context" active={activeTab === 'context'} onClick={() => setActiveTab('context')} />
+                  <Tab id="preview" label="Prompt Preview" active={activeTab === 'preview'} onClick={() => setActiveTab('preview')} />
+                </>
+              )}
+              {displayEngine?.canonical_schema && (
+                <Tab id="schema" label="Schema" active={activeTab === 'schema'} onClick={() => setActiveTab('schema')} />
+              )}
+              {displayEngine && (
+                <Tab id="consumers" label={`Consumers (${consumers?.total ?? 0})`} active={activeTab === 'consumers'} onClick={() => setActiveTab('consumers')} />
+              )}
               <Tab id="history" label="History" active={activeTab === 'history'} onClick={() => setActiveTab('history')} />
             </>
           ) : (
             <>
               {/* ── Legacy engine tabs ── */}
               <Tab id="about" label="About" active={activeTab === 'about'} onClick={() => setActiveTab('about')} />
-              {displayEngine.stage_context && (
+              {displayEngine?.stage_context && (
                 <>
                   <Tab id="context" label="Stage Context" active={activeTab === 'context'} onClick={() => setActiveTab('context')} />
                   <Tab id="preview" label="Prompt Preview" active={activeTab === 'preview'} onClick={() => setActiveTab('preview')} />
@@ -1261,7 +1286,9 @@ export default function EngineDetailPage() {
       {activeTab === 'depth' && capabilityDef && capabilityDef.depth_levels.length > 0 && (
         <div className="-mt-2">
           <div className="space-y-4">
-            {capabilityDef.depth_levels.map((dl, i) => (
+            {capabilityDef.depth_levels.map((dl, i) => {
+              const passes = passesByDepth[dl.key] || [];
+              return (
               <div key={dl.key} className={clsx(
                 'rounded-xl overflow-hidden shadow-sm border',
                 i === 0 && 'bg-amber-50/30 border-amber-200/60',
@@ -1284,17 +1311,17 @@ export default function EngineDetailPage() {
                   <p className="text-sm text-stone-600 leading-relaxed">{dl.description}</p>
                 </div>
 
-                {dl.passes && dl.passes.length > 0 && (
+                {passes.length > 0 && (
                   <div className="px-6 pb-4">
                     <div className="flex items-center gap-2">
-                      {dl.passes.map((pass, pi) => (
+                      {passes.map((pass, pi) => (
                         <div key={pass.pass_number} className="flex items-center gap-1.5">
                           {(() => { const s = getStanceStyle(pass.stance); return (
                           <span className={clsx('text-[10px] font-semibold px-2 py-0.5 rounded-full', s.bg, s.text)}>
                             {pass.stance}
                           </span>
                           ); })()}
-                          {pi < dl.passes.length - 1 && (
+                          {pi < passes.length - 1 && (
                             <span className="text-stone-300 text-[10px]">→</span>
                           )}
                         </div>
@@ -1309,14 +1336,15 @@ export default function EngineDetailPage() {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
       {/* ═══ Capability Engine: Dimensions Tab ═══ */}
       {activeTab === 'dimensions' && capabilityDef && (() => {
-        const passMap = buildDimensionPassMap(capabilityDef.depth_levels);
+        const passMap = buildDimensionPassMap(passesByDepth);
         return (
           <div className="-mt-2 space-y-6">
             <div className="flex items-center justify-between">
@@ -1331,9 +1359,10 @@ export default function EngineDetailPage() {
               </span>
             </div>
 
-            {capabilityDef.depth_levels.some(d => d.passes && d.passes.length > 0) && (
+            {Object.values(passesByDepth).some((passes) => passes.length > 0) && (
               <DimensionPassMatrix
                 depthLevels={capabilityDef.depth_levels}
+                passesByDepth={passesByDepth}
                 dimensions={capabilityDef.analytical_dimensions}
                 selectedDepth={matrixDepth}
                 onDepthChange={setMatrixDepth}
@@ -1351,7 +1380,7 @@ export default function EngineDetailPage() {
 
       {/* ═══ Capability Engine: Capabilities Tab ═══ */}
       {activeTab === 'capabilities' && capabilityDef && (() => {
-        const capPassMap = buildCapabilityPassMap(capabilityDef.depth_levels);
+        const capPassMap = buildCapabilityPassMap(passesByDepth);
         return (
           <div className="-mt-2">
             <div className="flex items-center gap-4 mb-6">
@@ -1462,7 +1491,7 @@ export default function EngineDetailPage() {
       )}
 
       {/* Stage Context Editor (for engines with stage_context) */}
-      {activeTab === 'context' && displayEngine.stage_context && (
+      {activeTab === 'context' && displayEngine?.stage_context && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -1484,7 +1513,7 @@ export default function EngineDetailPage() {
               try {
                 // Call the improve endpoint
                 const result = await api.llm.improveStageContext(
-                  key as string,
+                  legacyEngineKey as string,
                   stage,
                   field,
                   'Improve clarity and effectiveness'
@@ -1504,7 +1533,7 @@ export default function EngineDetailPage() {
       )}
 
       {/* Prompt Preview (for engines with stage_context) */}
-      {activeTab === 'preview' && displayEngine.stage_context && (
+      {activeTab === 'preview' && displayEngine?.stage_context && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -1586,8 +1615,7 @@ export default function EngineDetailPage() {
         </div>
       )}
 
-
-      {activeTab === 'schema' && (
+      {activeTab === 'schema' && displayEngine?.canonical_schema && (
         <div>
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-lg font-medium text-gray-900">Canonical Schema</h3>
@@ -1596,7 +1624,7 @@ export default function EngineDetailPage() {
               Validate with AI
             </button>
           </div>
-          <SchemaViewer schema={engine.canonical_schema} />
+          <SchemaViewer schema={displayEngine.canonical_schema} />
         </div>
       )}
 
@@ -1648,7 +1676,7 @@ export default function EngineDetailPage() {
                         ? new Date(version.created_at).toLocaleDateString()
                         : ''}
                     </span>
-                    {version.version !== engine.version && (
+                    {version.version !== displayIdentity.version && (
                       <button className="btn-secondary text-xs py-1">
                         Restore
                       </button>
