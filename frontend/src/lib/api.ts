@@ -76,6 +76,7 @@ import type {
   VariantSelectionResponse,
   RuntimeConsumerSummary,
   AnalysisResultManifest,
+  ConceptAnalysisArtifactLookup,
   RunDetail,
 } from '@/types';
 
@@ -846,6 +847,29 @@ class ApiClient {
         throw new Error(error.detail || `HTTP ${response.status}`);
       }
       return response.json();
+    },
+
+    getConceptArtifact: async (params: {
+      consumerKey: string;
+      externalProjectId: string;
+      conceptName: string;
+      analysisMode: string;
+      analyzerV2JobId?: string;
+    }) => {
+      const query = new URLSearchParams({
+        consumer_key: params.consumerKey,
+        external_project_id: params.externalProjectId,
+        concept_name: params.conceptName,
+        analysis_mode: params.analysisMode,
+      });
+      if (params.analyzerV2JobId) {
+        query.set('analyzer_v2_job_id', params.analyzerV2JobId);
+      }
+      const response = await fetch(
+        `${ANALYZER_V2_URL}/v1/orchestrator/concept-analysis-by-ref/result?${query.toString()}`
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json() as Promise<ConceptAnalysisArtifactLookup>;
     },
   };
 

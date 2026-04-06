@@ -1792,6 +1792,20 @@ export interface ExecutorJobProgress {
   phase_statuses: Record<string, string>;
 }
 
+export interface ConceptAnalysisContext {
+  consumer_key: string;
+  external_project_id: string;
+  concept_name: string;
+  analysis_mode: string;
+  workflow_key: string;
+  engine_or_chain_key?: string | null;
+  subject_author?: string | null;
+  subject_name?: string | null;
+  depth?: string | null;
+  translation_template_key?: string | null;
+  external_doc_keys?: string[];
+}
+
 export interface ExecutorJobSummary {
   job_id: string;
   plan_id: string;
@@ -1806,6 +1820,7 @@ export interface ExecutorJobSummary {
   total_llm_calls: number;
   total_input_tokens: number;
   total_output_tokens: number;
+  analysis_context?: ConceptAnalysisContext | null;
 }
 
 export interface ExecutorJobListResponse {
@@ -2139,4 +2154,21 @@ export interface RunDetail {
   selected_source_thinker_id?: string | null;
   selected_source_thinker_name?: string | null;
   links: RunLinks;
+}
+
+export interface ConceptAnalysisArtifactLookup {
+  consumer_key: string;
+  external_project_id: string;
+  concept_name: string;
+  analysis_mode: string;
+  workflow_key: string;
+  engine_or_chain_key: string;
+  depth: string;
+  analyzer_v2_job_id: string;
+  translation_template_key: string;
+  contract_validation_status: string;
+  validation_errors: string[];
+  produced_at: string;
+  lookup_mode: 'exact_run' | 'latest_validated';
+  translated_artifact: Record<string, unknown>;
 }

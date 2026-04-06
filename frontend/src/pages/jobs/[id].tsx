@@ -876,9 +876,11 @@ function resultStateTone(state: string): 'green' | 'amber' | 'blue' | 'red' | 'g
 }
 
 function ResultBoundaryTab({
+  job,
   jobId,
   consumerKey,
 }: {
+  job: ExecutorJobSummary;
   jobId: string;
   consumerKey: string;
 }) {
@@ -945,6 +947,7 @@ function ResultBoundaryTab({
   const rm = resultManifest;
   const run = runDetail;
   const workflowKey = rm.workflow_key || null;
+  const conceptContext = job.analysis_context || null;
 
   const {
     data: workflow,
@@ -966,6 +969,34 @@ function ResultBoundaryTab({
       )
     ),
     enabled: (workflow?.linked_transformation_keys?.length ?? 0) > 0,
+  });
+
+  const {
+    data: conceptArtifact,
+    error: conceptArtifactError,
+  } = useQuery({
+    queryKey: [
+      'concept-translated-artifact',
+      job.job_id,
+      conceptContext?.consumer_key,
+      conceptContext?.external_project_id,
+      conceptContext?.concept_name,
+      conceptContext?.analysis_mode,
+    ],
+    queryFn: () =>
+      api.resultBoundary.getConceptArtifact({
+        consumerKey: conceptContext!.consumer_key,
+        externalProjectId: conceptContext!.external_project_id,
+        conceptName: conceptContext!.concept_name,
+        analysisMode: conceptContext!.analysis_mode,
+        analyzerV2JobId: job.job_id,
+      }),
+    enabled:
+      job.status === 'completed' &&
+      !!conceptContext?.consumer_key &&
+      !!conceptContext?.external_project_id &&
+      !!conceptContext?.concept_name &&
+      !!conceptContext?.analysis_mode,
   });
 
   return (
@@ -1017,6 +1048,58 @@ function ResultBoundaryTab({
       {runError && !runLoading && (
         <div className="card p-5 border border-amber-200 bg-amber-50 text-amber-800 text-sm">
           Could not load run-boundary state: {(runError as Error).message}
+        </div>
+      )}
+
+      {conceptContext && conceptArtifact && (
+        <div className="card p-5 space-y-4 border border-indigo-200 bg-indigo-50/40">
+          <div className="flex items-center gap-2 flex-wrap">
+            <InfoBadge tone="purple">concept artifact</InfoBadge>
+            <InfoBadge tone={conceptArtifact.contract_validation_status === 'passed' ? 'green' : 'red'}>
+              validation {conceptArtifact.contract_validation_status}
+            </InfoBadge>
+            <InfoBadge tone="blue">{conceptArtifact.analysis_mode}</InfoBadge>
+            <InfoBadge tone={conceptArtifact.lookup_mode === 'exact_run' ? 'green' : 'amber'}>
+              lookup {conceptArtifact.lookup_mode}
+            </InfoBadge>
+          </div>
+
+          <div className="text-sm text-gray-700 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+            <p><span className="font-medium text-gray-900">Concept:</span> {conceptArtifact.concept_name}</p>
+            <p><span className="font-medium text-gray-900">Project:</span> {conceptArtifact.external_project_id}</p>
+            <p><span className="font-medium text-gray-900">Analyzer job:</span> <span className="font-mono text-xs">{conceptArtifact.analyzer_v2_job_id}</span></p>
+            <p><span className="font-medium text-gray-900">Workflow:</span> {conceptArtifact.workflow_key}</p>
+            <p><span className="font-medium text-gray-900">Engine/Chain:</span> {conceptArtifact.engine_or_chain_key}</p>
+            <p><span className="font-medium text-gray-900">Depth:</span> {conceptArtifact.depth}</p>
+            <p><span className="font-medium text-gray-900">Produced:</span> {formatDateTime(conceptArtifact.produced_at)}</p>
+            <p>
+              <span className="font-medium text-gray-900">Transformation:</span>{' '}
+              <Link
+                href={`/transformations/${conceptArtifact.translation_template_key}`}
+                className="text-indigo-600 hover:underline"
+              >
+                {conceptArtifact.translation_template_key}
+              </Link>
+            </p>
+          </div>
+
+          {conceptArtifact.validation_errors.length > 0 && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {conceptArtifact.validation_errors.join(' | ')}
+            </div>
+          )}
+
+          <ExpandableCard title="Translated Host Artifact">
+            <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words">
+              {formatJson(conceptArtifact.translated_artifact)}
+            </pre>
+          </ExpandableCard>
+        </div>
+      )}
+
+      {conceptContext && conceptArtifactError && job.status === 'completed' && (
+        <div className="card p-5 border border-amber-200 bg-amber-50 text-amber-800 text-sm">
+          Could not load translated concept artifact: {(conceptArtifactError as Error).message}
         </div>
       )}
 
@@ -1470,6 +1553,7 @@ export default function JobPresentationPage() {
 
       {activeTab === 'result-boundary' && (
         <ResultBoundaryTab
+          job={job}
           jobId={job.job_id}
           consumerKey={consumerKey}
         />
