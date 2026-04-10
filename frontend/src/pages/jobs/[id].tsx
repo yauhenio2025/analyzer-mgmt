@@ -21,6 +21,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import type {
   AnalysisResultManifest,
+  ConceptAnalysisArtifactLookup,
   DecisionTraceEntry,
   EffectiveManifestView,
   EffectivePresentationManifest,
@@ -875,6 +876,60 @@ function resultStateTone(state: string): 'green' | 'amber' | 'blue' | 'red' | 'g
   }
 }
 
+function ConceptArtifactAuthorityCard({
+  conceptArtifact,
+}: {
+  conceptArtifact: ConceptAnalysisArtifactLookup;
+}) {
+  const validationErrors = conceptArtifact.validation_errors || [];
+
+  return (
+    <div className="card p-5 space-y-4 border border-indigo-200 bg-indigo-50/40">
+      <div className="flex items-center gap-2 flex-wrap">
+        <InfoBadge tone="purple">concept artifact</InfoBadge>
+        <InfoBadge tone={conceptArtifact.contract_validation_status === 'passed' ? 'green' : 'red'}>
+          validation {conceptArtifact.contract_validation_status}
+        </InfoBadge>
+        <InfoBadge tone="blue">{conceptArtifact.analysis_mode}</InfoBadge>
+        <InfoBadge tone={conceptArtifact.lookup_mode === 'exact_run' ? 'green' : 'amber'}>
+          lookup {conceptArtifact.lookup_mode}
+        </InfoBadge>
+      </div>
+
+      <div className="text-sm text-gray-700 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+        <p><span className="font-medium text-gray-900">Concept:</span> {conceptArtifact.concept_name}</p>
+        <p><span className="font-medium text-gray-900">Project:</span> {conceptArtifact.external_project_id}</p>
+        <p><span className="font-medium text-gray-900">Analyzer job:</span> <span className="font-mono text-xs">{conceptArtifact.analyzer_v2_job_id}</span></p>
+        <p><span className="font-medium text-gray-900">Workflow:</span> {conceptArtifact.workflow_key}</p>
+        <p><span className="font-medium text-gray-900">Engine/Chain:</span> {conceptArtifact.engine_or_chain_key}</p>
+        <p><span className="font-medium text-gray-900">Depth:</span> {conceptArtifact.depth}</p>
+        <p><span className="font-medium text-gray-900">Produced:</span> {formatDateTime(conceptArtifact.produced_at)}</p>
+        <p>
+          <span className="font-medium text-gray-900">Transformation:</span>{' '}
+          <Link
+            href={`/transformations/${conceptArtifact.translation_template_key}`}
+            className="text-indigo-600 hover:underline"
+          >
+            {conceptArtifact.translation_template_key}
+          </Link>
+        </p>
+      </div>
+
+      {validationErrors.length > 0 && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {validationErrors.join(' | ')}
+        </div>
+      )}
+
+      <ExpandableCard title="Translated Host Artifact">
+        <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words">
+          {formatJson(conceptArtifact.translated_artifact)}
+        </pre>
+      </ExpandableCard>
+    </div>
+  );
+}
+
 function ResultBoundaryTab({
   job,
   jobId,
@@ -919,34 +974,8 @@ function ResultBoundaryTab({
     },
   });
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4 animate-pulse">
-        <div className="h-24 bg-gray-200 rounded" />
-        <div className="h-40 bg-gray-200 rounded" />
-      </div>
-    );
-  }
-
-  if (error || !resultManifest) {
-    return (
-      <div className="card p-6 border border-gray-200 bg-gray-50">
-        <div className="flex items-center gap-3 text-gray-500">
-          <Shield className="h-8 w-8 text-gray-300" />
-          <div>
-            <h2 className="text-lg font-semibold text-gray-700">Result boundary unavailable</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              {error ? (error as Error).message : 'No result manifest found for this job.'}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const rm = resultManifest;
   const run = runDetail;
-  const workflowKey = rm.workflow_key || null;
+  const workflowKey = resultManifest?.workflow_key || job.workflow_key || null;
   const conceptContext = job.analysis_context || null;
 
   const {
@@ -998,6 +1027,55 @@ function ResultBoundaryTab({
       !!conceptContext?.concept_name &&
       !!conceptContext?.analysis_mode,
   });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {conceptContext && conceptArtifact && (
+          <ConceptArtifactAuthorityCard conceptArtifact={conceptArtifact} />
+        )}
+        <div className="space-y-4 animate-pulse">
+          <div className="h-24 bg-gray-200 rounded" />
+          <div className="h-40 bg-gray-200 rounded" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !resultManifest) {
+    return (
+      <div className="space-y-6">
+        {conceptContext && conceptArtifact && (
+          <ConceptArtifactAuthorityCard conceptArtifact={conceptArtifact} />
+        )}
+
+        {conceptContext && conceptArtifactError && job.status === 'completed' && (
+          <div className="card p-5 border border-amber-200 bg-amber-50 text-amber-800 text-sm">
+            Could not load translated concept artifact: {(conceptArtifactError as Error).message}
+          </div>
+        )}
+
+        <div className="card p-6 border border-gray-200 bg-gray-50">
+          <div className="flex items-center gap-3 text-gray-500">
+            <Shield className="h-8 w-8 text-gray-300" />
+            <div>
+              <h2 className="text-lg font-semibold text-gray-700">Result boundary unavailable</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {error ? (error as Error).message : 'No result manifest found for this job.'}
+              </p>
+              {conceptContext && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Concept artifact authority is queried separately from generic presenter/result state.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const rm = resultManifest;
 
   return (
     <div className="space-y-6">
@@ -1052,49 +1130,7 @@ function ResultBoundaryTab({
       )}
 
       {conceptContext && conceptArtifact && (
-        <div className="card p-5 space-y-4 border border-indigo-200 bg-indigo-50/40">
-          <div className="flex items-center gap-2 flex-wrap">
-            <InfoBadge tone="purple">concept artifact</InfoBadge>
-            <InfoBadge tone={conceptArtifact.contract_validation_status === 'passed' ? 'green' : 'red'}>
-              validation {conceptArtifact.contract_validation_status}
-            </InfoBadge>
-            <InfoBadge tone="blue">{conceptArtifact.analysis_mode}</InfoBadge>
-            <InfoBadge tone={conceptArtifact.lookup_mode === 'exact_run' ? 'green' : 'amber'}>
-              lookup {conceptArtifact.lookup_mode}
-            </InfoBadge>
-          </div>
-
-          <div className="text-sm text-gray-700 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
-            <p><span className="font-medium text-gray-900">Concept:</span> {conceptArtifact.concept_name}</p>
-            <p><span className="font-medium text-gray-900">Project:</span> {conceptArtifact.external_project_id}</p>
-            <p><span className="font-medium text-gray-900">Analyzer job:</span> <span className="font-mono text-xs">{conceptArtifact.analyzer_v2_job_id}</span></p>
-            <p><span className="font-medium text-gray-900">Workflow:</span> {conceptArtifact.workflow_key}</p>
-            <p><span className="font-medium text-gray-900">Engine/Chain:</span> {conceptArtifact.engine_or_chain_key}</p>
-            <p><span className="font-medium text-gray-900">Depth:</span> {conceptArtifact.depth}</p>
-            <p><span className="font-medium text-gray-900">Produced:</span> {formatDateTime(conceptArtifact.produced_at)}</p>
-            <p>
-              <span className="font-medium text-gray-900">Transformation:</span>{' '}
-              <Link
-                href={`/transformations/${conceptArtifact.translation_template_key}`}
-                className="text-indigo-600 hover:underline"
-              >
-                {conceptArtifact.translation_template_key}
-              </Link>
-            </p>
-          </div>
-
-          {conceptArtifact.validation_errors.length > 0 && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {conceptArtifact.validation_errors.join(' | ')}
-            </div>
-          )}
-
-          <ExpandableCard title="Translated Host Artifact">
-            <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words">
-              {formatJson(conceptArtifact.translated_artifact)}
-            </pre>
-          </ExpandableCard>
-        </div>
+        <ConceptArtifactAuthorityCard conceptArtifact={conceptArtifact} />
       )}
 
       {conceptContext && conceptArtifactError && job.status === 'completed' && (
