@@ -876,6 +876,21 @@ function resultStateTone(state: string): 'green' | 'amber' | 'blue' | 'red' | 'g
   }
 }
 
+function conceptArtifactLaggingState(
+  conceptArtifact: ConceptAnalysisArtifactLookup | undefined,
+  run?: RunDetail,
+  manifest?: AnalysisResultManifest
+) {
+  if (!conceptArtifact || conceptArtifact.contract_validation_status !== 'passed') {
+    return false;
+  }
+
+  const runLagging = !!run && run.result_state !== 'ready';
+  const manifestLagging = !!manifest && (manifest.result_state !== 'ready' || !manifest.artifacts_ready);
+
+  return runLagging || manifestLagging;
+}
+
 function ConceptArtifactAuthorityCard({
   conceptArtifact,
 }: {
@@ -897,6 +912,7 @@ function ConceptArtifactAuthorityCard({
       </div>
 
       <div className="text-sm text-gray-700 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+        <p><span className="font-medium text-gray-900">Consumer:</span> {conceptArtifact.consumer_key}</p>
         <p><span className="font-medium text-gray-900">Concept:</span> {conceptArtifact.concept_name}</p>
         <p><span className="font-medium text-gray-900">Project:</span> {conceptArtifact.external_project_id}</p>
         <p><span className="font-medium text-gray-900">Analyzer job:</span> <span className="font-mono text-xs">{conceptArtifact.analyzer_v2_job_id}</span></p>
@@ -977,6 +993,12 @@ function ResultBoundaryTab({
   const run = runDetail;
   const workflowKey = resultManifest?.workflow_key || job.workflow_key || null;
   const conceptContext = job.analysis_context || null;
+  const conceptArtifactEnabled =
+    job.status === 'completed' &&
+    !!conceptContext?.consumer_key &&
+    !!conceptContext?.external_project_id &&
+    !!conceptContext?.concept_name &&
+    !!conceptContext?.analysis_mode;
 
   const {
     data: workflow,
@@ -1002,6 +1024,7 @@ function ResultBoundaryTab({
 
   const {
     data: conceptArtifact,
+    isLoading: conceptArtifactLoading,
     error: conceptArtifactError,
   } = useQuery({
     queryKey: [
@@ -1020,17 +1043,19 @@ function ResultBoundaryTab({
         analysisMode: conceptContext!.analysis_mode,
         analyzerV2JobId: job.job_id,
       }),
-    enabled:
-      job.status === 'completed' &&
-      !!conceptContext?.consumer_key &&
-      !!conceptContext?.external_project_id &&
-      !!conceptContext?.concept_name &&
-      !!conceptContext?.analysis_mode,
+    enabled: conceptArtifactEnabled,
   });
+
+  const showConceptArtifactLagNote = conceptArtifactLaggingState(conceptArtifact, run, resultManifest);
 
   if (isLoading) {
     return (
       <div className="space-y-4">
+        {conceptArtifactEnabled && conceptArtifactLoading && (
+          <div className="card p-5 border border-blue-200 bg-blue-50 text-sm text-blue-800">
+            Loading translated concept artifact authority from analyzer-v2. This fetch is separate from generic Result Boundary state.
+          </div>
+        )}
         {conceptContext && conceptArtifact && (
           <ConceptArtifactAuthorityCard conceptArtifact={conceptArtifact} />
         )}
@@ -1133,9 +1158,22 @@ function ResultBoundaryTab({
         <ConceptArtifactAuthorityCard conceptArtifact={conceptArtifact} />
       )}
 
+      {conceptArtifactEnabled && conceptArtifactLoading && !conceptArtifact && !conceptArtifactError && (
+        <div className="card p-5 border border-blue-200 bg-blue-50 text-sm text-blue-800">
+          Loading translated concept artifact authority from analyzer-v2. Generic Result Boundary state may lag this concept-specific authority check.
+        </div>
+      )}
+
       {conceptContext && conceptArtifactError && job.status === 'completed' && (
         <div className="card p-5 border border-amber-200 bg-amber-50 text-amber-800 text-sm">
           Could not load translated concept artifact: {(conceptArtifactError as Error).message}
+        </div>
+      )}
+
+      {showConceptArtifactLagNote && (
+        <div className="card p-5 border border-purple-200 bg-purple-50 text-sm text-purple-800">
+          Concept artifact authority is already validated from analyzer-v2 even though generic Result Boundary state is still lagging.
+          For admitted concept jobs, treat the concept artifact card as the operator truth.
         </div>
       )}
 
