@@ -28,6 +28,7 @@ import {
   Zap,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { api } from '@/lib/api';
 import type {
   PlanDetail,
   PlannerDecisionTrace,
@@ -37,14 +38,16 @@ import type {
   PhaseDecision,
   PerWorkDecision,
   CatalogCoverageEntry,
+  ExecutorJobSummary,
 } from '@/types';
 
 const ANALYZER_V2_URL = process.env.NEXT_PUBLIC_ANALYZER_V2_URL || 'https://analyzer-v2.onrender.com';
 
-type TabKey = 'summary' | 'decision-trace' | 'phases' | 'raw';
+type TabKey = 'summary' | 'jobs' | 'decision-trace' | 'phases' | 'raw';
 
 const tabs: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: 'summary', label: 'Summary', icon: BookOpen },
+  { key: 'jobs', label: 'Jobs', icon: Zap },
   { key: 'decision-trace', label: 'Decision Trace', icon: Brain },
   { key: 'phases', label: 'Phases', icon: Layers },
   { key: 'raw', label: 'Raw JSON', icon: FileJson },
@@ -804,6 +807,114 @@ function RawJsonTab({ plan }: { plan: PlanDetail }) {
   );
 }
 
+function JobsTab({
+  planId,
+  active,
+}: {
+  planId: string;
+  active: boolean;
+}) {
+  const {
+    data,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['plan-jobs', planId],
+    queryFn: async () => (await api.executorJobs.list({ limit: 200, plan_id: planId })).jobs,
+    enabled: active && !!planId,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="h-24 bg-gray-200 rounded" />
+        <div className="h-24 bg-gray-200 rounded" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="card p-5 border border-red-200 bg-red-50 text-red-700">
+        Failed to load jobs for this plan.
+      </div>
+    );
+  }
+
+  const jobs = data || [];
+
+  return (
+    <div className="space-y-5">
+      <div className="card p-5">
+        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-2">
+          <Zap className="h-5 w-5 text-indigo-500" />
+          Jobs
+        </h2>
+        <p className="text-sm text-gray-600">
+          Runtime presentation inspection is job-scoped. This tab lists executor jobs directly filtered to this plan.
+        </p>
+      </div>
+
+      {jobs.length === 0 ? (
+        <div className="card p-8 text-center">
+          <Clock className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+          <h3 className="text-sm font-semibold text-gray-900">No jobs found</h3>
+          <p className="text-sm text-gray-500 mt-1">
+            This plan does not have any recent executor jobs in the current analyzer-v2 job list.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {jobs.map((job: ExecutorJobSummary) => (
+            <div key={job.job_id} className="card p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Link
+                      href={`/jobs/${job.job_id}`}
+                      className="text-base font-semibold text-indigo-600 hover:underline"
+                    >
+                      {job.job_id}
+                    </Link>
+                    <StatusBadge status={job.status} />
+                    <span className="badge bg-gray-100 text-gray-700 text-xs">
+                      {job.workflow_key}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                    <span>Created {new Date(job.created_at).toLocaleString()}</span>
+                    {job.completed_at && (
+                      <>
+                        <span className="text-gray-300">|</span>
+                        <span>Completed {new Date(job.completed_at).toLocaleString()}</span>
+                      </>
+                    )}
+                    {job.total_llm_calls > 0 && (
+                      <>
+                        <span className="text-gray-300">|</span>
+                        <span>{job.total_llm_calls} LLM calls</span>
+                      </>
+                    )}
+                  </div>
+                  {job.progress?.detail && (
+                    <p className="mt-2 text-sm text-gray-600">{job.progress.detail}</p>
+                  )}
+                </div>
+                <Link
+                  href={`/jobs/${job.job_id}`}
+                  className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                >
+                  Open runtime inspector
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============================================================================
 // Main Page Component
 // ============================================================================
@@ -960,6 +1071,10 @@ export default function PlanDetailPage() {
 
       {/* Tab content */}
       {activeTab === 'summary' && <SummaryTab plan={plan} />}
+
+      {activeTab === 'jobs' && (
+        <JobsTab planId={plan.plan_id} active={activeTab === 'jobs'} />
+      )}
 
       {activeTab === 'decision-trace' && trace && (
         <DecisionTraceTab trace={trace} plan={plan} />
