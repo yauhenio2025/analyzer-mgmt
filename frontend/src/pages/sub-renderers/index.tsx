@@ -175,7 +175,7 @@ export default function SubRenderersListPage() {
             <p className="mt-1 text-emerald-600">
               Sub-renderers are the building blocks inside container renderers like
               <strong> accordion</strong> and <strong>tab</strong>. Each section in an accordion
-              uses a sub-renderer (chip_grid, mini_card_list, prose_block, etc.) to display its data.
+              uses a sub-renderer (chip_grid, mini_card_list, annotated_prose, prose_block, etc.) to display its data.
               The orchestrator selects sub-renderers based on data shape and stance affinity.
             </p>
           </div>

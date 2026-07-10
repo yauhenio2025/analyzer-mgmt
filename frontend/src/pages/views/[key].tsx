@@ -471,6 +471,10 @@ const RENDERER_CONFIG_FIELDS: Record<string, { field: string; label: string; pla
     { field: 'value_field', label: 'Value Field', placeholder: 'e.g. meaning, definition' },
   ],
   prose_block: [],
+  annotated_prose: [
+    { field: 'pull_quote_min_length', label: 'Pull Quote Min Length', placeholder: 'e.g. 90' },
+    { field: 'show_paragraph_numbers', label: 'Show Paragraph Numbers', placeholder: 'true / false' },
+  ],
   stat_row: [],
   comparison_panel: [
     { field: 'left_field', label: 'Left Column', placeholder: 'e.g. pole_a, option_a' },
@@ -487,6 +491,7 @@ const FALLBACK_SUB_RENDERER_OPTIONS = [
   { value: 'chip_grid', label: 'Chip Grid' },
   { value: 'key_value_table', label: 'Key-Value Table' },
   { value: 'prose_block', label: 'Prose Block' },
+  { value: 'annotated_prose', label: 'Annotated Prose' },
   { value: 'stat_row', label: 'Stat Row' },
   { value: 'comparison_panel', label: 'Comparison Panel' },
   { value: 'timeline_strip', label: 'Timeline Strip' },
@@ -637,7 +642,7 @@ function SectionRendererCard({
     const newKey = `field_${Object.keys(subRenderers).length + 1}`;
     onChange({
       ...entry,
-      sub_renderers: { ...subRenderers, [newKey]: { renderer_type: 'prose_block', config: {} } },
+      sub_renderers: { ...subRenderers, [newKey]: { renderer_type: 'annotated_prose', config: {} } },
     });
   };
 
@@ -820,7 +825,7 @@ function SectionRenderersEditor({
     const newKey = `new_section_${Object.keys(sectionRenderers).length + 1}`;
     onChange({
       ...sectionRenderers,
-      [newKey]: { renderer_type: 'prose_block', config: {} },
+      [newKey]: { renderer_type: 'annotated_prose', config: {} },
     });
   };
 
