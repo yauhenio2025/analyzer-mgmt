@@ -199,23 +199,23 @@ export default function MapPage() {
           </div>
         </SectionHeading>
         {dossierQ.isError && <InlineError>dossier_standard is not in the registry</InlineError>}
-        <div className="card p-5 overflow-x-auto scrollbar-thin">
+        <div className="card p-5">
           {dossierQ.isLoading && <div className="h-32 animate-pulse bg-gray-50 rounded" />}
           {dossierPhases.length > 0 && (
-            <ol className="flex gap-3 min-w-max pb-1">
+            <ol className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
               {dossierPhases.map((phase, i) => (
-                <li key={phase.phase_number} className="flex items-stretch">
+                <li key={phase.phase_number} className="relative">
                   <Link
                     href={`/processes/dossier_standard#phase-${phase.phase_number}`}
-                    className="w-52 rounded-lg border border-gray-200 bg-white p-3 hover:border-primary-300 hover:shadow-sm transition-all flex flex-col"
+                    className="h-full rounded-lg border border-gray-200 bg-white p-3 hover:border-primary-300 hover:shadow-sm transition-all flex flex-col"
                   >
-                    <span className="font-mono text-xs text-amber-600 font-semibold">{phase.phase_number}</span>
+                    <span className="flex items-center justify-between">
+                      <span className="font-mono text-sm text-amber-600 font-semibold">{phase.phase_number}</span>
+                      {i < dossierPhases.length - 1 && <ChevronRight className="h-3.5 w-3.5 text-gray-300" />}
+                    </span>
                     <span className="text-sm font-semibold text-gray-900 mt-0.5 leading-tight">{phase.phase_name}</span>
-                    <span className="text-[11px] text-gray-500 mt-1.5 line-clamp-4 leading-snug">{phase.phase_description}</span>
+                    <span className="text-[11px] text-gray-500 mt-1.5 line-clamp-5 leading-snug">{phase.phase_description}</span>
                   </Link>
-                  {i < dossierPhases.length - 1 && (
-                    <ChevronRight className="h-4 w-4 text-gray-300 self-center ml-3 -mr-0.5 flex-shrink-0" />
-                  )}
                 </li>
               ))}
             </ol>

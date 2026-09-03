@@ -83,7 +83,7 @@ export function OrganCard({ organ, compact = false }: { organ: OrganSummary; com
             {organ.organ_name}
             <ChevronRight className="h-3.5 w-3.5 text-gray-300 group-hover:text-primary-500" />
           </Link>
-          <p className={clsx('text-xs text-gray-500 mt-0.5', compact ? 'line-clamp-2' : '')}>{organ.tagline}</p>
+          <p className={clsx('text-xs text-gray-500 mt-0.5', compact ? 'line-clamp-3' : '')}>{organ.tagline}</p>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <ReachDot state={reach} />

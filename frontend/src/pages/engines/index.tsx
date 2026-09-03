@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import {
   Search,
   Plus,
@@ -9,9 +10,11 @@ import {
   AlertCircle,
   Layers,
   ChevronsUpDown,
+  X,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { EngineSummary, EngineCategory } from '@/types';
+import { FAMILY_META, familyChipClass, familyLabel } from '@/lib/families';
 import clsx from 'clsx';
 
 // ─── Category metadata ───────────────────────────────────────────────
@@ -113,6 +116,73 @@ const CATEGORY_META: CategoryMeta[] = [
     description: 'Essay construction, talking points, and synthesis operations',
     colors: { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', accent: 'bg-teal-500' },
   },
+  // Estate methods — mirrored from other organs (2026-09-04)
+  {
+    key: 'storytelling',
+    label: 'Storytelling',
+    description: 'Spine, telling dials, narrative approaches, and script-first writing',
+    colors: { bg: 'bg-pink-50', text: 'text-pink-700', border: 'border-pink-200', accent: 'bg-pink-500' },
+  },
+  {
+    key: 'editing',
+    label: 'Editing',
+    description: 'Pacing, sharpening, harmonizing, and the red pen over a draft',
+    colors: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', accent: 'bg-orange-500' },
+  },
+  {
+    key: 'restructuring',
+    label: 'Restructuring',
+    description: 'Long-form re-imagining: architecture, rivals, and rebuilds in another form',
+    colors: { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', accent: 'bg-teal-600' },
+  },
+  {
+    key: 'imagination',
+    label: 'Imagination',
+    description: 'Rival framings, counterfactuals, and what the material could become',
+    colors: { bg: 'bg-fuchsia-50', text: 'text-fuchsia-700', border: 'border-fuchsia-200', accent: 'bg-fuchsia-500' },
+  },
+  {
+    key: 'search',
+    label: 'Search',
+    description: 'Budgeted retrieval loops, lanes, effectors, and citation vetting',
+    colors: { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', accent: 'bg-cyan-600' },
+  },
+  {
+    key: 'planning',
+    label: 'Planning',
+    description: 'Storyboards and approach selection before anything is rendered',
+    colors: { bg: 'bg-lime-50', text: 'text-lime-700', border: 'border-lime-200', accent: 'bg-lime-500' },
+  },
+  {
+    key: 'visual',
+    label: 'Visual',
+    description: 'Prompt benches, text layers, and per-clip visual doctrine',
+    colors: { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200', accent: 'bg-violet-500' },
+  },
+  {
+    key: 'audio',
+    label: 'Audio',
+    description: 'Casting, music briefs, scratch voice-over, and the sound check',
+    colors: { bg: 'bg-fuchsia-50', text: 'text-fuchsia-700', border: 'border-fuchsia-200', accent: 'bg-fuchsia-600' },
+  },
+  {
+    key: 'composition',
+    label: 'Composition',
+    description: 'Figures, plates, layouts, and the assembly of exhibits',
+    colors: { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', accent: 'bg-indigo-500' },
+  },
+  {
+    key: 'quality',
+    label: 'Quality',
+    description: 'Dailies, screening, grounding review, verdicts, and retrospectives',
+    colors: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', accent: 'bg-emerald-500' },
+  },
+  {
+    key: 'governance',
+    label: 'Governance',
+    description: 'Activity models, method selection, budgets, and the estate contract',
+    colors: { bg: 'bg-stone-100', text: 'text-stone-700', border: 'border-stone-300', accent: 'bg-stone-500' },
+  },
 ];
 
 const CATEGORY_COLOR_BADGES: Record<EngineCategory, string> = {
@@ -150,11 +220,30 @@ const META_GROUPS: { label: string; categories: EngineCategory[] }[] = [
   { label: 'Actor & Structure', categories: ['power', 'institutional', 'market'] },
   { label: 'Discourse Analysis', categories: ['rhetoric', 'scholarly'] },
   { label: 'Critical & Synthesis', categories: ['vulnerability', 'outline'] },
+  // Methods mirrored from other organs of the estate
+  { label: 'Storytelling & Editing', categories: ['storytelling', 'editing', 'restructuring', 'imagination'] },
+  { label: 'Search, Rendering & Governance', categories: ['search', 'planning', 'visual', 'audio', 'composition', 'quality', 'governance'] },
 ];
+
+type OrganNames = Map<string, string>;
+
+/** "Wirecut · mirrored" — shown when an engine's home is another organ. */
+function OrganBadge({ engine, organNames }: { engine: EngineSummary; organNames: OrganNames }) {
+  if (!engine.home_organ || engine.home_organ === 'the-analyst') return null;
+  return (
+    <span
+      className="badge text-[10px] py-0 bg-white text-gray-600 border border-gray-300 whitespace-nowrap"
+      title={`Home organ: ${engine.home_organ}${engine.sync ? ` (${engine.sync})` : ''}`}
+    >
+      {organNames.get(engine.home_organ) ?? engine.home_organ}
+      {engine.sync && <span className="text-gray-400"> · {engine.sync}</span>}
+    </span>
+  );
+}
 
 // ─── Engine row within a category ────────────────────────────────────
 
-function EngineRow({ engine }: { engine: EngineSummary }) {
+function EngineRow({ engine, organNames }: { engine: EngineSummary; organNames: OrganNames }) {
   return (
     <Link
       href={`/engines/${engine.engine_key}`}
@@ -165,6 +254,7 @@ function EngineRow({ engine }: { engine: EngineSummary }) {
           <span className="text-sm font-medium text-gray-900 truncate">
             {engine.engine_name}
           </span>
+          <OrganBadge engine={engine} organNames={organNames} />
           <span className="text-xs text-gray-400 capitalize hidden sm:inline">{engine.kind}</span>
           {engine.paradigm_keys.length > 0 && (
             <span className="text-xs text-gray-400 hidden md:inline">
@@ -186,11 +276,13 @@ function CategorySection({
   engines,
   isOpen,
   onToggle,
+  organNames,
 }: {
   meta: CategoryMeta;
   engines: EngineSummary[];
   isOpen: boolean;
   onToggle: () => void;
+  organNames: OrganNames;
 }) {
   if (engines.length === 0) return null;
 
@@ -230,7 +322,7 @@ function CategorySection({
           {engines
             .sort((a, b) => a.engine_name.localeCompare(b.engine_name))
             .map((engine) => (
-              <EngineRow key={engine.engine_key} engine={engine} />
+              <EngineRow key={engine.engine_key} engine={engine} organNames={organNames} />
             ))}
         </div>
       )}
@@ -240,7 +332,7 @@ function CategorySection({
 
 // ─── Search results (flat list when searching) ──────────────────────
 
-function SearchResults({ engines }: { engines: EngineSummary[] }) {
+function SearchResults({ engines, organNames }: { engines: EngineSummary[]; organNames: OrganNames }) {
   return (
     <div className="card overflow-hidden divide-y divide-gray-100">
       {engines
@@ -256,9 +348,10 @@ function SearchResults({ engines }: { engines: EngineSummary[] }) {
                 <span className="text-sm font-medium text-gray-900 truncate">
                   {engine.engine_name}
                 </span>
-                <span className={clsx('badge text-xs', CATEGORY_COLOR_BADGES[engine.category])}>
+                <span className={clsx('badge text-xs', CATEGORY_COLOR_BADGES[engine.category] ?? 'badge-gray')}>
                   {engine.category}
                 </span>
+                <OrganBadge engine={engine} organNames={organNames} />
               </div>
               <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{engine.description}</p>
             </div>
@@ -272,11 +365,21 @@ function SearchResults({ engines }: { engines: EngineSummary[] }) {
 // ─── Main page ───────────────────────────────────────────────────────
 
 export default function EnginesPage() {
+  const router = useRouter();
   const [search, setSearch] = useState('');
   const [selectedApp, setSelectedApp] = useState<string | null>(null);
   const [selectedFunction, setSelectedFunction] = useState<string | null>(null);
+  const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
+  const [selectedOrgan, setSelectedOrgan] = useState<string | null>(null);
   const [capabilityOnly, setCapabilityOnly] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
+  // Deep links from the estate pages: /engines?family=storytelling, /engines?organ=wirecut
+  useEffect(() => {
+    if (!router.isReady) return;
+    setSelectedFamily(typeof router.query.family === 'string' ? router.query.family : null);
+    setSelectedOrgan(typeof router.query.organ === 'string' ? router.query.organ : null);
+  }, [router.isReady, router.query.family, router.query.organ]);
 
   const { data: engineData, isLoading, error } = useQuery({
     queryKey: ['engines', { search, app: selectedApp, function: selectedFunction }],
@@ -304,6 +407,15 @@ export default function EnginesPage() {
     queryFn: () => api.engines.listCapabilityKeys(),
   });
 
+  const { data: organsData } = useQuery({
+    queryKey: ['organs'],
+    queryFn: () => api.organs.list(),
+  });
+  const organNames = useMemo<OrganNames>(
+    () => new Map((organsData ?? []).map((o) => [o.organ_key, o.organ_name])),
+    [organsData]
+  );
+
   const capKeySet = useMemo(() => new Set(capabilityKeys ?? []), [capabilityKeys]);
 
   const allEnginesRaw = engineData?.engines ?? [];
@@ -311,9 +423,22 @@ export default function EnginesPage() {
     () => allEnginesRaw.filter(e => capKeySet.has(e.engine_key)).length,
     [allEnginesRaw, capKeySet]
   );
-  const allEngines = capabilityOnly
+  const baseEngines = capabilityOnly
     ? allEnginesRaw.filter(e => capKeySet.has(e.engine_key))
     : allEnginesRaw;
+  const familyCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const e of baseEngines) {
+      const f = e.family ?? 'analytical';
+      counts[f] = (counts[f] ?? 0) + 1;
+    }
+    return counts;
+  }, [baseEngines]);
+  const allEngines = baseEngines.filter(
+    (e) =>
+      (!selectedFamily || (e.family ?? 'analytical') === selectedFamily) &&
+      (!selectedOrgan || e.home_organ === selectedOrgan)
+  );
   const apps = appsData ?? [];
   const functions = functionsData ?? [];
 
@@ -370,8 +495,12 @@ export default function EnginesPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Engines</h1>
           <p className="mt-1 text-gray-500">
-            {allEngines.length} analytical engines across {Object.keys(enginesByCategory).length} categories
+            {allEngines.length} {selectedFamily ? familyLabel(selectedFamily).toLowerCase() : ''} engines across{' '}
+            {Object.keys(enginesByCategory).length} categories
             {selectedApp && <span className="text-primary-600 font-medium"> in {selectedApp}</span>}
+            {selectedOrgan && (
+              <span className="text-primary-600 font-medium"> hosted by {organNames.get(selectedOrgan) ?? selectedOrgan}</span>
+            )}
           </p>
         </div>
         <Link href="/engines/new" className="btn-primary">
@@ -382,6 +511,50 @@ export default function EnginesPage() {
 
       {/* Search + App filter bar */}
       <div className="card p-4 space-y-3">
+        {/* Family strip */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mr-1">Family</span>
+          <button
+            onClick={() => setSelectedFamily(null)}
+            className={clsx(
+              'badge cursor-pointer text-xs',
+              selectedFamily === null ? 'badge-primary' : 'badge-gray hover:bg-gray-200'
+            )}
+          >
+            All <span className="ml-1 opacity-60">{baseEngines.length}</span>
+          </button>
+          {FAMILY_META.map((f) => {
+            const n = familyCounts[f.key] ?? 0;
+            const active = selectedFamily === f.key;
+            return (
+              <button
+                key={f.key}
+                disabled={n === 0}
+                onClick={() => setSelectedFamily(active ? null : f.key)}
+                className={clsx(
+                  'badge text-xs border',
+                  active
+                    ? clsx(familyChipClass(f.key), 'ring-1 ring-gray-400 ring-offset-1')
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50',
+                  n === 0 ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
+                )}
+              >
+                {f.label} <span className="ml-1 opacity-60">{n}</span>
+              </button>
+            );
+          })}
+          {selectedOrgan && (
+            <button
+              onClick={() => setSelectedOrgan(null)}
+              className="badge text-xs bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 cursor-pointer"
+              title="Clear organ filter"
+            >
+              organ: {organNames.get(selectedOrgan) ?? selectedOrgan}
+              <X className="h-3 w-3 ml-1" />
+            </button>
+          )}
+        </div>
+
         <div className="flex gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -514,7 +687,7 @@ export default function EnginesPage() {
           <p className="text-sm text-gray-500 mb-3">
             {allEngines.length} result{allEngines.length !== 1 ? 's' : ''} for &ldquo;{search}&rdquo;
           </p>
-          <SearchResults engines={allEngines} />
+          <SearchResults engines={allEngines} organNames={organNames} />
         </div>
       )}
 
@@ -550,6 +723,7 @@ export default function EnginesPage() {
                         engines={engines}
                         isOpen={expandedCategories.has(meta.key)}
                         onToggle={() => toggleCategory(meta.key)}
+                        organNames={organNames}
                       />
                     );
                   })}
@@ -564,6 +738,14 @@ export default function EnginesPage() {
       {!isLoading && allEngines.length === 0 && (
         <div className="card p-12 text-center">
           <p className="text-gray-500">No engines found</p>
+          {(selectedFamily || selectedOrgan) && (
+            <button
+              onClick={() => { setSelectedFamily(null); setSelectedOrgan(null); }}
+              className="mt-2 mr-3 text-primary-600 hover:text-primary-700 text-sm font-medium"
+            >
+              Clear family / organ filter
+            </button>
+          )}
           {search && (
             <button
               onClick={() => setSearch('')}

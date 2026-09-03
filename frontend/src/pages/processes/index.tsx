@@ -59,10 +59,14 @@ export default function ProcessesPage() {
         return (
           <section key={organKey} className="space-y-3">
             <div className="flex items-center gap-2 mt-2">
-              <Link href={`/organs/${organKey}`} className="text-base font-semibold text-gray-900 hover:text-primary-700 inline-flex items-center">
-                {organ?.organ_name ?? organKey}
-                <ChevronRight className="h-4 w-4 ml-0.5 text-gray-300" />
-              </Link>
+              {organ ? (
+                <Link href={`/organs/${organKey}`} className="text-base font-semibold text-gray-900 hover:text-primary-700 inline-flex items-center">
+                  {organ.organ_name}
+                  <ChevronRight className="h-4 w-4 ml-0.5 text-gray-300" />
+                </Link>
+              ) : (
+                <span className="text-base font-semibold text-gray-700 font-mono">{organKey}</span>
+              )}
               {organ?.tagline && <span className="text-sm text-gray-400 hidden md:inline truncate">{organ.tagline}</span>}
               <div className="flex-1 h-px bg-gray-200" />
               <span className="text-xs text-gray-400">{workflows.length}</span>

@@ -33,9 +33,18 @@ export function workflowCategoryClass(category: string | undefined): string {
   return (category && WORKFLOW_CATEGORY_COLORS[category]) || 'badge-gray';
 }
 
+/** Legacy source_project values that predate the organs registry. */
+const SOURCE_PROJECT_ALIASES: Record<string, string> = {
+  critic: 'the-critic',
+  'the-critic': 'the-critic',
+  analyzer: 'the-analyst',
+  'analyzer-v2': 'the-analyst',
+};
+
 /** Which organ a workflow runs in; the registry's own processes default to The Analyst. */
 export function workflowOrganKey(workflow: Pick<Workflow, 'source_project'>): string {
-  return workflow.source_project || 'the-analyst';
+  const raw = workflow.source_project || 'the-analyst';
+  return SOURCE_PROJECT_ALIASES[raw] ?? raw;
 }
 
 export function ProcessCard({
@@ -60,9 +69,13 @@ export function ProcessCard({
           </Link>
           <p className="mt-0.5 text-xs text-gray-500">
             runs in{' '}
-            <Link href={`/organs/${organKey}`} className="text-primary-600 hover:underline">
-              {organName ?? organKey}
-            </Link>
+            {organName ? (
+              <Link href={`/organs/${organKey}`} className="text-primary-600 hover:underline">
+                {organName}
+              </Link>
+            ) : (
+              <span className="font-mono text-gray-600">{organKey}</span>
+            )}
             <span className="text-gray-300"> · </span>
             {phases.length} phases
           </p>
