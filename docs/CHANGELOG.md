@@ -6,6 +6,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **The Master · Method Registry** (2026-09-04) — the console becomes the face of the estate's one registry of methods.
+  - **Map** (`/`, [frontend/src/pages/index.tsx](frontend/src/pages/index.tsx)) — dark hero with the 10 July 2026 doctrine quote; live counts strip (engines by family, processes, chains, paradigms, audiences, stances, organs, presentation grammar with tooltip); organs by layer Sources → Search → Reasoning → Composition → Creative → Consumers with Governance as the base band (solid = native, outlined = mirrored, dashed = planned; status pills; non-blocking reachability dots via `mode:'no-cors'` probes); "How a dossier is made" rail of the 11 `dossier_standard` phases with links to a real run and its plates; cross-organ processes.
+  - **Organs** (`/organs`, `/organs/[key]`, [frontend/src/pages/organs/](frontend/src/pages/organs/)) — cards by layer; detail with role, contributions, families, counts, depends-on/feeds, engines hosted here, processes, lineage.
+  - **Processes** (`/processes`, `/processes/[key]`, [frontend/src/pages/processes/](frontend/src/pages/processes/)) — workflows grouped by organ with phase rails; detail as a vertical numbered spine with engine/chain/function links and `#phase-N` anchors.
+  - Shared estate components in [frontend/src/components/estate/](frontend/src/components/estate/) (`OrganCard`, `EstateMap`, `PhaseRail`/`ProcessCard`, `ProcessSpine`, `useReachable`) and vocabulary in [frontend/src/lib/families.ts](frontend/src/lib/families.ts).
+  - API client: `api.organs.{list, byLayer, get, engines}`, `api.registry.{count, counts}`, `api.workflows.listDetailed`, `api.engines.getDoctrine` ([frontend/src/lib/api.ts](frontend/src/lib/api.ts)); types `EngineFamily`, `EngineSyncMode`, `EngineRegistryStatus`, `Organ*`, `EngineDoctrine`.
+  - **Engines index** — family strip with counts (client-side filter on `family`), `?family=`/`?organ=` deep links, 11 new categories (storytelling, editing, restructuring, search, visual, audio, planning, quality, composition, imagination, governance) in browse mode, "Organ · sync" badge on rows whose home organ is not The Analyst.
+  - **Engine detail** — banner for mirrored/planned methods with `lineage_refs` and "Open in {organ}"; Doctrine section from `/v1/engines/{key}/doctrine` (per-file header with chars and sha256 prefix, collapsed preformatted text); empty states for Lineage/Depth/Dimensions/Capabilities/Composability/Schema; Prompt Preview shows "No composed prompt: the doctrine is in the home organ" on 404.
+  - Verification screenshots (local, untracked) in `.playwright-mcp/master-{map,organs,organ-wirecut,processes,process-wirecut,engines-families,engine-wirecut-spine,engine-argument-architecture}.png`.
+
+### Changed
+- Layout wordmark is now "The Master" with the "Method Registry" kicker; document title "The Master"; new ESTATE sidebar group (Map, Organs, Processes) ahead of Story and Definitions. Story and Definitions unchanged.
+- `api.engines.list/get` keep the registry lifecycle under `registry_status` (the console's `EngineStatus` is untouched).
+- `WorkflowCategory` accepts `process` and `rendering`; `EngineCategory` accepts the 11 estate categories.
+
+---
+
+## [2026-09-03]
+
+### Added
 - **The Analyst · Console** (branch `feat/the-analyst-console`, 2026-09-03) — see `communications/CHANGES_the_analyst_console.md`.
   - **Runs** list (`/jobs`, [frontend/src/pages/jobs/index.tsx](frontend/src/pages/jobs/index.tsx)) — executor jobs + dossier jobs (404-tolerant), status/plan/steps/created/tokens/cost, links to console and inspector; "Runs" added to the sidebar Story group.
   - **Run Console** (`/jobs/{id}/console`, [frontend/src/pages/jobs/[id]/console.tsx](frontend/src/pages/jobs/[id]/console.tsx)) — strategy strip with alternatives considered, phase tree with live pips (lifted from the-critic `PipelineVisualization`), prompt | output per node with model/tokens/cost/duration, kind-coloured timeline, executive view toggle, cost meter. Components in `frontend/src/components/console/`, events feed hook in [frontend/src/lib/events.ts](frontend/src/lib/events.ts) (SSE → polling → 404 degrade), dev fixture `frontend/src/fixtures/events-sample.json` (`?fixture=1&replay=1`).

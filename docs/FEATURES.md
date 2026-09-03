@@ -1,6 +1,81 @@
 # Feature Inventory
 
-> Auto-maintained by Claude Code. Last updated: 2026-09-03
+> Auto-maintained by Claude Code. Last updated: 2026-09-04
+
+
+## The Master (Estate)
+
+### Estate navigation and wordmark
+- **Status**: Active
+- **Description**: Console rebranded "The Master · Method Registry"; document title; sidebar group ESTATE (Map, Organs, Processes) ahead of Story and Definitions
+- **Entry Points**:
+  - `frontend/src/components/Layout.tsx:58` - ESTATE nav group
+  - `frontend/src/components/Layout.tsx:124` - wordmark + kicker
+  - `frontend/src/components/Layout.tsx:157` - document title
+- **Dependencies**: lucide-react
+- **Added**: 2026-09-04
+
+### Estate Map (`/`)
+- **Status**: Active
+- **Description**: Landing page for the estate: dark hero with the 10 July 2026 doctrine quote, live counts strip from the registry (engines by family, processes, chains, paradigms, audiences, stances, organs, presentation grammar), organs by layer with sync/status treatment and reachability dots, the 11-phase dossier rail with links to a real run and its plates, and the cross-organ processes
+- **Entry Points**:
+  - `frontend/src/pages/index.tsx:73-254` - MapPage (hero `:108`, counts `:125`, map `:154`, dossier rail `:182`, processes `:226`)
+  - `frontend/src/components/estate/EstateMap.tsx:21-89` - layer bands (Sources → Search → Reasoning → Composition → Creative → Consumers, Governance base) + caption
+  - `frontend/src/components/estate/OrganCard.tsx:67-130` - organ card (status pill, sync surface, family chips, counts, Open/API/Repo, reachability dot)
+  - `frontend/src/components/estate/useReachable.ts:13-47` - no-cors probe with 6 s timeout (health → api → ui)
+  - `frontend/src/components/estate/PhaseRail.tsx:7-98` - PhaseRail, ProcessCard, workflowOrganKey (legacy source_project aliases)
+  - `frontend/src/lib/families.ts:14-102` - family/layer/status/sync vocabulary and colours
+  - `frontend/src/lib/api.ts:790` - api.registry.count/counts (list-endpoint counters)
+- **Dependencies**: registry `/v1/organs`, `/v1/engines`, `/v1/workflows`, `/v1/workflows/dossier_standard`, count endpoints
+- **Added**: 2026-09-04
+
+### Organs pages (`/organs`, `/organs/[key]`)
+- **Status**: Active
+- **Description**: Organs by layer (same card as the map) and organ detail: header with status/sync/workspace/links, role, contributions, families, counts, depends-on/feeds links, engines hosted here, processes run here, lineage paths
+- **Entry Points**:
+  - `frontend/src/pages/organs/index.tsx:6-44` - OrgansPage
+  - `frontend/src/pages/organs/[key].tsx:65-335` - OrganDetailPage (engines `:252`, processes `:300`, lineage `:320`)
+  - `frontend/src/lib/api.ts:756` - api.organs.list/byLayer/get/engines
+  - `frontend/src/types/index.ts:90` - OrganSummary / Organ types
+- **Dependencies**: registry `/v1/organs`, `/v1/organs/{key}`, `/v1/organs/{key}/engines`, `/v1/workflows/*`
+- **Added**: 2026-09-04
+
+### Processes pages (`/processes`, `/processes/[key]`)
+- **Status**: Active
+- **Description**: All workflows grouped by the organ that runs them (phase rails on each card) and a process detail with the phases as a vertical numbered spine (engine/chain/function references, dependency anchors `#phase-N`)
+- **Entry Points**:
+  - `frontend/src/pages/processes/index.tsx:9-88` - ProcessesPage
+  - `frontend/src/pages/processes/[key].tsx:10-135` - ProcessDetailPage
+  - `frontend/src/components/estate/ProcessSpine.tsx:6-67` - ProcessSpine
+  - `frontend/src/lib/api.ts:561` - api.workflows.listDetailed (summaries lack phases/source_project)
+- **Dependencies**: registry `/v1/workflows`, `/v1/workflows/{key}`
+- **Added**: 2026-09-04
+
+### Engines index: family strip and estate categories
+- **Status**: Active
+- **Description**: Family chips with counts filter engines client-side; `?family=` / `?organ=` deep links; 11 estate categories in browse mode; "Organ · sync" badge on engines whose home is another organ
+- **Entry Points**:
+  - `frontend/src/pages/engines/index.tsx:119` - estate CATEGORY_META entries
+  - `frontend/src/pages/engines/index.tsx:231` - OrganBadge
+  - `frontend/src/pages/engines/index.tsx:429` - family/organ filtering
+  - `frontend/src/pages/engines/index.tsx:514` - family strip UI
+  - `frontend/src/types/index.ts:46` - EngineFamily / EngineSyncMode / EngineRegistryStatus
+- **Dependencies**: registry `/v1/engines` (family, home_organ, sync), `/v1/organs`
+- **Added**: 2026-09-04
+
+### Engine detail: mirrored-method banner and Doctrine
+- **Status**: Active
+- **Description**: For engines with sync mirrored|planned: banner naming the home organ with lineage_refs and "Open in {organ}"; Doctrine section listing mirrored doctrine files (name, chars, sha256 prefix, collapsible preformatted text); graceful empty states for Lineage/Depth/Dimensions/Capabilities/Composability/Schema; Prompt Preview 404 fallback
+- **Entry Points**:
+  - `frontend/src/pages/engines/[key].tsx:731` - DoctrineFileBlock
+  - `frontend/src/pages/engines/[key].tsx:765` - MirroredEmptyState
+  - `frontend/src/pages/engines/[key].tsx:911` - organ + doctrine queries
+  - `frontend/src/pages/engines/[key].tsx:1062` - banner + Doctrine section
+  - `frontend/src/pages/engines/[key].tsx:1792` - schema empty state
+  - `frontend/src/lib/api.ts:354` - api.engines.getDoctrine
+  - `frontend/src/types/index.ts:112` - EngineDoctrine / DoctrineFile
+- **Dependencies**: registry `/v1/engines/{key}` (sync, home_organ, runs_at, lineage_refs), `/v1/engines/{key}/doctrine`
+- **Added**: 2026-09-04
 
 ## Backend API
 
