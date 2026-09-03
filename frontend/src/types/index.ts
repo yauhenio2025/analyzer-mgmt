@@ -2172,3 +2172,197 @@ export interface ConceptAnalysisArtifactLookup {
   lookup_mode: 'exact_run' | 'latest_validated';
   translated_artifact: Record<string, unknown>;
 }
+
+// ============================================================================
+// The Analyst — Runs, Events ledger, Run Console
+// ============================================================================
+
+export type RunEventKind =
+  | 'job_started'
+  | 'phase_started'
+  | 'phase_finished'
+  | 'chain_started'
+  | 'chain_finished'
+  | 'call_started'
+  | 'call_finished'
+  | 'call_failed'
+  | 'narration'
+  | 'artifact'
+  | 'note'
+  | 'job_finished'
+  | 'job_failed';
+
+/** One row of the per-call event ledger (GET /v1/events/{job_id}). */
+export interface RunEvent {
+  job_id: string;
+  seq: number;
+  ts: string;
+  kind: RunEventKind | string;
+  phase?: number | string | null;
+  chain?: string | null;
+  engine?: string | null;
+  pass_name?: string | null;
+  stance?: string | null;
+  work_key?: string | null;
+  model?: string | null;
+  input_chars?: number | null;
+  output_chars?: number | null;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cost_usd?: number | null;
+  duration_ms?: number | null;
+  prompt_hash?: string | null;
+  prompt_excerpt?: string | null;
+  output_excerpt?: string | null;
+  detail?: string | null;
+  narrator?: string | null;
+  payload_json?: string | Record<string, unknown> | null;
+}
+
+export interface RunEventsResponse {
+  job_id: string;
+  events: RunEvent[];
+  last_seq?: number;
+  count?: number;
+}
+
+/** GET /v1/events/{job_id}/summary — field names tolerated loosely. */
+export interface RunEventsSummary {
+  job_id: string;
+  status?: string;
+  total_cost_usd?: number | null;
+  cost_usd?: number | null;
+  total_input_tokens?: number | null;
+  total_output_tokens?: number | null;
+  total_calls?: number | null;
+  calls?: number | null;
+  duration_ms?: number | null;
+  last_seq?: number | null;
+  by_phase?: Record<string, { cost_usd?: number; calls?: number; input_tokens?: number; output_tokens?: number; duration_ms?: number }>;
+}
+
+/** GET /v1/executor/jobs/{id}/results */
+export interface PhaseResultSummary {
+  phase_number: number;
+  phase_name: string;
+  status: string;
+  duration_ms: number;
+  total_tokens: number;
+  error?: string | null;
+  final_output_preview?: string;
+}
+
+export interface JobResultsResponse {
+  job_id: string;
+  status: string;
+  phase_results: Record<string, PhaseResultSummary>;
+  total_outputs: number;
+  total_llm_calls: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+}
+
+/** GET /v1/executor/jobs/{id}/phases/{n} */
+export interface PhaseOutputRecord {
+  id: string;
+  engine_key: string;
+  pass_number: number;
+  work_key: string;
+  stance_key?: string | null;
+  role?: string | null;
+  content: string;
+  model_used?: string | null;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+}
+
+export interface PhaseOutputsResponse {
+  job_id: string;
+  phase_number: number;
+  outputs: PhaseOutputRecord[];
+  count: number;
+}
+
+/** GET /v1/orchestrator/plans/{id}/pipeline-visualization */
+export interface PipelinePassViz {
+  pass_number: number;
+  stance_key: string;
+  stance_name: string;
+  cognitive_mode: string;
+  label: string;
+  focus_dimensions: string[];
+  focus_capabilities: string[];
+  consumes_from: number[];
+  stance_prose: string;
+  description: string;
+  input_summary: string;
+  output_summary: string;
+}
+
+export interface PipelineEngineViz {
+  engine_key: string;
+  engine_name: string;
+  category: string;
+  depth: string;
+  override_rationale: string | null;
+  focus_dimensions: string[] | null;
+  passes: PipelinePassViz[];
+  dimensions: { key: string; description: string }[];
+  capabilities: string[];
+}
+
+export interface PipelineExecutionViz {
+  type: 'chain' | 'engine' | 'unknown';
+  chain_key?: string | null;
+  chain_name?: string | null;
+  blend_mode?: string | null;
+  engines: PipelineEngineViz[];
+}
+
+export interface PipelinePhaseViz {
+  phase_number: number;
+  phase_name: string;
+  depth: string;
+  rationale: string;
+  model_hint: string | null;
+  per_work: boolean;
+  depends_on: number[];
+  skip: boolean;
+  document_scope?: string;
+  chapter_targets?: { chapter_id: string; chapter_title: string; work_key: string; rationale: string }[] | null;
+  execution: PipelineExecutionViz;
+}
+
+export interface PipelineVisualization {
+  plan_id: string;
+  workflow_key: string;
+  thinker_name: string;
+  strategy_summary: string;
+  estimated_llm_calls: number;
+  depth_profile: string;
+  total_phases: number;
+  phases: PipelinePhaseViz[];
+}
+
+/** GET /v1/dossier/jobs — The Analyst dossier workflow (may be absent on older backends). */
+export interface DossierJobSummary {
+  job_id: string;
+  status: string;
+  step?: string | null;
+  intent?: string | null;
+  audience?: string | null;
+  depth?: string | null;
+  title?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
+  receipts_total?: number | null;
+  analysis_job_id?: string | null;
+  console_url?: string | null;
+  sources_count?: number | null;
+}
+
+export interface DossierJobListResponse {
+  jobs: DossierJobSummary[];
+  count?: number;
+}

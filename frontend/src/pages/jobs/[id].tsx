@@ -1558,6 +1558,12 @@ export default function JobPresentationPage() {
             <Clock className="h-4 w-4" />
             Refresh
           </button>
+          <Link
+            href={`/jobs/${job.job_id}/console`}
+            className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-700"
+          >
+            Run console
+          </Link>
         </div>
       </div>
 
