@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Head from 'next/head';
 import { useRouter } from 'next/router';
 import {
   Cpu,
@@ -28,6 +29,9 @@ import {
   Target,
   Map,
   Activity,
+  Globe,
+  Boxes,
+  Route,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -44,11 +48,20 @@ interface NavGroup {
 }
 
 /**
- * Sidebar groups. "Story" is the executive path (what we wanted → how we
- * planned it → what actually ran); "Definitions" keeps the catalog pages in
- * their historical order.
+ * Sidebar groups. "Estate" is the network view (which organs draw which
+ * methods from the registry); "Story" is the executive path (what we wanted →
+ * how we planned it → what actually ran); "Definitions" keeps the catalog pages
+ * in their historical order.
  */
 const navigation: NavGroup[] = [
+  {
+    name: 'Estate',
+    items: [
+      { name: 'Map', href: '/', icon: Globe },
+      { name: 'Organs', href: '/organs', icon: Boxes },
+      { name: 'Processes', href: '/processes', icon: Route },
+    ],
+  },
   {
     name: 'Story',
     items: [
@@ -86,6 +99,7 @@ const navigation: NavGroup[] = [
 ];
 
 function isActivePath(pathname: string, href: string) {
+  if (href === '/') return pathname === '/';
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -110,8 +124,8 @@ function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
 function Brand() {
   return (
     <Link href="/" className="flex items-baseline gap-2">
-      <span className="font-display text-xl text-paper tracking-tight">The Analyst</span>
-      <span className="mono-label text-gold-500">Console</span>
+      <span className="font-display text-xl text-paper tracking-tight">The Master</span>
+      <span className="mono-label text-gold-500 whitespace-nowrap">Method Registry</span>
     </Link>
   );
 }
@@ -139,6 +153,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Head>
+        <title>The Master</title>
+      </Head>
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div

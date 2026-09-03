@@ -22,9 +22,112 @@ export type EngineCategory =
   | 'rhetoric'
   | 'scholarly'
   | 'vulnerability'
-  | 'outline';
+  | 'outline'
+  // Estate categories (2026-09-04): methods mirrored from other organs
+  | 'storytelling'
+  | 'editing'
+  | 'restructuring'
+  | 'search'
+  | 'visual'
+  | 'audio'
+  | 'planning'
+  | 'quality'
+  | 'composition'
+  | 'imagination'
+  | 'governance';
 
 export type EngineStatus = 'active' | 'deprecated' | 'draft' | 'archived';
+
+// ============================================================================
+// Estate / registry provenance (The Master, 2026-09-04)
+// ============================================================================
+
+/** Method family: which kind of skill an engine encodes. */
+export type EngineFamily =
+  | 'analytical'
+  | 'imagination'
+  | 'search'
+  | 'storytelling'
+  | 'editing'
+  | 'restructuring'
+  | 'rendering'
+  | 'composition'
+  | 'quality'
+  | 'governance';
+
+/** Registry-side lifecycle of a method. */
+export type EngineRegistryStatus = 'live' | 'pilot' | 'designed' | 'frozen';
+
+/**
+ * native   — the organ reads this method from the registry at runtime
+ * mirrored — the registry mirrors the organ's doctrine; source still in its repo
+ * planned  — declared, not yet running anywhere
+ */
+export type EngineSyncMode = 'native' | 'mirrored' | 'planned';
+
+export type OrganLayer =
+  | 'sources'
+  | 'search'
+  | 'reasoning'
+  | 'composition'
+  | 'creative'
+  | 'consumers'
+  | 'governance';
+
+export type OrganStatus = 'live' | 'partial' | 'frozen' | 'local' | 'planned' | 'suspended';
+
+export interface OrganUrls {
+  ui?: string;
+  api?: string;
+  health?: string;
+  console?: string;
+  repo?: string;
+  docs?: string;
+  longform?: string;
+  registry_repo?: string;
+}
+
+export interface OrganSummary {
+  organ_key: string;
+  organ_name: string;
+  tagline: string;
+  layer: OrganLayer;
+  families: EngineFamily[];
+  counts: Record<string, number>;
+  urls: OrganUrls;
+  status: OrganStatus;
+  sync: EngineSyncMode;
+  order: number;
+}
+
+export interface DoctrineFile {
+  name: string;
+  source_ref: string;
+  sha256: string;
+  chars: number;
+  text: string;
+}
+
+/** GET /v1/engines/{key}/doctrine — the mirrored doctrine text for an engine. */
+export interface EngineDoctrine {
+  engine_key: string;
+  engine_name: string;
+  home_organ: string;
+  sync: EngineSyncMode;
+  lineage_refs: string[];
+  files: DoctrineFile[];
+  note: string | null;
+}
+
+export interface Organ extends OrganSummary {
+  role: string;
+  contributes: string[];
+  depends_on: string[];
+  feeds: string[];
+  lineage: string[];
+  notes: string | null;
+  workspace: string | null;
+}
 
 // ============================================================================
 // Stage Context Types (for prompt composition)
@@ -169,6 +272,13 @@ export interface Engine {
   engine_profile?: EngineProfile;
   created_at?: string;
   updated_at?: string;
+  // Estate provenance (full registry definition)
+  family?: EngineFamily;
+  home_organ?: string;
+  registry_status?: EngineRegistryStatus;
+  sync?: EngineSyncMode;
+  runs_at?: string | null;
+  lineage_refs?: string[];
 }
 
 export interface EngineSummary {
@@ -184,6 +294,11 @@ export interface EngineSummary {
   has_profile?: boolean;        // Indicates if engine has rich profile/about section
   apps?: string[];              // Apps that use this engine (e.g., 'critic')
   function?: string;              // Primary function/role (e.g., 'genealogy')
+  // Estate provenance (registry summaries carry these since 2026-09-04)
+  family?: EngineFamily;
+  home_organ?: string;
+  registry_status?: EngineRegistryStatus;
+  sync?: EngineSyncMode;
 }
 
 export interface EngineVersion {
@@ -341,7 +456,10 @@ export type WorkflowCategory =
   | 'outline'
   | 'analysis'
   | 'genealogy'
-  | 'decision_support';
+  | 'decision_support'
+  // Cross-organ processes mirrored into the registry (2026-09-04)
+  | 'process'
+  | 'rendering';
 
 export interface WorkflowPhase {
   phase_number: number;

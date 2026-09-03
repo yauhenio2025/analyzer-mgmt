@@ -130,6 +130,18 @@ const CATEGORY_COLOR_BADGES: Record<EngineCategory, string> = {
   scholarly: 'bg-slate-100 text-slate-800',
   vulnerability: 'bg-amber-100 text-amber-800',
   outline: 'bg-teal-100 text-teal-800',
+  // Estate categories (methods mirrored from other organs)
+  storytelling: 'bg-pink-100 text-pink-800',
+  editing: 'bg-orange-100 text-orange-800',
+  restructuring: 'bg-teal-100 text-teal-800',
+  search: 'bg-cyan-100 text-cyan-800',
+  visual: 'bg-violet-100 text-violet-800',
+  audio: 'bg-fuchsia-100 text-fuchsia-800',
+  planning: 'bg-lime-100 text-lime-800',
+  quality: 'bg-emerald-100 text-emerald-800',
+  composition: 'bg-indigo-100 text-indigo-800',
+  imagination: 'bg-fuchsia-100 text-fuchsia-800',
+  governance: 'bg-stone-200 text-stone-800',
 };
 
 const META_GROUPS: { label: string; categories: EngineCategory[] }[] = [

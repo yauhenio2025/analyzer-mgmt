@@ -86,6 +86,10 @@ import type {
   AnalysisResultManifest,
   ConceptAnalysisArtifactLookup,
   RunDetail,
+  Organ,
+  OrganSummary,
+  OrganLayer,
+  EngineDoctrine,
 } from '@/types';
 
 import { ANALYZER_V2_URL, API_BASE } from '@/lib/config';
@@ -210,7 +214,13 @@ class ApiClient {
       const query = queryParams.toString();
       const response = await fetch(`${ANALYZER_V2_URL}/v1/engines${query ? `?${query}` : ''}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const engines = await response.json() as EngineSummary[];
+      const raw = await response.json() as Array<EngineSummary & { status?: string }>;
+      // The registry's `status` is its lifecycle (live|pilot|designed|frozen); keep it
+      // under registry_status so the console's EngineStatus semantics stay untouched.
+      const engines: EngineSummary[] = raw.map((e) => ({
+        ...e,
+        registry_status: (e.registry_status ?? e.status) as EngineSummary['registry_status'],
+      }));
       return { engines, total: engines.length, limit: params?.limit ?? 200, offset: params?.offset ?? 0 };
     },
 
@@ -225,6 +235,7 @@ class ApiClient {
       return {
         ...data,
         id: data.engine_key,
+        registry_status: data.status,
         status: 'active' as const,
       } as Engine;
     },
@@ -336,6 +347,17 @@ class ApiClient {
      * Get the capability definition for an engine from analyzer-v2.
      * Returns null if the engine has no capability definition.
      */
+    /**
+     * Get the mirrored doctrine text for an engine (mirrored/planned engines).
+     * Returns null on 404 so native engines simply have no doctrine section.
+     */
+    getDoctrine: async (engineKey: string): Promise<EngineDoctrine | null> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/engines/${engineKey}/doctrine`);
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+
     getCapabilityDefinition: async (engineKey: string): Promise<CapabilityEngineDefinition | null> => {
       const response = await fetch(`${ANALYZER_V2_URL}/v1/engines/${engineKey}/capability-definition`);
       if (response.status === 404) return null;
@@ -533,6 +555,24 @@ class ApiClient {
     },
 
     /**
+     * List workflows with their full definitions (phases, source_project).
+     * Summaries omit both, so the estate pages fetch every detail in parallel.
+     */
+    listDetailed: async (params?: { category?: string }): Promise<Workflow[]> => {
+      const { workflows } = await this.workflows.list(params);
+      const details = await Promise.all(
+        workflows.map(async (w) => {
+          try {
+            return await this.workflows.get(w.workflow_key);
+          } catch {
+            return null;
+          }
+        })
+      );
+      return details.filter((w): w is Workflow => w !== null);
+    },
+
+    /**
      * Get a single workflow from analyzer-v2 with full phase details.
      * Normalizes legacy 'passes' field to 'phases' for backward compatibility.
      */
@@ -707,6 +747,72 @@ class ApiClient {
 
     removeDependency: (consumerId: string, dependencyId: string) =>
       this.delete<{ message: string }>(`/consumers/${consumerId}/dependencies/${dependencyId}`),
+  };
+
+  // ============================================================================
+  // Organs (the estate map) — registry, direct fetch
+  // ============================================================================
+
+  organs = {
+    list: async (): Promise<OrganSummary[]> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/organs`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+
+    byLayer: async (): Promise<Partial<Record<OrganLayer, OrganSummary[]>>> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/organs/by-layer`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+
+    get: async (organKey: string): Promise<Organ> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/organs/${organKey}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+
+    engines: async (organKey: string): Promise<EngineSummary[]> => {
+      const response = await fetch(`${ANALYZER_V2_URL}/v1/organs/${organKey}/engines`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const raw = await response.json() as Array<EngineSummary & { status?: string }>;
+      return raw.map((e) => ({
+        ...e,
+        registry_status: (e.registry_status ?? e.status) as EngineSummary['registry_status'],
+      }));
+    },
+  };
+
+  // ============================================================================
+  // Registry counts — the Map page's live counts strip
+  // ============================================================================
+
+  registry = {
+    /**
+     * Count the items behind a registry list endpoint (e.g. 'chains', 'operations/stances').
+     * Returns null when the endpoint is unreachable so one dead route never blanks the strip.
+     */
+    count: async (path: string): Promise<number | null> => {
+      try {
+        const response = await fetch(`${ANALYZER_V2_URL}/v1/${path}`);
+        if (!response.ok) return null;
+        const body = await response.json();
+        if (Array.isArray(body)) return body.length;
+        if (body && typeof body === 'object') {
+          const firstList = Object.values(body as Record<string, unknown>).find(Array.isArray);
+          if (firstList) return (firstList as unknown[]).length;
+          if (typeof (body as { total?: number }).total === 'number') return (body as { total: number }).total;
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    },
+
+    counts: async (paths: string[]): Promise<Record<string, number | null>> => {
+      const values = await Promise.all(paths.map((p) => this.registry.count(p)));
+      return Object.fromEntries(paths.map((p, i) => [p, values[i]]));
+    },
   };
 
   // ============================================================================
