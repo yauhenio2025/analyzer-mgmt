@@ -1,6 +1,6 @@
 # Feature Inventory
 
-> Auto-maintained by Claude Code. Last updated: 2026-02-18
+> Auto-maintained by Claude Code. Last updated: 2026-09-03
 
 ## Backend API
 
@@ -161,11 +161,45 @@
 
 ## Frontend UI
 
+### Runs List
+- **Status**: Active
+- **Description**: Executor jobs (+ dossier jobs when the route exists) with status, plan, step progress, tokens and ledger cost; entry to the Run Console
+- **Entry Points**:
+  - `frontend/src/pages/jobs/index.tsx:51-393` - Page (queries, ledger probe, filters, tables)
+  - `frontend/src/lib/api.ts:783-796` - `dossierJobs.list` (404 → unavailable)
+- **Dependencies**: The Analyst `/v1/executor/jobs`, `/v1/orchestrator/plans`, `/v1/events/{id}/summary`, `/v1/dossier/jobs`
+- **Added**: 2026-09-03
+
+### Run Console
+- **Status**: Active
+- **Description**: "Under the hood" page for one run — strategy + alternatives, phase tree with live pips, prompt | output per node, timeline, executive view, cost meter
+- **Entry Points**:
+  - `frontend/src/pages/jobs/[id]/console.tsx:53-406` - Page (queries, fixture loading, layout)
+  - `frontend/src/lib/events.ts:48-197` - `useRunEvents` (replay → SSE → polling → 404 degrade; fixture/replay)
+  - `frontend/src/components/console/model.ts:130-720` - `buildConsoleTree`, `defaultSelection`, helpers
+  - `frontend/src/components/console/PhaseTree.tsx:28-207` - Tree with pips and per-node stats
+  - `frontend/src/components/console/NodeDetail.tsx:78-351` - Selected node: prompt | output, stats, narration
+  - `frontend/src/components/console/Timeline.tsx:74-150` - Kind-coloured event list
+  - `frontend/src/components/console/widgets.tsx:1-158` - StatusPip/Tag, StatChip, KindChip, CostMeter, Toggle
+  - `frontend/src/fixtures/events-sample.json` - Dev fixture (`?fixture=1`)
+  - `frontend/src/lib/api.ts:737-781` - `executorJobs.results/phaseOutputs`, `plans.*`, `runEvents.*`
+  - `frontend/src/types/index.ts:2178-2364` - Console types
+- **Dependencies**: The Analyst executor/orchestrator/events routes; EventSource
+- **Added**: 2026-09-03
+
+### Settings
+- **Status**: Active
+- **Description**: Backend URLs (build-time env) and live health probes
+- **Entry Points**:
+  - `frontend/src/pages/settings.tsx:1-128` - Page
+  - `frontend/src/lib/config.ts:1-15` - `ANALYZER_V2_URL`, `API_BASE`
+- **Added**: 2026-09-03
+
 ### Layout and Navigation
 - **Status**: Active
 - **Description**: Responsive sidebar layout with navigation
 - **Entry Points**:
-  - `frontend/src/components/Layout.tsx:1-150` - Main layout component
+  - `frontend/src/components/Layout.tsx:1-207` - Main layout component (grouped sidebar: Story / Definitions; The Analyst branding)
   - `frontend/src/pages/_app.tsx:1-30` - App wrapper with React Query
 - **Dependencies**: Next.js, Tailwind CSS
 - **Added**: 2026-01-28

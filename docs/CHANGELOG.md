@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- **The Analyst · Console** (branch `feat/the-analyst-console`, 2026-09-03) — see `communications/CHANGES_the_analyst_console.md`.
+  - **Runs** list (`/jobs`, [frontend/src/pages/jobs/index.tsx](frontend/src/pages/jobs/index.tsx)) — executor jobs + dossier jobs (404-tolerant), status/plan/steps/created/tokens/cost, links to console and inspector; "Runs" added to the sidebar Story group.
+  - **Run Console** (`/jobs/{id}/console`, [frontend/src/pages/jobs/[id]/console.tsx](frontend/src/pages/jobs/[id]/console.tsx)) — strategy strip with alternatives considered, phase tree with live pips (lifted from the-critic `PipelineVisualization`), prompt | output per node with model/tokens/cost/duration, kind-coloured timeline, executive view toggle, cost meter. Components in `frontend/src/components/console/`, events feed hook in [frontend/src/lib/events.ts](frontend/src/lib/events.ts) (SSE → polling → 404 degrade), dev fixture `frontend/src/fixtures/events-sample.json` (`?fixture=1&replay=1`).
+  - **Settings** page (`/settings`) showing backend URLs and health probes (fixes the 404 sidebar link).
+  - `frontend/src/lib/config.ts` — single exported `ANALYZER_V2_URL` / `API_BASE`; `frontend/.env.example`; repo-root `render.yaml` for both services.
+  - Types `RunEvent`, `RunEventsSummary`, `JobResultsResponse`, `PhaseOutputsResponse`, `Pipeline*Viz`, `DossierJobSummary`; API `executorJobs.results/phaseOutputs`, `plans.get/pipelineVisualization`, `runEvents.*`, `dossierJobs.list`, `HttpError`.
+  - Editorial design tokens (`ink`, `paper`, `gold`, `font-display`) in `tailwind.config.js` / `globals.css`, applied to Layout, Runs and Console only.
+  - Cherry-picked recovery commit c365b2c: Plans → Jobs tab, `annotated_prose` sub-renderer option/default, ui-docs.
+
+### Changed
+- Default analyzer-v2 target is now The Analyst (`https://the-analyst-kcuc.onrender.com`); the five page-level `ANALYZER_V2_URL` copies (objectives/*, plans/*) import from `lib/config`.
+- Layout brand renamed to "The Analyst · Console"; sidebar grouped (Story / Definitions), dark editorial styling.
+- Plans → Jobs tab links to the run console; jobs inspector header links to the run console.
+
+### Fixed
+- "Failed to load engines" on the live console — dead default host baked into the bundle (`api.ts`), env var never set on Render.
+- Plans → Jobs tab listed every job: `GET /v1/executor/jobs` ignores `plan_id`; now filtered client-side.
+- Sidebar Settings link 404.
+
 ### Fixed
 - **Section renderer dropdown** — Dropdown for selecting sub-renderer type now reads from the renderer definition's `available_section_renderers` instead of a hardcoded list. New sub-renderers (e.g., evidence_trail) appear automatically when added to the accordion definition. Fallback to hardcoded list when definition not loaded.
   ([frontend/src/pages/views/[key].tsx](frontend/src/pages/views/[key].tsx))
