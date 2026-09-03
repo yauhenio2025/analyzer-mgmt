@@ -15,7 +15,7 @@ import {
   Workflow,
 } from 'lucide-react';
 
-const ANALYZER_V2_URL = process.env.NEXT_PUBLIC_ANALYZER_V2_URL || 'https://analyzer-v2.onrender.com';
+import { ANALYZER_V2_URL } from '@/lib/config';
 
 interface AnalysisObjective {
   objective_key: string;

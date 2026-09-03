@@ -65,6 +65,14 @@ import type {
   TransformationExecuteResponse,
   ExecutorJobListResponse,
   ExecutorJobSummary,
+  JobResultsResponse,
+  PhaseOutputsResponse,
+  PipelineVisualization,
+  PlanDetail,
+  RunEventsResponse,
+  RunEventsSummary,
+  DossierJobListResponse,
+  DossierJobSummary,
   PresentationStatusResponse,
   EffectivePresentationManifest,
   PresentationDecisionTrace,
@@ -80,8 +88,44 @@ import type {
   RunDetail,
 } from '@/types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
-const ANALYZER_V2_URL = process.env.NEXT_PUBLIC_ANALYZER_V2_URL || 'https://analyzer-v2.onrender.com';
+import { ANALYZER_V2_URL, API_BASE } from '@/lib/config';
+
+export { ANALYZER_V2_URL, API_BASE };
+
+/** Error carrying the HTTP status so callers can treat 404 (feature absent) differently from failures. */
+export class HttpError extends Error {
+  status: number;
+  constructor(status: number, message?: string) {
+    super(message || `HTTP ${status}`);
+    this.name = 'HttpError';
+    this.status = status;
+  }
+}
+
+async function fetchV2<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${ANALYZER_V2_URL}${path}`, init);
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    try {
+      const body = await response.json();
+      if (body && typeof body.detail === 'string') detail = body.detail;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new HttpError(response.status, detail);
+  }
+  return response.json() as Promise<T>;
+}
+
+/** Resolve to null on 404 (endpoint or record absent); rethrow anything else. */
+async function fetchV2OrNull<T>(path: string): Promise<T | null> {
+  try {
+    return await fetchV2<T>(path);
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 404) return null;
+    throw err;
+  }
+}
 
 // ============================================================================
 // HTTP Client
@@ -687,6 +731,61 @@ class ApiClient {
       const response = await fetch(`${ANALYZER_V2_URL}/v1/executor/jobs/${jobId}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json() as Promise<ExecutorJobSummary>;
+    },
+
+    /** Phase-level summaries (status, duration, tokens, output preview). */
+    results: (jobId: string) =>
+      fetchV2<JobResultsResponse>(`/v1/executor/jobs/${encodeURIComponent(jobId)}/results`),
+
+    /** Full prose outputs for one phase; null when the phase has produced nothing yet. */
+    phaseOutputs: (jobId: string, phaseNumber: number | string) =>
+      fetchV2OrNull<PhaseOutputsResponse>(
+        `/v1/executor/jobs/${encodeURIComponent(jobId)}/phases/${encodeURIComponent(String(phaseNumber))}`
+      ),
+  };
+
+  // ============================================================================
+  // Orchestrator plans (typed; the Plans pages still use inline fetch)
+  // ============================================================================
+
+  plans = {
+    get: (planId: string) => fetchV2<PlanDetail>(`/v1/orchestrator/plans/${encodeURIComponent(planId)}`),
+
+    /** phases → chains → engines → passes tree; null when the plan cannot be assembled. */
+    pipelineVisualization: (planId: string) =>
+      fetchV2OrNull<PipelineVisualization>(
+        `/v1/orchestrator/plans/${encodeURIComponent(planId)}/pipeline-visualization`
+      ),
+  };
+
+  // ============================================================================
+  // Events ledger (The Analyst). Returns null on 404 = ledger not deployed.
+  // ============================================================================
+
+  runEvents = {
+    list: async (jobId: string, after = 0) => {
+      const data = await fetchV2OrNull<RunEventsResponse | unknown[]>(
+        `/v1/events/${encodeURIComponent(jobId)}?after=${after}`
+      );
+      if (data === null) return null;
+      return data;
+    },
+    summary: (jobId: string) =>
+      fetchV2OrNull<RunEventsSummary>(`/v1/events/${encodeURIComponent(jobId)}/summary`),
+    streamUrl: (jobId: string, after = 0) =>
+      `${ANALYZER_V2_URL}/v1/events/${encodeURIComponent(jobId)}/stream?after=${after}`,
+  };
+
+  // ============================================================================
+  // Dossier jobs (The Analyst). Returns [] when the route is not deployed yet.
+  // ============================================================================
+
+  dossierJobs = {
+    list: async (): Promise<{ jobs: DossierJobSummary[]; available: boolean }> => {
+      const data = await fetchV2OrNull<DossierJobListResponse | DossierJobSummary[]>('/v1/dossier/jobs');
+      if (data === null) return { jobs: [], available: false };
+      const jobs = Array.isArray(data) ? data : data.jobs || [];
+      return { jobs, available: true };
     },
   };
 

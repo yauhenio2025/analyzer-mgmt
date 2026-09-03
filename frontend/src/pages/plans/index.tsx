@@ -4,7 +4,7 @@ import { Map, AlertCircle, ChevronRight, Fingerprint, DollarSign, Layers, Target
 import clsx from 'clsx';
 import type { PlanSummary } from '@/types';
 
-const ANALYZER_V2_URL = process.env.NEXT_PUBLIC_ANALYZER_V2_URL || 'https://analyzer-v2.onrender.com';
+import { ANALYZER_V2_URL } from '@/lib/config';
 
 const statusColors: Record<string, { bg: string; text: string }> = {
   draft: { bg: 'bg-gray-100', text: 'text-gray-700' },

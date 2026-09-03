@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Target, AlertCircle, ChevronRight, Plus, Trash2 } from 'lucide-react';
 
-const ANALYZER_V2_URL = process.env.NEXT_PUBLIC_ANALYZER_V2_URL || 'https://analyzer-v2.onrender.com';
+import { ANALYZER_V2_URL } from '@/lib/config';
 
 interface AnalysisObjective {
   objective_key: string;

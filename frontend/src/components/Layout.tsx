@@ -27,6 +27,7 @@ import {
   Network,
   Target,
   Map,
+  Activity,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -37,31 +38,56 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-const navigation: NavItem[] = [
-  { name: 'Engines', href: '/engines', icon: Cpu },
-  { name: 'Paradigms', href: '/paradigms', icon: Layers },
-  { name: 'Audiences', href: '/audiences', icon: UserCircle },
-  { name: 'Chains', href: '/chains', icon: Network },
-  { name: 'Pipelines', href: '/pipelines', icon: GitBranch },
-  { name: 'Workflows', href: '/workflows', icon: GitMerge },
-  { name: 'Objectives', href: '/objectives', icon: Target },
-  { name: 'Plans', href: '/plans', icon: Map },
-  { name: 'Implementations', href: '/implementations', icon: Workflow },
-  { name: 'Grids', href: '/grids', icon: LayoutGrid },
-  { name: 'Styles', href: '/styles', icon: Palette },
-  { name: 'Primitives', href: '/primitives', icon: Shapes },
-  { name: 'Display', href: '/display', icon: Brush },
-  { name: 'Functions', href: '/functions', icon: Zap },
-  { name: 'Stances', href: '/stances', icon: Compass },
-  { name: 'Views', href: '/views', icon: Eye },
-  { name: 'Renderers', href: '/renderers', icon: Monitor },
-  { name: 'Sub-Renderers', href: '/sub-renderers', icon: Component },
-  { name: 'Transformations', href: '/transformations', icon: Repeat },
-  { name: 'Operationalizations', href: '/operationalizations', icon: Combine },
-  { name: 'Rhetoric', href: '/rhetoric', icon: MessageSquareWarning },
-  { name: 'Consumers', href: '/consumers', icon: Users },
-  { name: 'Changes', href: '/changes', icon: History },
+interface NavGroup {
+  name: string;
+  items: NavItem[];
+}
+
+/**
+ * Sidebar groups. "Story" is the executive path (what we wanted → how we
+ * planned it → what actually ran); "Definitions" keeps the catalog pages in
+ * their historical order.
+ */
+const navigation: NavGroup[] = [
+  {
+    name: 'Story',
+    items: [
+      { name: 'Objectives', href: '/objectives', icon: Target },
+      { name: 'Plans', href: '/plans', icon: Map },
+      { name: 'Runs', href: '/jobs', icon: Activity },
+    ],
+  },
+  {
+    name: 'Definitions',
+    items: [
+      { name: 'Engines', href: '/engines', icon: Cpu },
+      { name: 'Paradigms', href: '/paradigms', icon: Layers },
+      { name: 'Audiences', href: '/audiences', icon: UserCircle },
+      { name: 'Chains', href: '/chains', icon: Network },
+      { name: 'Pipelines', href: '/pipelines', icon: GitBranch },
+      { name: 'Workflows', href: '/workflows', icon: GitMerge },
+      { name: 'Implementations', href: '/implementations', icon: Workflow },
+      { name: 'Grids', href: '/grids', icon: LayoutGrid },
+      { name: 'Styles', href: '/styles', icon: Palette },
+      { name: 'Primitives', href: '/primitives', icon: Shapes },
+      { name: 'Display', href: '/display', icon: Brush },
+      { name: 'Functions', href: '/functions', icon: Zap },
+      { name: 'Stances', href: '/stances', icon: Compass },
+      { name: 'Views', href: '/views', icon: Eye },
+      { name: 'Renderers', href: '/renderers', icon: Monitor },
+      { name: 'Sub-Renderers', href: '/sub-renderers', icon: Component },
+      { name: 'Transformations', href: '/transformations', icon: Repeat },
+      { name: 'Operationalizations', href: '/operationalizations', icon: Combine },
+      { name: 'Rhetoric', href: '/rhetoric', icon: MessageSquareWarning },
+      { name: 'Consumers', href: '/consumers', icon: Users },
+      { name: 'Changes', href: '/changes', icon: History },
+    ],
+  },
 ];
+
+function isActivePath(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
   const Icon = item.icon;
@@ -69,15 +95,41 @@ function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
     <Link
       href={item.href}
       className={clsx(
-        'flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors',
+        'flex items-center gap-3 px-3 py-1.5 text-[13px] rounded-sm transition-colors border-l-2',
         isActive
-          ? 'bg-primary-100 text-primary-700'
-          : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+          ? 'border-gold-500 bg-ink-800 text-paper'
+          : 'border-transparent text-ink-300 hover:bg-ink-800 hover:text-ink-100'
       )}
     >
-      <Icon className="h-5 w-5" />
+      <Icon className={clsx('h-4 w-4', isActive ? 'text-gold-500' : 'text-ink-400')} />
       {item.name}
     </Link>
+  );
+}
+
+function Brand() {
+  return (
+    <Link href="/" className="flex items-baseline gap-2">
+      <span className="font-display text-xl text-paper tracking-tight">The Analyst</span>
+      <span className="mono-label text-gold-500">Console</span>
+    </Link>
+  );
+}
+
+function SidebarNav({ pathname }: { pathname: string }) {
+  return (
+    <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto scrollbar-thin">
+      {navigation.map((group) => (
+        <div key={group.name}>
+          <div className="mono-label px-3 mb-1.5">{group.name}</div>
+          <div className="space-y-0.5">
+            {group.items.map((item) => (
+              <NavLink key={item.name} item={item} isActive={isActivePath(pathname, item.href)} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </nav>
   );
 }
 
@@ -90,7 +142,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-gray-600 bg-opacity-75 z-20 lg:hidden"
+          className="fixed inset-0 bg-ink-900 bg-opacity-70 z-20 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -98,57 +150,35 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile sidebar */}
       <div
         className={clsx(
-          'fixed inset-y-0 left-0 w-64 bg-white shadow-lg z-30 transform transition-transform lg:hidden',
+          'fixed inset-y-0 left-0 w-64 bg-ink-900 shadow-lg z-30 transform transition-transform lg:hidden flex flex-col',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex items-center justify-between h-16 px-4 border-b">
-          <Link href="/" className="text-xl font-bold text-gray-900">
-            Analyzer Mgmt
-          </Link>
+        <div className="flex items-center justify-between h-16 px-4 border-b border-ink-700">
+          <Brand />
           <button
             onClick={() => setSidebarOpen(false)}
-            className="p-2 text-gray-500 hover:text-gray-700"
+            className="p-2 text-ink-400 hover:text-paper"
+            aria-label="Close navigation"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
-        <nav className="p-4 space-y-1">
-          {navigation.map((item) => (
-            <NavLink
-              key={item.name}
-              item={item}
-              isActive={router.pathname.startsWith(item.href)}
-            />
-          ))}
-        </nav>
+        <SidebarNav pathname={router.pathname} />
       </div>
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex flex-col flex-1 bg-white border-r">
-          <div className="flex items-center h-16 px-4 border-b">
-            <Link href="/" className="text-xl font-bold text-gray-900">
-              Analyzer Mgmt
-            </Link>
+        <div className="flex flex-col flex-1 bg-ink-900 border-r border-ink-700">
+          <div className="flex items-center h-16 px-5 border-b border-ink-700">
+            <Brand />
           </div>
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            {navigation.map((item) => (
-              <NavLink
-                key={item.name}
-                item={item}
-                isActive={router.pathname.startsWith(item.href)}
-              />
-            ))}
-          </nav>
-          <div className="p-4 border-t">
-            <Link
-              href="/settings"
-              className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100"
-            >
-              <Settings className="h-5 w-5" />
-              Settings
-            </Link>
+          <SidebarNav pathname={router.pathname} />
+          <div className="px-3 py-3 border-t border-ink-700">
+            <NavLink
+              item={{ name: 'Settings', href: '/settings', icon: Settings }}
+              isActive={isActivePath(router.pathname, '/settings')}
+            />
           </div>
         </div>
       </div>
@@ -156,16 +186,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Mobile header */}
-        <div className="sticky top-0 z-10 flex items-center h-16 px-4 bg-white border-b lg:hidden">
+        <div className="sticky top-0 z-10 flex items-center h-16 px-4 bg-ink-900 border-b border-ink-700 lg:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 -ml-2 text-gray-500 hover:text-gray-700"
+            className="p-2 -ml-2 text-ink-300 hover:text-paper"
+            aria-label="Open navigation"
           >
             <Menu className="h-6 w-6" />
           </button>
-          <Link href="/" className="ml-4 text-xl font-bold text-gray-900">
-            Analyzer Mgmt
-          </Link>
+          <div className="ml-4">
+            <Brand />
+          </div>
         </div>
 
         {/* Page content */}

@@ -101,6 +101,47 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   "The Analyst" editorial tokens — used by Layout, Runs (/jobs) and Run Console
+   (/jobs/[id]/console). Other pages keep the legacy gray/blue styling for now.
+   --------------------------------------------------------------------------- */
+@layer components {
+  .mono-label {
+    @apply font-mono text-[10px] uppercase tracking-[0.18em] text-ink-400;
+  }
+  .display-title {
+    @apply font-display font-normal tracking-tight text-ink-900;
+  }
+  .console-surface {
+    @apply bg-ink-900 text-ink-100;
+  }
+  .console-panel {
+    @apply rounded-md border border-ink-700 bg-ink-800;
+  }
+  .console-panel-light {
+    @apply rounded-md border border-ink-200 bg-white;
+  }
+  .pip {
+    @apply inline-block h-2 w-2 rounded-full flex-shrink-0;
+  }
+  .pip-pending { @apply bg-ink-300; }
+  .pip-running { @apply bg-gold-500; animation: pip-pulse 1.4s ease-in-out infinite; }
+  .pip-completed { @apply bg-emerald-600; }
+  .pip-failed { @apply bg-red-600; }
+  .pip-skipped { @apply bg-ink-200 ring-1 ring-ink-300; }
+  .excerpt {
+    @apply font-mono text-[12px] leading-relaxed whitespace-pre-wrap break-words;
+  }
+  .gold-rule {
+    @apply border-t border-gold-500/60;
+  }
+}
+
+@keyframes pip-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(194, 162, 74, 0.55); opacity: 1; }
+  50% { box-shadow: 0 0 0 5px rgba(194, 162, 74, 0); opacity: 0.75; }
+}
+
 /* Custom utility styles */
 @layer utilities {
   .scrollbar-thin {

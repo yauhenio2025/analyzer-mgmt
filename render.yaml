@@ -1,0 +1,41 @@
+# Render Blueprint for analyzer-mgmt — "The Analyst · Console".
+#
+# Two services in the CAII workspace:
+#   analyzer-mgmt-frontend  Next.js console (this repo, frontend/)
+#   analyzer-mgmt-api       legacy FastAPI mgmt-api (this repo, api/) — unchanged
+#
+# NEXT_PUBLIC_* variables are inlined into the JS bundle at build time, so a change
+# to NEXT_PUBLIC_ANALYZER_V2_URL requires a redeploy (Manual Deploy → Clear build cache & deploy).
+services:
+  - type: web
+    name: analyzer-mgmt-frontend
+    runtime: node
+    plan: starter
+    rootDir: .
+    buildCommand: cd frontend && npm install && npm run build
+    startCommand: cd frontend && npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: NEXT_PUBLIC_ANALYZER_V2_URL
+        # "The Analyst" backend (fork of analyzer-v2). Slug carries the Render suffix "-kcuc".
+        value: https://the-analyst-kcuc.onrender.com
+      - key: NEXT_PUBLIC_API_URL
+        value: https://analyzer-mgmt-api.onrender.com/api
+
+  - type: web
+    name: analyzer-mgmt-api
+    runtime: python
+    plan: starter
+    rootDir: api
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

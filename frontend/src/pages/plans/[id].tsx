@@ -41,7 +41,7 @@ import type {
   ExecutorJobSummary,
 } from '@/types';
 
-const ANALYZER_V2_URL = process.env.NEXT_PUBLIC_ANALYZER_V2_URL || 'https://analyzer-v2.onrender.com';
+import { ANALYZER_V2_URL } from '@/lib/config';
 
 type TabKey = 'summary' | 'jobs' | 'decision-trace' | 'phases' | 'raw';
 
@@ -820,7 +820,10 @@ function JobsTab({
     error,
   } = useQuery({
     queryKey: ['plan-jobs', planId],
-    queryFn: async () => (await api.executorJobs.list({ limit: 200, plan_id: planId })).jobs,
+    // analyzer-v2 `GET /v1/executor/jobs` ignores `plan_id` (accepts only status/limit/project_id),
+    // so filter client-side.
+    queryFn: async () =>
+      (await api.executorJobs.list({ limit: 200 })).jobs.filter((job) => job.plan_id === planId),
     enabled: active && !!planId,
   });
 
@@ -851,7 +854,7 @@ function JobsTab({
           Jobs
         </h2>
         <p className="text-sm text-gray-600">
-          Runtime presentation inspection is job-scoped. This tab lists executor jobs directly filtered to this plan.
+          Executor jobs created from this plan. Open the run console to watch each step feed the next; the runtime inspector shows how the result is presented.
         </p>
       </div>
 
@@ -900,12 +903,20 @@ function JobsTab({
                     <p className="mt-2 text-sm text-gray-600">{job.progress.detail}</p>
                   )}
                 </div>
-                <Link
-                  href={`/jobs/${job.job_id}`}
-                  className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700"
-                >
-                  Open runtime inspector
-                </Link>
+                <div className="flex flex-col items-end gap-1">
+                  <Link
+                    href={`/jobs/${job.job_id}/console`}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                  >
+                    Open run console
+                  </Link>
+                  <Link
+                    href={`/jobs/${job.job_id}`}
+                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    Runtime inspector
+                  </Link>
+                </div>
               </div>
             </div>
           ))}
