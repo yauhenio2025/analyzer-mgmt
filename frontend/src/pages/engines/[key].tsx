@@ -16,6 +16,9 @@ import {
   ChevronDown,
   ChevronUp,
   Settings2,
+  ExternalLink,
+  BookOpen,
+  ChevronRight,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import {
@@ -26,7 +29,7 @@ import {
   type PassHit,
   type PassesByDepth,
 } from '@/enginePasses';
-import type { Engine, EngineUpdate, StageContext, AudienceType, EngineProfile, CapabilityEngineDefinition, EngineOperationalization, ThinkerReference, TraditionEntry, KeyConceptEntry } from '@/types';
+import type { Engine, EngineUpdate, StageContext, AudienceType, EngineProfile, CapabilityEngineDefinition, EngineOperationalization, ThinkerReference, TraditionEntry, KeyConceptEntry, DoctrineFile } from '@/types';
 import clsx from 'clsx';
 import { StageContextEditor } from '@/components/StageContextEditor';
 import { EngineProfileEditor } from '@/components/EngineProfileEditor';
@@ -724,6 +727,53 @@ function HistoryEntryCard({ entry, isLatest }: {
   );
 }
 
+/** One mirrored doctrine file: header row + collapsible preformatted text. */
+function DoctrineFileBlock({ file }: { file: DoctrineFile }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+        <span className="font-mono text-sm font-medium text-gray-900">{file.name}</span>
+        <span className="font-mono text-xs text-gray-500">{file.chars.toLocaleString('en-US')} chars</span>
+        <span className="font-mono text-xs text-gray-400" title={file.sha256}>sha256 {file.sha256.slice(0, 8)}</span>
+        <span className="font-mono text-[11px] text-gray-400 truncate">{file.source_ref}</span>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="ml-auto inline-flex items-center text-xs font-medium text-primary-600 hover:text-primary-700"
+        >
+          {open ? 'Hide doctrine' : 'Show doctrine'}
+          {open ? <ChevronUp className="h-3.5 w-3.5 ml-1" /> : <ChevronDown className="h-3.5 w-3.5 ml-1" />}
+        </button>
+      </div>
+      {open && (
+        <pre className="p-4 max-h-[36rem] overflow-auto scrollbar-thin font-mono text-xs leading-relaxed text-gray-800 whitespace-pre-wrap break-words">
+          {file.text}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+const MIRRORED_TAB_LABELS: Partial<Record<TabId, string>> = {
+  lineage: 'intellectual lineage',
+  depth: 'depth levels',
+  dimensions: 'dimensions',
+  capabilities: 'capabilities',
+  composability: 'composability notes',
+};
+
+function MirroredEmptyState({ what, organName }: { what: string; organName: string }) {
+  return (
+    <div className="card p-8 text-center">
+      <BookOpen className="h-8 w-8 mx-auto text-gray-300 mb-3" />
+      <p className="text-gray-700 font-medium">No {what} in the registry for this method</p>
+      <p className="text-sm text-gray-500 mt-1">
+        The doctrine lives in {organName}; the registry mirrors it. See the Doctrine section above.
+      </p>
+    </div>
+  );
+}
+
 export default function EngineDetailPage() {
   const router = useRouter();
   const { key } = router.query;
@@ -820,13 +870,13 @@ export default function EngineDetailPage() {
   }, [profileData, localProfile]);
 
   // Query for composed prompts (preview tab)
-  const { data: extractionPreview } = useQuery({
+  const { data: extractionPreview, isError: extractionError } = useQuery({
     queryKey: ['engines', legacyEngineKey, 'extraction-prompt', previewAudience],
     queryFn: () => api.engines.getPrompt(legacyEngineKey as string, 'extraction', previewAudience),
     enabled: !!legacyEngineKey && activeTab === 'preview' && !!engine?.stage_context,
   });
 
-  const { data: curationPreview } = useQuery({
+  const { data: curationPreview, isError: curationError } = useQuery({
     queryKey: ['engines', legacyEngineKey, 'curation-prompt', previewAudience],
     queryFn: () => api.engines.getPrompt(legacyEngineKey as string, 'curation', previewAudience),
     enabled: !!legacyEngineKey && activeTab === 'preview' && !!engine?.stage_context,
@@ -856,6 +906,21 @@ export default function EngineDetailPage() {
       }
     },
     enabled: !!legacyEngineKey && activeTab === 'history' && !capabilityDef,
+  });
+
+  // Estate provenance: mirrored/planned engines live in another organ
+  const isMirrored = engine?.sync === 'mirrored' || engine?.sync === 'planned';
+  const { data: organsList } = useQuery({
+    queryKey: ['organs'],
+    queryFn: () => api.organs.list(),
+    enabled: !!engine?.home_organ,
+  });
+  const homeOrgan = organsList?.find((o) => o.organ_key === engine?.home_organ);
+  const homeOrganName = homeOrgan?.organ_name ?? engine?.home_organ ?? 'its home organ';
+  const { data: doctrine, isLoading: doctrineLoading, isError: doctrineError } = useQuery({
+    queryKey: ['engines', legacyEngineKey, 'doctrine'],
+    queryFn: () => api.engines.getDoctrine(legacyEngineKey as string),
+    enabled: !!legacyEngineKey && isMirrored,
   });
 
   const updateMutation = useMutation({
@@ -916,6 +981,9 @@ export default function EngineDetailPage() {
   }, [activeTab, localProfile, localEngine, updateMutation, saveProfileMutation]);
 
   const displayEngine = localEngine || engine;
+  // Mirrored engines carry an empty `{}` schema; treat that as "no schema".
+  const hasSchema =
+    !!displayEngine?.canonical_schema && Object.keys(displayEngine.canonical_schema).length > 0;
   const displayIdentity = capabilityDef
     ? {
         engine_name: capabilityDef.engine_name,
@@ -991,6 +1059,73 @@ export default function EngineDetailPage() {
         </div>
       </div>
 
+      {/* Mirrored / planned: the method lives in another organ */}
+      {isMirrored && engine && (
+        <div className="rounded-lg border border-gold-300 bg-gold-100/40 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm text-gray-900">
+                <span className="font-semibold">This method lives in {homeOrganName}.</span>{' '}
+                {engine.sync === 'planned'
+                  ? 'It is declared here but not yet running anywhere.'
+                  : 'The registry mirrors its doctrine; the source is still in its repo.'}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <span className={clsx('badge text-[10px] py-0', engine.sync === 'planned' ? 'border border-dashed border-gray-400 text-gray-600' : 'bg-white text-gray-700 border border-gray-300')}>
+                  {engine.sync}
+                </span>
+                {engine.family && <span className="badge badge-gray text-[10px] py-0 capitalize">{engine.family}</span>}
+                {engine.registry_status && <span className="badge badge-gray text-[10px] py-0">{engine.registry_status}</span>}
+                {engine.home_organ && (
+                  <Link href={`/organs/${engine.home_organ}`} className="inline-flex items-center text-primary-600 hover:underline">
+                    About {homeOrganName}
+                    <ChevronRight className="h-3 w-3" />
+                  </Link>
+                )}
+              </div>
+              {(engine.lineage_refs?.length ?? 0) > 0 && (
+                <ul className="mt-3 space-y-0.5">
+                  {engine.lineage_refs!.map((ref) => (
+                    <li key={ref} className="font-mono text-xs text-gray-700">{ref}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {engine.runs_at && (
+              <a href={engine.runs_at} target="_blank" rel="noreferrer" className="btn-secondary text-sm flex-shrink-0">
+                <ExternalLink className="h-4 w-4 mr-1.5" />
+                Open in {homeOrganName}
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isMirrored && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-gold-600" />
+            <h2 className="text-lg font-semibold text-gray-900">Doctrine</h2>
+            {doctrine && doctrine.files.length > 0 && (
+              <span className="badge badge-gray">{doctrine.files.length} file{doctrine.files.length === 1 ? '' : 's'}</span>
+            )}
+          </div>
+          {doctrineLoading && <div className="card p-4 text-sm text-gray-400 animate-pulse">Loading doctrine…</div>}
+          {doctrineError && <div className="card p-4 text-sm text-red-600">Failed to load the doctrine from the registry</div>}
+          {doctrine && doctrine.files.length > 0 && doctrine.files.map((file) => (
+            <DoctrineFileBlock key={file.source_ref || file.name} file={file} />
+          ))}
+          {doctrine && doctrine.files.length === 0 && (
+            <div className="card p-4 text-sm text-gray-500">
+              {doctrine.note || `No doctrine text mirrored yet; it stays in ${homeOrganName}.`}
+            </div>
+          )}
+          {!doctrineLoading && !doctrineError && doctrine === null && (
+            <div className="card p-4 text-sm text-gray-500">No doctrine endpoint for this method yet.</div>
+          )}
+        </div>
+      )}
+
       {/* Description */}
       <div className="card p-4">
         <p className="text-gray-700">{displayIdentity.description}</p>
@@ -1031,6 +1166,15 @@ export default function EngineDetailPage() {
             <>
               {/* ── Legacy engine tabs ── */}
               <Tab id="about" label="About" active={activeTab === 'about'} onClick={() => setActiveTab('about')} />
+              {isMirrored && (
+                <>
+                  <Tab id="lineage" label="Lineage" active={activeTab === 'lineage'} onClick={() => setActiveTab('lineage')} />
+                  <Tab id="depth" label="Depth" active={activeTab === 'depth'} onClick={() => setActiveTab('depth')} />
+                  <Tab id="dimensions" label="Dimensions" active={activeTab === 'dimensions'} onClick={() => setActiveTab('dimensions')} />
+                  <Tab id="capabilities" label="Capabilities" active={activeTab === 'capabilities'} onClick={() => setActiveTab('capabilities')} />
+                  <Tab id="composability" label="Composability" active={activeTab === 'composability'} onClick={() => setActiveTab('composability')} />
+                </>
+              )}
               {displayEngine?.stage_context && (
                 <>
                   <Tab id="context" label="Stage Context" active={activeTab === 'context'} onClick={() => setActiveTab('context')} />
@@ -1046,6 +1190,11 @@ export default function EngineDetailPage() {
       </div>
 
       {/* Tab Content */}
+
+      {/* Capability-style tabs on a mirrored engine: graceful empty state */}
+      {!capabilityDef && MIRRORED_TAB_LABELS[activeTab] && (
+        <MirroredEmptyState what={MIRRORED_TAB_LABELS[activeTab] as string} organName={homeOrganName} />
+      )}
 
       {/* About Tab (legacy engines only — capability engines use the block below) */}
       {activeTab === 'about' && !capabilityDef && (
@@ -1567,6 +1716,11 @@ export default function EngineDetailPage() {
                 </span>
               )}
             </div>
+            {extractionError ? (
+              <div className="px-4 py-10 text-center text-sm text-gray-500">
+                No composed prompt: the doctrine is in the home organ
+              </div>
+            ) : (
             <div className="h-96">
               <MonacoEditor
                 height="100%"
@@ -1583,6 +1737,7 @@ export default function EngineDetailPage() {
                 theme="vs-light"
               />
             </div>
+            )}
           </div>
 
           {/* Curation Preview */}
@@ -1595,6 +1750,11 @@ export default function EngineDetailPage() {
                 </span>
               )}
             </div>
+            {curationError ? (
+              <div className="px-4 py-10 text-center text-sm text-gray-500">
+                No composed prompt: the doctrine is in the home organ
+              </div>
+            ) : (
             <div className="h-96">
               <MonacoEditor
                 height="100%"
@@ -1611,11 +1771,12 @@ export default function EngineDetailPage() {
                 theme="vs-light"
               />
             </div>
+            )}
           </div>
         </div>
       )}
 
-      {activeTab === 'schema' && displayEngine?.canonical_schema && (
+      {activeTab === 'schema' && hasSchema && displayEngine?.canonical_schema && (
         <div>
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-lg font-medium text-gray-900">Canonical Schema</h3>
@@ -1625,6 +1786,14 @@ export default function EngineDetailPage() {
             </button>
           </div>
           <SchemaViewer schema={displayEngine.canonical_schema} />
+        </div>
+      )}
+
+      {activeTab === 'schema' && !hasSchema && (
+        <div className="card p-8 text-center text-gray-500">
+          {isMirrored
+            ? `No canonical schema in the registry: the output shape of this method is defined in ${homeOrganName}.`
+            : 'No canonical schema recorded for this engine.'}
         </div>
       )}
 
