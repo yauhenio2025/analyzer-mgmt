@@ -124,7 +124,7 @@ function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
 function Brand() {
   return (
     <Link href="/" className="flex items-baseline gap-2">
-      <span className="font-display text-xl text-paper tracking-tight">The Master</span>
+      <span className="font-display text-xl text-paper tracking-tight">The Mastermind</span>
       <span className="mono-label text-gold-500 whitespace-nowrap">Method Registry</span>
     </Link>
   );
@@ -154,7 +154,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <Head>
-        <title>The Master</title>
+        <title>The Mastermind</title>
       </Head>
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (

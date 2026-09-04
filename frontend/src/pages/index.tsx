@@ -108,7 +108,7 @@ export default function MapPage() {
       {/* Hero */}
       <div className="rounded-xl bg-ink-900 border border-ink-700 px-8 py-10 text-paper">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="font-display text-4xl tracking-tight text-paper">The Master</span>
+          <span className="font-display text-4xl tracking-tight text-paper">The Mastermind</span>
           <span className="mono-label text-gold-500">Method Registry</span>
         </div>
         <p className="mt-4 max-w-3xl text-lg text-ink-100 leading-snug">
