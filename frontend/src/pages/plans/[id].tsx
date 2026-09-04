@@ -236,7 +236,7 @@ function SummaryTab({ plan }: { plan: PlanDetail }) {
             <p className="text-xs text-gray-500 mt-1">LLM Calls</p>
           </div>
           <div className="text-center p-3 bg-gray-50 rounded-lg">
-            <p className="text-2xl font-bold text-emerald-600">${plan.estimated_total_cost_usd.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-emerald-600">${(Number(plan.estimated_total_cost_usd) || 0).toFixed(2)}</p>
             <p className="text-xs text-gray-500 mt-1">Est. Cost</p>
           </div>
           <div className="text-center p-3 bg-gray-50 rounded-lg">
@@ -786,7 +786,7 @@ function PhaseCard({ phase }: { phase: PlanPhaseSpec }) {
         </span>
         <span className="inline-flex items-center gap-1">
           <DollarSign className="h-3 w-3" />
-          ${phase.estimated_cost_usd.toFixed(3)}
+          ${(Number(phase.estimated_cost_usd) || 0).toFixed(3)}
         </span>
       </div>
     </div>

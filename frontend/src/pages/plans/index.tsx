@@ -61,7 +61,7 @@ function PlanCard({ plan }: { plan: PlanSummary }) {
             {/* Cost estimate */}
             <span className="inline-flex items-center gap-1 text-xs text-gray-500">
               <DollarSign className="h-3.5 w-3.5" />
-              ${plan.estimated_total_cost_usd.toFixed(2)}
+              ${(Number(plan.estimated_total_cost_usd) || 0).toFixed(2)}
             </span>
 
             {/* Depth profile */}
