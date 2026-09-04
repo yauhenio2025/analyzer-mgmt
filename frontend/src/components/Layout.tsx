@@ -123,8 +123,8 @@ function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
 
 function Brand() {
   return (
-    <Link href="/" className="flex items-baseline gap-2">
-      <span className="font-display text-xl text-paper tracking-tight">The Mastermind</span>
+    <Link href="/" className="flex flex-col gap-0.5">
+      <span className="font-display text-xl text-paper tracking-tight whitespace-nowrap">The Mastermind</span>
       <span className="mono-label text-gold-500 whitespace-nowrap">Method Registry</span>
     </Link>
   );
