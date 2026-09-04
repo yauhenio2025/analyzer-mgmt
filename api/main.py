@@ -50,6 +50,7 @@ app.add_middleware(
         "http://localhost:3002",
         "https://analyzer-mgmt.onrender.com",
         "https://analyzer-mgmt-frontend.onrender.com",
+        "https://the-mastermind.onrender.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
